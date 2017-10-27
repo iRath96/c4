@@ -6,7 +6,7 @@
 //  Copyright © 2017 Alexander Rath. All rights reserved.
 //
 
-#include "Lexer.hpp"
+#include "Lexer.h"
 
 bool is_whitespace(char c) {
     return c == ' ' || c == '\t' || c == '\n';

@@ -8,7 +8,7 @@
 
 #include <iostream>
 #include <fstream>
-#include "lexer/Lexer.hpp"
+#include "Lexer.h"
 
 std::string token_type_name(TokenType type) {
     switch (type) {
