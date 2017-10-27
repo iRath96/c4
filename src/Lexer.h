@@ -14,8 +14,8 @@
 #include <map>
 
 struct TextPosition {
-    int line;
-    int column;
+    int index, length;
+    int line, column;
 };
 
 enum TokenType {
@@ -35,6 +35,18 @@ struct LexerInput {
     int length;
 };
 
+class LexerError {
+public:
+    TextPosition pos;
+    std::string message;
+    
+    LexerError(const std::string &message, TextPosition pos, int length) {
+        this->message = message;
+        this->pos = pos;
+        this->pos.length = length;
+    }
+};
+
 class Lexer {
 public:
     Lexer(LexerInput input) : input(input) {
@@ -43,13 +55,11 @@ public:
 protected:
     LexerInput input;
     
-    int index;
-    
-    TextPosition pos = { .line = 1, .column = 1 };
+    TextPosition pos = { .index = 0, .line = 1, .column = 1, .length = 0 };
     
     std::string consume(int length) {
-        const char *buffer = input.data + index;
-        index += length;
+        const char *buffer = input.data + pos.index;
+        pos.index += length;
         
         for (int i = 0; i < length; ++i) {
             // update position
@@ -68,11 +78,11 @@ protected:
         if (eof(offset))
             return 0;
         
-        return input.data[index + offset];
+        return input.data[pos.index + offset];
     }
     
     bool eof(int offset) {
-        return index + offset >= input.length;
+        return pos.index + offset >= input.length;
     }
     
 public:
@@ -80,6 +90,7 @@ public:
     
 protected:
     Token create_token(TokenType type, int length);
+    void error(const std::string &message, int offset);
     
     int read_whitespace();
     int read_comment();

@@ -39,16 +39,26 @@ void tokenize(std::string filename) {
     
     Lexer lexer(input);
     while (true) {
-        Token t = lexer.next_token();
-        
-        if (t.type == TokenType::END)
-            break;
-        
-        std::cout << filename << ":"
-            << t.pos.line << ":" << t.pos.column << ": "
-            << token_type_name(t.type) << " "
-            << t.text
-            << std::endl;
+        try {
+            Token t = lexer.next_token();
+            
+            if (t.type == TokenType::END)
+                break;
+            
+            std::cout << filename << ":"
+                << t.pos.line << ":" << t.pos.column << ": "
+                << token_type_name(t.type) << " "
+                << t.text
+                << std::endl;
+        } catch (LexerError e) {
+            std::cout << filename << ":"
+                << e.pos.line << ":" << e.pos.column << ": "
+                << "error: "
+                << e.message
+                << std::endl;
+            
+            exit(1);
+        }
     }
     
     free(buffer);

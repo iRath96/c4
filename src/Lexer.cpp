@@ -58,6 +58,8 @@ Token Lexer::create_token(TokenType type, int length) {
     Token token;
     
     token.pos = pos;
+    token.pos.length = length;
+    
     token.type = type;
     token.text = consume(length);
     
@@ -105,8 +107,8 @@ int Lexer::read_string() {
         i += c == '\\' ? 2 : 1;
     }
     
-    printf("EOF encountered while reading string\n");
-    exit(1);
+    error("EOF encountered while reading string", i);
+    return 0;
 }
 
 int Lexer::read_char() {
@@ -117,15 +119,11 @@ int Lexer::read_char() {
     int i = 1;
     i += peek(i) == '\\' ? 2 : 1;
     
-    if (eof(i)) {
-        printf("EOF encountered while reading character constant\n");
-        exit(1);
-    }
+    if (eof(i))
+        error("EOF encountered while reading character constant", i);
     
-    if (peek(i) != '\'') {
-        printf("Character constant too long\n");
-        exit(1);
-    }
+    if (peek(i) != '\'')
+        error("Character constant too long", i);
     
     return i + 1;
 }
@@ -143,8 +141,8 @@ int Lexer::read_comment() {
         ++i;
     }
     
-    printf("EOF encountered while reading comment\n");
-    exit(1);
+    error("EOF encountered while reading comment", i);
+    return 0;
 }
 
 int Lexer::read_punctuator() {
@@ -200,4 +198,8 @@ int Lexer::read_constant() {
     while (is_num(peek(i)))
         ++i;
     return i;
+}
+
+void Lexer::error(const std::string &message, int offset) {
+    throw LexerError(message, pos, offset);
 }
