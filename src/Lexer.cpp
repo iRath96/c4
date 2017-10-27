@@ -40,7 +40,7 @@ Token Lexer::next_token() {
         }
         else if ((length = read_punctuator()))
             return create_token(TokenType::PUNCTUATOR, length);
-        else if ((length = read_string()))
+        else if ((length = read_string()) || (length = read_char()))
             return create_token(TokenType::STRING_LITERAL, length);
         else if ((length = read_identifier()))
             return create_token(TokenType::IDENTIFIER, length);
@@ -106,7 +106,28 @@ int Lexer::read_string() {
     }
     
     printf("EOF encountered while reading string\n");
-    return 0;
+    exit(1);
+}
+
+int Lexer::read_char() {
+    if (peek(0) != '\'')
+        // not a character
+        return 0;
+    
+    int i = 1;
+    i += peek(i) == '\\' ? 2 : 1;
+    
+    if (eof(i)) {
+        printf("EOF encountered while reading character constant\n");
+        exit(1);
+    }
+    
+    if (peek(i) != '\'') {
+        printf("Character constant too long\n");
+        exit(1);
+    }
+    
+    return i + 1;
 }
 
 int Lexer::read_comment() {
@@ -123,7 +144,7 @@ int Lexer::read_comment() {
     }
     
     printf("EOF encountered while reading comment\n");
-    return 0;
+    exit(1);
 }
 
 int Lexer::read_punctuator() {

@@ -87,6 +87,7 @@ protected:
     int read_punctuator();
     int read_identifier();
     int read_string();
+    int read_char();
     int read_constant();
 };
 
