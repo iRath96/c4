@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <map>
 
 struct TextPosition {
     int line;
@@ -29,23 +30,25 @@ struct Token {
     std::string text;
 };
 
+struct LexerInput {
+    const char *data;
+    int length;
+};
+
 class Lexer {
 public:
-    Lexer(std::istream *input) : input(input) {
+    Lexer(LexerInput input) : input(input) {
     }
     
 protected:
-    std::istream *input;
+    LexerInput input;
+    
     int index;
     
     TextPosition pos = { .line = 1, .column = 1 };
     
     std::string consume(int length) {
-        input->seekg(index, input->beg);
-        
-        char buffer[length];
-        
-        input->read(buffer, length);
+        const char *buffer = input.data + index;
         index += length;
         
         for (int i = 0; i < length; ++i) {
@@ -62,13 +65,14 @@ protected:
     }
     
     char peek(int offset) {
-        input->clear(); // clear state flaags
-        input->seekg(index + offset, input->beg);
-        return input->peek();
+        if (eof(offset))
+            return 0;
+        
+        return input.data[index + offset];
     }
     
-    bool eof() {
-        return input->eof();
+    bool eof(int offset) {
+        return index + offset >= input.length;
     }
     
 public:

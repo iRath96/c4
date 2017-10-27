@@ -31,7 +31,7 @@ bool is_alphanum(char c) {
 Token Lexer::next_token() {
     peek(0); // make sure eof flag is set appropriately
     
-    while (!eof()) {
+    while (!eof(0)) {
         int length = 0;
         if ((length = read_whitespace()) || (length = read_comment())) {
             // skip whitespace and comments
@@ -98,7 +98,7 @@ int Lexer::read_string() {
         return 0;
     
     int i = 1;
-    while (!eof()) {
+    while (!eof(i)) {
         char c = peek(i);
         if (c == '"')
             return i + 1;
@@ -115,7 +115,7 @@ int Lexer::read_comment() {
         return 0;
     
     int i = 2;
-    while (!eof()) {
+    while (!eof(i + 1)) {
         if (peek(i) == '*' && peek(i + 1) == '/')
             return i + 2;
         
@@ -163,7 +163,7 @@ int Lexer::read_identifier() {
         return 0;
     
     int i = 1;
-    while (!eof()) {
+    while (!eof(i)) {
         char c = peek(i);
         if (!is_alphanum(c) && c != '_')
             return i;

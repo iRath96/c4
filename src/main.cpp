@@ -22,18 +22,27 @@ std::string token_type_name(TokenType type) {
 }
 
 void tokenize(std::string filename) {
-    std::ifstream file(filename);
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
         std::cout << "Could not open " << filename << " for reading." << std::endl;
         exit(1);
     }
     
-    Lexer lexer(&file);
+    LexerInput input;
+    input.length = (int)file.tellg();
+    
+    char *buffer = (char *)malloc(input.length);
+    file.seekg(0, file.beg);
+    file.read(buffer, input.length);
+    
+    input.data = buffer;
+    
+    Lexer lexer(input);
     while (true) {
         Token t = lexer.next_token();
         
         if (t.type == TokenType::END)
-            return;
+            break;
         
         std::cout << filename << ":"
             << t.pos.line << ":" << t.pos.column << ": "
@@ -41,6 +50,8 @@ void tokenize(std::string filename) {
             << t.text
             << std::endl;
     }
+    
+    free(buffer);
 }
 
 int main(int argc, const char *argv[]) {
