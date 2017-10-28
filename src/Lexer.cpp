@@ -48,7 +48,7 @@ Token Lexer::next_token() {
             return create_token(TokenType::CONSTANT, length);
         
         // no token was found
-        exit(1);
+        error("unrecognized character", 0);
     }
     
     return create_token(TokenType::END, 0);
@@ -159,7 +159,10 @@ int Lexer::read_punctuator() {
         && d == c)
         return 2;
     
-    if ((c == '*' || c == '/' || c == '%' || c == '+' || c == '-' || c == '&' || c == '^' || c == '|')
+    if ((c == '*' || c == '/' || c == '%' || c == '+' || c == '-' // arithmetic assignments
+         || c == '&' || c == '^' || c == '|' // bitwise assignments
+         || c == '!' || c == '=' || c == '>' || c == '<' // comparison operators
+         )
         && d == '=')
         return 2;
     
@@ -170,8 +173,8 @@ int Lexer::read_punctuator() {
     if (c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}') return 1;
     if (c == '#' || c == ',' || c == '=' || c == '?' || c == ':' || c == ';') return 1;
     if (c == '-' || c == '+' || c == '*' || c == '/' || c == '%') return 1;
-    if (c == '~' || c == '&' || c == '|' || c == '^' || c == '.') return 1;
-    if (c == ',') return 1;
+    if (c == '~' || c == '&' || c == '|' || c == '^' || c == '!') return 1;
+    if (c == '.') return 1;
     
     return 0;
 }
