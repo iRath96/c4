@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <string.h>
 #include "Lexer.h"
 
 std::string token_type_name(TokenType type) {
@@ -19,6 +20,7 @@ std::string token_type_name(TokenType type) {
         case TokenType::PUNCTUATOR: return "punctuator";
         case TokenType::END: return "end";
     }
+    return "unknown";
 }
 
 void tokenize(std::string filename) {

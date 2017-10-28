@@ -80,7 +80,7 @@ Token Lexer::create_token(TokenType type, int length) {
         K("float")      K("switch")     K("_Static_assert")
         K("for")        K("typedef")    K("_Thread_local")
         K("goto")       K("union")
-        ;
+        {}
 #undef K
     }
     

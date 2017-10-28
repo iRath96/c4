@@ -14,8 +14,11 @@
 #include <map>
 
 struct TextPosition {
-    int index, length;
-    int line, column;
+    int index = 0;
+    int length = 0;
+    
+    int line = 1;
+    int column = 1;
 };
 
 enum TokenType {
@@ -55,7 +58,7 @@ public:
 protected:
     LexerInput input;
     
-    TextPosition pos = { .index = 0, .line = 1, .column = 1, .length = 0 };
+    TextPosition pos;
     
     std::string consume(int length) {
         const char *buffer = input.data + pos.index;
