@@ -100,8 +100,11 @@ protected:
     
     int read_punctuator();
     int read_identifier();
+    
+    int read_escape_seq(int);
     int read_string();
     int read_char();
+    
     int read_constant();
 };
 

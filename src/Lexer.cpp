@@ -20,12 +20,20 @@ bool is_nondigit(char c) {
     return is_alpha(c) || c == '_';
 }
 
-bool is_num(char c) {
+bool is_octal(char c) {
+    return c >= '0' && c <= '7';
+}
+
+bool is_decimal(char c) {
     return c >= '0' && c <= '9';
 }
 
+bool is_hexadecimal(char c) {
+    return is_decimal(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
 bool is_alphanum(char c) {
-    return is_alpha(c) || is_num(c);
+    return is_alpha(c) || is_decimal(c);
 }
 
 Token Lexer::next_token() {
@@ -104,11 +112,38 @@ int Lexer::read_string() {
         char c = peek(i);
         if (c == '"')
             return i + 1;
-        i += c == '\\' ? 2 : 1;
+        i = read_escape_seq(i);
     }
     
     error("EOF encountered while reading string", i);
     return 0;
+}
+
+int Lexer::read_escape_seq(int i) {
+    if (peek(i++) != '\\')
+        // ordinary character of length 1
+        return i;
+    
+    char c = peek(i++);
+    if (c == '\'' || c == '"' || c == '?' || c == '\\')
+        return i;
+    
+    if (is_octal(c)) {
+        // octal escape sequence
+        while (i <= 4 && is_octal(peek(++i)));
+        return i;
+    }
+    
+    if (c == 'x') {
+        if (!is_hexadecimal(peek(i)))
+            error("hexadecimal escape sequence expected", i);
+        
+        while (is_hexadecimal(peek(++i)));
+        return i;
+    }
+    
+    error("invalid escape sequence", i);
+    return i;
 }
 
 int Lexer::read_char() {
@@ -116,8 +151,7 @@ int Lexer::read_char() {
         // not a character
         return 0;
     
-    int i = 1;
-    i += peek(i) == '\\' ? 2 : 1;
+    int i = read_escape_seq(1);
     
     if (eof(i))
         error("EOF encountered while reading character constant", i);
@@ -204,7 +238,7 @@ int Lexer::read_identifier() {
 
 int Lexer::read_constant() {
     int i = 0;
-    while (is_num(peek(i)))
+    while (is_decimal(peek(i)))
         ++i;
     return i;
 }
