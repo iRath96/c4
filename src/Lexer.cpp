@@ -170,7 +170,7 @@ int Lexer::read_punctuator() {
     if (c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}') return 1;
     if (c == '#' || c == ',' || c == '=' || c == '?' || c == ':' || c == ';') return 1;
     if (c == '-' || c == '+' || c == '*' || c == '/' || c == '%') return 1;
-    if (c == '~' || c == '&' || c == '|' || c == '^') return 1;
+    if (c == '~' || c == '&' || c == '|' || c == '^' || c == '.') return 1;
     if (c == ',') return 1;
     
     return 0;
