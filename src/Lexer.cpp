@@ -148,33 +148,39 @@ int Lexer::read_comment() {
 int Lexer::read_punctuator() {
     char c = peek(0), d = peek(1);
     
+    // punctuators of length 4
+    
     if (c == '%' && d == ':' && peek(2) == '%' && peek(3) == ':')
         return 4;
     
+    // punctuators of length 3
+    
     if (c == '.' && d == '.' && peek(2) == '.')
         return 3;
+    
+    // punctuators of length 2
+    bool is_bitwise = c == '&' || c == '|' || c == '^' || c == '!'; // not ~, because there is no ~=
+    bool is_arithmetic = c == '*' || c == '/' || c == '%' || c == '+' || c == '-';
+    bool is_comparison = c == '<' || c == '>';
     
     if (c == '-' && d == '>') return 2;
     if ((c == '+' || c == '-' || c == '&' || c == '|' || c == '<' || c == '>' || c == '#')
         && d == c)
         return 2;
     
-    if ((c == '*' || c == '/' || c == '%' || c == '+' || c == '-' // arithmetic assignments
-         || c == '&' || c == '^' || c == '|' // bitwise assignments
-         || c == '!' || c == '=' || c == '>' || c == '<' // comparison operators
-         )
-        && d == '=')
+    if ((is_arithmetic || is_bitwise || is_comparison || c == '=') && d == '=')
         return 2;
     
     if (c == '<' && (d == ':' || d == '%')) return 2;
     if ((c == ':' || c == '%') && d == '>') return 2;
     if (c == '%' && d == ':') return 2;
     
-    if (c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}') return 1;
-    if (c == '#' || c == ',' || c == '=' || c == '?' || c == ':' || c == ';') return 1;
-    if (c == '-' || c == '+' || c == '*' || c == '/' || c == '%') return 1;
-    if (c == '~' || c == '&' || c == '|' || c == '^' || c == '!') return 1;
-    if (c == '.') return 1;
+    // punctuators of length 1
+    
+    if (c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}') return 1; // brackets
+    if (c == '#' || c == ',' || c == '=' || c == '?' || c == ':' || c == ';') return 1; // weird stuff
+    if (is_arithmetic || is_bitwise || is_comparison || c == '~') return 1;
+    if (c == '.') return 1; // subscript
     
     return 0;
 }
