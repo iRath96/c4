@@ -1,0 +1,8 @@
+test:
+  image: oszi/buildpack:latest
+  stage: test
+  script:
+    - make
+    - ./build/debug/c4 --tokenize tests/lexer/all_chars.c
+  only:
+    - branches
