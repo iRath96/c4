@@ -9,9 +9,9 @@
 #ifndef Lexer_hpp
 #define Lexer_hpp
 
-#include <iostream>
-#include <sstream>
-#include <map>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct TextPosition {
     int index = 0;
