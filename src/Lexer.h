@@ -48,8 +48,8 @@ struct LexerInput {
 
 class LexerError {
 public:
-    TextPosition start_pos, end_pos;
     std::string message;
+    TextPosition start_pos, end_pos;
     
     LexerError(const std::string &message, TextPosition start_pos, TextPosition end_pos)
     : message(message), start_pos(start_pos), end_pos(end_pos) {
