@@ -51,7 +51,7 @@ Token Lexer::next_token() {
 }
 
 Token Lexer::create_token(TokenType type, int length) {
-    Token token(input.data, length);
+    Token token(input.data + pos.index, length);
     token.pos = pos;
     token.type = type;
     
