@@ -9,6 +9,8 @@
 #ifndef Lexer_hpp
 #define Lexer_hpp
 
+#include <string>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
