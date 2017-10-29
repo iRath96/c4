@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "Lexer.h"
 
-std::string token_type_name(TokenType type) {
+const char *token_type_name(TokenType type) {
     switch (type) {
         case TokenType::KEYWORD: return "keyword";
         case TokenType::IDENTIFIER: return "identifier";
@@ -25,8 +25,8 @@ std::string token_type_name(TokenType type) {
     return "unknown";
 }
 
-void tokenize(std::string filename) {
-    FILE *f = fopen(filename.c_str(), "rb");
+void tokenize(const char *filename) {
+    FILE *f = fopen(filename, "rb");
     if (!f) {
         std::cout << "Could not open " << filename << " for reading." << std::endl;
         exit(1);
@@ -52,18 +52,9 @@ void tokenize(std::string filename) {
             if (t.type == TokenType::END)
                 break;
             
-            std::cout << filename << ":"
-                << t.pos.line << ":" << t.pos.column << ": "
-                << token_type_name(t.type) << " "
-                << t.text
-                << std::endl;
+            printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
         } catch (LexerError e) {
-            std::cout << filename << ":"
-                << e.pos.line << ":" << e.pos.column << ": "
-                << "error: "
-                << e.message
-                << std::endl;
-            
+            printf("%s:%d:%d: error %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
             exit(1);
         }
     }

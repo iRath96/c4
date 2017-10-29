@@ -30,7 +30,17 @@ struct Token {
     TextPosition pos;
     
     TokenType type;
-    std::string text;
+    char *text;
+    
+    Token(const char *input, size_t length) {
+        text = (char *)malloc(length + 1);
+        memcpy(text, input, length);
+        text[length] = 0;
+    }
+    
+    ~Token() {
+        free(text);
+    }
 };
 
 struct LexerInput {
@@ -60,7 +70,7 @@ protected:
     
     TextPosition pos;
     
-    std::string consume(int length) {
+    void consume(int length) {
         const char *buffer = input.data + pos.index;
         pos.index += length;
         
@@ -73,8 +83,6 @@ protected:
                 ++pos.column;
             }
         }
-        
-        return std::string(buffer, length);
     }
     
     char peek(int offset) {

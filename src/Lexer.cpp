@@ -8,33 +8,21 @@
 
 #include "Lexer.h"
 
-bool is_whitespace(char c) {
-    return c == ' ' || c == '\t' || c == '\n';
-}
+bool is_whitespace[256] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-bool is_alpha(char c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-bool is_nondigit(char c) {
-    return is_alpha(c) || c == '_';
-}
+bool is_alpha[256] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 bool is_octal(char c) {
     return c >= '0' && c <= '7';
 }
 
-bool is_decimal(char c) {
-    return c >= '0' && c <= '9';
-}
+bool is_decimal[256] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 bool is_hexadecimal(char c) {
-    return is_decimal(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    return is_decimal[c] || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
 
-bool is_alphanum(char c) {
-    return is_alpha(c) || is_decimal(c);
-}
+bool is_alphanum[256] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 Token Lexer::next_token() {
     peek(0); // make sure eof flag is set appropriately
@@ -63,32 +51,38 @@ Token Lexer::next_token() {
 }
 
 Token Lexer::create_token(TokenType type, int length) {
-    Token token;
+    Token token(input.data, length);
     
     token.pos = pos;
     token.pos.length = length;
     
     token.type = type;
-    token.text = consume(length);
+    
+    consume(length);
     
     if (token.type == TokenType::IDENTIFIER) {
-#define K(x) if (token.text == x) token.type = TokenType::KEYWORD; else
-        K("auto")       K("if")         K("unsigned")
-        K("break")      K("inline")     K("void")
-        K("case")       K("int")        K("volatile")
-        K("char")       K("long")       K("while")
-        K("const")      K("register")   K("_Alignas")
-        K("continue")   K("restrict")   K("_Alignof")
-        K("default")    K("return")     K("_Atomic")
-        K("do")         K("short")      K("_Bool")
-        K("double")     K("signed")     K("_Complex")
-        K("else")       K("sizeof")     K("_Generic")
-        K("enum")       K("static")     K("_Imaginary")
-        K("extern")     K("struct")     K("_Noreturn")
-        K("float")      K("switch")     K("_Static_assert")
-        K("for")        K("typedef")    K("_Thread_local")
-        K("goto")       K("union")
-        {}
+#define K(x, y) if (length != y || !strcmp(token.text, x)) token.type = TokenType::KEYWORD; else
+        switch (token.text[0]) {
+            case 'a': K("auto", 4) {}; break;
+            case 'b': K("break", 5) {}; break;
+            case 'c': K("case", 4) K("char", 4) K("const", 5) K("continue", 8) {}; break;
+            case 'd': K("default", 7) K("do", 2) K("double", 6) {}; break;
+            case 'e': K("else", 4) K("enum", 4) K("extern", 6) {}; break;
+            case 'f': K("float", 5) K("for", 3) {}; break;
+            case 'g': K("goto", 4) {}; break;
+            case 'i': K("if", 2) K("inline", 6) K("int", 3) {}; break;
+            case 'l': K("long", 4) {}; break;
+            case 'r': K("register", 8) K("restrict", 8) K("return", 6) {}; break;
+            case 's': K("short", 5) K("signed", 6) K("sizeof", 6) K("static", 6) K("struct", 6) K("switch", 6) {}; break;
+            case 't': K("typedef", 7) {}; break;
+            case 'u': K("union", 5) K("unsigned", 8) {}; break;
+            case 'v': K("void", 4) K("volatile", 8) {}; break;
+            case 'w': K("while", 5) {}; break;
+            case '_':
+                K("_Alignas", 8) K("_Alignof", 8) K("_Atomic", 7) K("_Bool", 5) K("_Complex", 8)
+                K("_Generic", 8) K("Imaginary", 9) K("_Noreturn", 9) K("_Static_assert", 14) K("_Thread_local", 13)
+                {}; break;
+        }
 #undef K
     }
     
@@ -97,7 +91,7 @@ Token Lexer::create_token(TokenType type, int length) {
 
 int Lexer::read_whitespace() {
     int i = 0;
-    while (is_whitespace(peek(i)))
+    while (is_whitespace[peek(i)])
         ++i;
     return i;
 }
@@ -141,6 +135,9 @@ int Lexer::read_escape_seq(int i) {
         while (is_hexadecimal(peek(++i)));
         return i;
     }
+    
+    if (c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v')
+        return i;
     
     error("invalid escape sequence", i);
     return i;
@@ -220,14 +217,15 @@ int Lexer::read_punctuator() {
 }
 
 int Lexer::read_identifier() {
-    if (!is_nondigit(peek(0)))
+    char c = peek(0);
+    if (!is_alpha[c] && c != '_')
         // not an identifier
         return 0;
     
     int i = 1;
     while (!eof(i)) {
-        char c = peek(i);
-        if (!is_alphanum(c) && c != '_')
+        c = peek(i);
+        if (!is_alphanum[c] && c != '_')
             return i;
         
         ++i;
@@ -238,7 +236,7 @@ int Lexer::read_identifier() {
 
 int Lexer::read_constant() {
     int i = 0;
-    while (is_decimal(peek(i)))
+    while (is_decimal[peek(i)])
         ++i;
     return i;
 }
