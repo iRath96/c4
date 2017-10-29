@@ -9,6 +9,8 @@
 #include <iostream>
 #include <fstream>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "Lexer.h"
 
 std::string token_type_name(TokenType type) {
@@ -24,18 +26,21 @@ std::string token_type_name(TokenType type) {
 }
 
 void tokenize(std::string filename) {
-    std::ifstream file(filename, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
+    FILE *f = fopen(filename.c_str(), "rb");
+    if (!f) {
         std::cout << "Could not open " << filename << " for reading." << std::endl;
         exit(1);
     }
     
+    fseek(f, 0, SEEK_END);
+    
     LexerInput input;
-    input.length = (int)file.tellg();
+    input.length = (int)ftell(f);
     
     char *buffer = (char *)malloc(input.length);
-    file.seekg(0, file.beg);
-    file.read(buffer, input.length);
+    fseek(f, 0, SEEK_SET);
+    fread(buffer, input.length, 1, f);
+    fclose(f);
     
     input.data = buffer;
     
