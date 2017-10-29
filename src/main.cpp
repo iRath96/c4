@@ -45,18 +45,18 @@ void tokenize(const char *filename) {
     input.data = buffer;
     
     Lexer lexer(input);
-    while (true) {
-        try {
+    try {
+        while (true) {
             Token t = lexer.next_token();
-            
+        
             if (t.type == TokenType::END)
                 break;
-            
+        
             printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
-        } catch (LexerError e) {
-            printf("%s:%d:%d: error %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
-            exit(1);
         }
+    } catch (LexerError e) {
+        printf("%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
+        exit(1);
     }
     
     free(buffer);

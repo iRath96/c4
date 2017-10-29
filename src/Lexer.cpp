@@ -52,10 +52,7 @@ Token Lexer::next_token() {
 
 Token Lexer::create_token(TokenType type, int length) {
     Token token(input.data, length);
-    
     token.pos = pos;
-    token.pos.length = length;
-    
     token.type = type;
     
     consume(length);
@@ -139,8 +136,8 @@ int Lexer::read_escape_seq(int i) {
     if (c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v')
         return i;
     
-    error("invalid escape sequence", i);
-    return i;
+    error("invalid escape sequence", i - 1);
+    return 0;
 }
 
 int Lexer::read_char() {
@@ -242,5 +239,7 @@ int Lexer::read_constant() {
 }
 
 void Lexer::error(const std::string &message, int offset) {
-    throw LexerError(message, pos, offset);
+    TextPosition start_pos = pos;
+    consume(offset);
+    throw LexerError(message, start_pos, pos);
 }

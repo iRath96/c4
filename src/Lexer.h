@@ -15,8 +15,6 @@
 
 struct TextPosition {
     int index = 0;
-    int length = 0;
-    
     int line = 1;
     int column = 1;
 };
@@ -50,13 +48,12 @@ struct LexerInput {
 
 class LexerError {
 public:
-    TextPosition pos;
+    TextPosition start_pos, end_pos;
     std::string message;
     
-    LexerError(const std::string &message, TextPosition pos, int length) {
-        this->message = message;
-        this->pos = pos;
-        this->pos.length = length;
+    LexerError(const std::string &message, TextPosition start_pos, TextPosition end_pos)
+    : message(message), start_pos(start_pos), end_pos(end_pos) {
+        
     }
 };
 
