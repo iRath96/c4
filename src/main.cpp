@@ -55,7 +55,7 @@ void tokenize(const char *filename) {
             printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
         }
     } catch (LexerError e) {
-        printf("%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
+        fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
         exit(1);
     }
     
