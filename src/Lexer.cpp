@@ -171,9 +171,9 @@ int Lexer::read_comment() {
         return 0;
     
     int i = 2;
-    while (!eof(i + 1)) {
-        if (peek(i) == '*' && peek(i + 1) == '/')
-            return i + 2;
+    while (!eof(i)) {
+        if (peek(i - 1) == '*' && peek(i) == '/')
+            return i + 1;
         
         ++i;
     }
