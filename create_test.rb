@@ -16,7 +16,7 @@ test_folder = "tests/lexer/#{name}"
 test_input_path = "#{test_folder}/input.c"
 puts "Copying file into #{test_folder}"
 
-Dir.mkdir test_folder
+Dir.mkdir(test_folder) rescue nil
 File.write(test_input_path, File.read(filename))
 
 stdout, stderr, status = Open3.capture3($BIN, "--tokenize", test_input_path)
