@@ -1,0 +1,4 @@
+tests/lexer/encoding/input.c:1:1: identifier hällo
+tests/lexer/encoding/input.c:1:7: identifier wörld
+tests/lexer/encoding/input.c:1:12: punctuator :
+tests/lexer/encoding/input.c:1:14: identifier ÖVAR9000
