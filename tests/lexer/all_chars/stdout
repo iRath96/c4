@@ -56,4 +56,4 @@ tests/lexer/all_chars/input.c:6:54: punctuator :>
 tests/lexer/all_chars/input.c:6:57: punctuator <%
 tests/lexer/all_chars/input.c:6:60: punctuator %>
 tests/lexer/all_chars/input.c:6:63: punctuator %:
-tests/lexer/all_chars/input.c:6:66: punctuator %:%:s
+tests/lexer/all_chars/input.c:6:66: punctuator %:%:
