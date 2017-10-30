@@ -9,3 +9,5 @@ tests/lexer/comments/input.c:9:10: identifier isn
 tests/lexer/comments/input.c:9:13: string-literal 't'
 tests/lexer/comments/input.c:9:17: identifier it
 tests/lexer/comments/input.c:9:19: punctuator ?
+tests/lexer/comments/input.c:10:22: punctuator *
+tests/lexer/comments/input.c:10:23: punctuator /
