@@ -11,6 +11,10 @@ def cross
   "\033[31mx\033[0m"
 end
 
+def format_ms(time)
+  "#{(time * 1000).round(1)} ms"
+end
+
 def show_diff(name, expected, actual)
   if actual == expected
     puts "  #{checkmark} #{name}"
@@ -22,10 +26,15 @@ def show_diff(name, expected, actual)
   end
 end
 
+$start_time = Time.now
+
 $failures = []
 $tests = Dir["tests/lexer/*"]
 $tests.each do |test|
+  test_start_time = Time.now
   stdout, stderr, status = Open3.capture3($BIN, "--tokenize", "#{test}/input.c")
+  test_runtime = Time.now - test_start_time
+
   expected_stdout = File.read("#{test}/stdout")
   expected_stderr = File.read("#{test}/stderr")
   expected_status = expected_stderr.empty? ? 0 : 1
@@ -36,7 +45,7 @@ $tests.each do |test|
   $failures << test unless test_success
 
   puts
-  puts "\033[#{test_success ? 32 : 31}m•\033[0m #{test}"
+  puts "\033[#{test_success ? 32 : 31}m•\033[0m #{test} (#{format_ms test_runtime})"
   puts
 
   show_diff "stdout", expected_stdout, stdout
@@ -49,10 +58,18 @@ $tests.each do |test|
   #puts expected_status.inspect
 end
 
-exit 0 if $failures.empty?
+total_runtime = Time.now - $start_time
+
+if $failures.empty?
+  puts
+  puts "\033[32m#{$tests.count} test(s) passed (#{format_ms total_runtime})\033[0m"
+  puts
+
+  exit 0
+end
 
 puts
-puts "#{$failures.count} test(s) have failed:"
+puts "\033[31m#{$failures.count} test(s) have failed (#{format_ms total_runtime})\033[0m"
 puts $failures.map { |path| "- #{path}\n" }.join
 puts
 
