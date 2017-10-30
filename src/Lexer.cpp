@@ -241,6 +241,10 @@ int Lexer::read_identifier() {
 }
 
 int Lexer::read_constant() {
+    if (peek(0) == '0')
+        // octal constants are now allowed
+        return 1;
+    
     int i = 0;
     while (TEST_CHAR(is_decimal, peek(i)))
         ++i;

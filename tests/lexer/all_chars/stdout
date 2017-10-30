@@ -1,6 +1,6 @@
 tests/lexer/all_chars/input.c:1:1: identifier abcdefghijklmnopqrstuvwxyz_
 tests/lexer/all_chars/input.c:2:1: identifier ABCDEFGHIJKLMNOPQRSTUVWXYZ_
-tests/lexer/all_chars/input.c:3:1: constant 0123456789
+tests/lexer/all_chars/input.c:3:1: constant 1234567890
 tests/lexer/all_chars/input.c:5:1: punctuator [
 tests/lexer/all_chars/input.c:5:3: punctuator ]
 tests/lexer/all_chars/input.c:5:5: punctuator (
