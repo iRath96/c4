@@ -1,4 +1,0 @@
-/* much comment
-   so long
-   such multiline
-   woooow */
