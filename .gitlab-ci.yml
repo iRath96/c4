@@ -6,7 +6,6 @@ test:
   stage: test
   script:
     - make
-    - ./build/debug/c4 --tokenize tests/lexer/all_chars.c
     - gem install diffy
     - ruby test.rb
   only:
