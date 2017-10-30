@@ -60,7 +60,7 @@ Token Lexer::create_token(TokenType type, int length) {
     consume(length);
     
     if (token.type == TokenType::IDENTIFIER) {
-#define K(x, y) if (length != y || !strcmp(token.text, x)) token.type = TokenType::KEYWORD; else
+#define K(x, y) if (length == y && !strcmp(token.text, x)) token.type = TokenType::KEYWORD; else
         switch (token.text[0]) {
             case 'a': K("auto", 4) {}; break;
             case 'b': K("break", 5) {}; break;
