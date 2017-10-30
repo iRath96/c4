@@ -79,7 +79,7 @@ Token Lexer::create_token(TokenType type, int length) {
             case 'w': K("while", 5) {}; break;
             case '_':
                 K("_Alignas", 8) K("_Alignof", 8) K("_Atomic", 7) K("_Bool", 5) K("_Complex", 8)
-                K("_Generic", 8) K("Imaginary", 9) K("_Noreturn", 9) K("_Static_assert", 14) K("_Thread_local", 13)
+                K("_Generic", 8) K("_Imaginary", 10) K("_Noreturn", 9) K("_Static_assert", 14) K("_Thread_local", 13)
                 {}; break;
         }
 #undef K
