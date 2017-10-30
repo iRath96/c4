@@ -113,6 +113,10 @@ int Lexer::read_string() {
 }
 
 int Lexer::read_escape_seq(int i) {
+    if (eof(i))
+        // can't read anything
+        return i;
+    
     if (peek(i++) != '\\')
         // ordinary character of length 1
         return i;
