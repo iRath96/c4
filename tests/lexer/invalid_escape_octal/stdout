@@ -1,0 +1,1 @@
+tests/lexer/invalid_escape_octal/input.c:1:1: identifier test

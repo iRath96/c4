@@ -1,0 +1,4 @@
+tests/lexer/char_constant_empty/input.c:1:1: identifier this
+tests/lexer/char_constant_empty/input.c:1:6: identifier should
+tests/lexer/char_constant_empty/input.c:1:13: identifier fail
+tests/lexer/char_constant_empty/input.c:1:17: punctuator :

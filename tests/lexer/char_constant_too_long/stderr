@@ -1,0 +1,1 @@
+tests/lexer/char_constant_too_long/input.c:1:26: error: character constant too long

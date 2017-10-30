@@ -1,0 +1,9 @@
+tests/lexer/escape_sequences/input.c:1:1: identifier numeric
+tests/lexer/escape_sequences/input.c:1:8: punctuator :
+tests/lexer/escape_sequences/input.c:1:10: string-literal "escape\x12\"\123\"test"
+tests/lexer/escape_sequences/input.c:2:1: identifier special
+tests/lexer/escape_sequences/input.c:2:8: punctuator :
+tests/lexer/escape_sequences/input.c:2:10: string-literal "\'\"\?\\"
+tests/lexer/escape_sequences/input.c:3:1: identifier letter
+tests/lexer/escape_sequences/input.c:3:7: punctuator :
+tests/lexer/escape_sequences/input.c:3:9: string-literal "\a\b\f\n\r\t\v"

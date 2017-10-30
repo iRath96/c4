@@ -1,0 +1,3 @@
+tests/lexer/char_constant_too_long/input.c:1:1: keyword if
+tests/lexer/char_constant_too_long/input.c:1:4: identifier character
+tests/lexer/char_constant_too_long/input.c:1:14: identifier constants

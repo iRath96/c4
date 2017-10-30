@@ -1,0 +1,5 @@
+tests/lexer/identifiers/input.c:1:1: identifier identifier
+tests/lexer/identifiers/input.c:2:1: identifier very_long_identifier_name_that_spans_quite_a_few_characters
+tests/lexer/identifiers/input.c:3:1: identifier id_1234
+tests/lexer/identifiers/input.c:4:1: constant 4
+tests/lexer/identifiers/input.c:4:2: identifier asd

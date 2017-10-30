@@ -1,0 +1,1 @@
+tests/lexer/invalid_escape/input.c:2:3: error: invalid escape sequence

@@ -1,0 +1,11 @@
+tests/lexer/comments/input.c:2:1: identifier abc
+tests/lexer/comments/input.c:2:8: punctuator /
+tests/lexer/comments/input.c:2:32: punctuator *
+tests/lexer/comments/input.c:2:33: punctuator /
+tests/lexer/comments/input.c:2:34: identifier test
+tests/lexer/comments/input.c:9:1: identifier awesome
+tests/lexer/comments/input.c:9:8: punctuator ,
+tests/lexer/comments/input.c:9:10: identifier isn
+tests/lexer/comments/input.c:9:13: string-literal 't'
+tests/lexer/comments/input.c:9:17: identifier it
+tests/lexer/comments/input.c:9:19: punctuator ?
