@@ -170,7 +170,7 @@ int Lexer::read_comment() {
         // not a comment
         return 0;
     
-    int i = 2;
+    int i = 3;
     while (!eof(i)) {
         if (peek(i - 1) == '*' && peek(i) == '/')
             return i + 1;
