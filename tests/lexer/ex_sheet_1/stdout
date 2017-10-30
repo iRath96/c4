@@ -1,0 +1,5 @@
+tests/lexer/ex_sheet_1/input.c:1:1: constant 42
+tests/lexer/ex_sheet_1/input.c:1:5: keyword if
+tests/lexer/ex_sheet_1/input.c:2:5: string-literal "bla\n"
+tests/lexer/ex_sheet_1/input.c:2:12: identifier x
+tests/lexer/ex_sheet_1/input.c:2:13: punctuator +
