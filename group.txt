@@ -1,2 +1,3 @@
 Rath, Alexander, 2567082, Master Computer Science
 Weber, Max Dominik, 2542441, Bachelor Computer Science
+Bund, Johannes, 2545761, Master Computer Science
