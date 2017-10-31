@@ -127,7 +127,8 @@ int Lexer::read_escape_seq(int i) {
     
     if (is_octal(c)) {
         // octal escape sequence
-        while (i <= 4 && is_octal(peek(++i)));
+        while (i <= 4 && is_octal(peek(i)))
+            ++i;
         return i;
     }
     
