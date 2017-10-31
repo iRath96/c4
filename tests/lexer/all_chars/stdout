@@ -27,4 +27,4 @@ tests/lexer/all_chars/input.c:1:86: punctuator {
 tests/lexer/all_chars/input.c:1:87: punctuator |
 tests/lexer/all_chars/input.c:1:88: punctuator }
 tests/lexer/all_chars/input.c:1:89: punctuator ~
-tests/lexer/all_chars/input.c:1:90: identifier €‚ƒ„…†‡ˆ‰Š‹Œ‘’“”•–—˜™š›œŸ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖ×ØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõö÷øùúûüışÿ
+tests/lexer/all_chars/input.c:1:90: identifier ¨ª­¯²³´µ·¸¹º¼½¾ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏĞÑÒÓÔÕÖØÙÚÛÜİŞßàáâãäåæçèéêëìíîïğñòóôõöøùúûüışÿ
