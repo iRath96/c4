@@ -134,6 +134,12 @@ int Lexer::read_escape_seq(int i) {
         // can't read anything
         return i;
     
+    if (peek(i) == '\n') {
+        // newlines are not allowed in string-literals
+        error("newline inside string-literal", i);
+        return 0;
+    }
+    
     if (peek(i++) != '\\')
         // ordinary character of length 1
         return i;
