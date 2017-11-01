@@ -1,10 +1,21 @@
-/* hello */
-abc/**///* test *//* example */*/test
+/* block comments */
+
+a/* hello */b
+/*/ ab /*/
+1/* a *//* b */2
+
 /*
-  this
-  can /*
-  do /
-  multiline
+  multiline /* /
 */
-awesome, isn't' it?
-/* hi */ /*/ wow /*/ */
+
+*/
+
+// single line comments
+
+/* example // */ hi
+// hi /* example */ madness
+// kittens // rule
+/**// test
+/**/// test
+
+// end of file
