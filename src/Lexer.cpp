@@ -211,10 +211,14 @@ int Lexer::read_comment() {
         // single line comment
         
         int i = 2;
-        while (!eof(i) && peek(i) != '\n')
-            ++i;
+        while (!eof(i))
+            if (peek(i) == '\n')
+                return i;
+            else
+                ++i;
         
-        return i;
+        error("EOF encountered while reading comment", i);
+        return 0;
     }
     
     // not a comment
