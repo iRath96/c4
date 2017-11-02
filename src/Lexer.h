@@ -78,6 +78,9 @@ protected:
             if (buffer[i] == '\n') {
                 ++pos.line;
                 pos.column = 1;
+            } else if (buffer[i] == '\r') {
+                // maybe doing nothing for \r will fix the failing tests
+                // 😅
             } else {
                 ++pos.column;
             }
