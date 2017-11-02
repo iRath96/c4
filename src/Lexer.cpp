@@ -145,7 +145,8 @@ int Lexer::read_escape_seq(int i) {
         return i;
     
     char c = peek(i++);
-    if (c == '\'' || c == '"' || c == '?' || c == '\\')
+    if (c == '\'' || c == '"' || c == '?' || c == '\\' ||
+        c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v')
         return i;
     
     if (is_octal(c)) {
@@ -162,9 +163,6 @@ int Lexer::read_escape_seq(int i) {
         while (isxdigit(peek(++i)));
         return i;
     }
-    
-    if (c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v')
-        return i;
     
     error("invalid escape sequence", i - 1);
     return 0;
