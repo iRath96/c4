@@ -150,8 +150,10 @@ int Lexer::read_escape_seq(int i) {
         return i;
     
     if (is_octal(c)) {
+        int max_i = i + 2; // two more octal digits are allowed
+        
         // octal escape sequence
-        while (i <= 4 && is_octal(peek(i)))
+        while (i <= max_i && is_octal(peek(i)))
             ++i;
         return i;
     }
