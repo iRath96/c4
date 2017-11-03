@@ -34,17 +34,14 @@ void tokenize(const char *filename) {
     
     fseek(f, 0, SEEK_END);
     
-    LexerInput input;
-    input.length = (int)ftell(f);
+    int length = (int)ftell(f);
     
-    char *buffer = (char *)malloc(input.length);
+    char *buffer = (char *)malloc(length);
     fseek(f, 0, SEEK_SET);
-    fread(buffer, input.length, 1, f);
+    fread(buffer, length, 1, f);
     fclose(f);
     
-    input.data = buffer;
-    
-    Lexer lexer(input);
+    Lexer lexer(buffer, length);
     try {
         while (true) {
             Token t = lexer.next_token();

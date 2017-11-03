@@ -44,7 +44,7 @@ struct Token {
 };
 
 struct LexerInput {
-    const char *data;
+    char *data;
     int length;
 };
 
@@ -61,13 +61,49 @@ public:
 
 class Lexer {
 public:
-    Lexer(LexerInput input) : input(input) {
+    Lexer(char *data, int length) {
+        input.data = data;
+        input.length = length;
+        
+        replace_eol();
     }
     
 protected:
     LexerInput input;
     
     TextPosition pos;
+    
+    void replace_eol() {
+        bool last_char_was_cr = false;
+        
+        int skip = 0;
+        for (int i = 0; i < input.length; ++i) {
+            char c_in = input.data[i + skip];
+            char c_out = c_in;
+            
+            switch (c_in) {
+                // @todo could as well replace other EOL characters with LF here.
+                case '\r':
+                    c_out = '\n';
+                    break;
+                case '\n':
+                    if (last_char_was_cr) {
+                        // don't replace CRLF with LFLF, replace it with one LF only
+                        --input.length;
+                        ++skip;
+                        
+                        if (i == input.length)
+                            // CRLF at end of file, we're done
+                            return;
+                        
+                        c_out = input.data[i + skip];
+                    }
+            }
+            
+            input.data[i] = c_out;
+            last_char_was_cr = c_in == '\r';
+        }
+    }
     
     void consume(int length) {
         const char *buffer = input.data + pos.index;
@@ -77,9 +113,6 @@ protected:
             // update position
             if (buffer[i] == '\n') {
                 ++pos.line;
-                pos.column = 1;
-            } else if (buffer[i] == '\r') {
-                // maybe this will fix the failing tests
                 pos.column = 1;
             } else {
                 ++pos.column;
