@@ -194,34 +194,29 @@ int Lexer::read_comment() {
         // not a comment
         return 0;
     
+    int i;
     if (peek(1) == '*') {
         // block comment
         
-        int i = 3;
-        while (!eof(i)) {
+        i = 3;
+        while (!eof(i))
             if (peek(i - 1) == '*' && peek(i) == '/')
                 return i + 1;
-            
-            ++i;
-        }
-        
-        error("EOF encountered while reading comment", i);
-        return 0;
+            else
+                ++i;
     } else if (peek(1) == '/') {
         // single line comment
         
-        int i = 2;
+        i = 2;
         while (!eof(i))
             if (peek(i) == '\n')
                 return i;
             else
                 ++i;
-        
-        error("EOF encountered while reading comment", i);
+    } else
         return 0;
-    }
     
-    // not a comment
+    error("EOF encountered while reading comment", i);
     return 0;
 }
 
