@@ -14,6 +14,15 @@
 
 #include "Lexer.h"
 
+class ParserError {
+public:
+    std::string message;
+    ParserError(const std::string &message)
+    : message(message) {
+        
+    }
+};
+
 class Parser {
 public:
     Parser(Lexer lexer) : lexer(lexer) {
@@ -37,10 +46,12 @@ protected:
         if (i < (int)token_queue.size())
             return token_queue[i];
         
-        while (!lexer.has_ended() && (int)token_queue.size() < i)
+        while (!lexer.has_ended() && (int)token_queue.size() <= i) {
+            printf("reading token...\n");
             token_queue.push_back(lexer.next_token());
+        }
         
-        return token_queue[token_queue.size() - 1]; // size() <= i
+        return token_queue[token_queue.size() - 1]; // size() <= i+1
     }
     
     int read_type_specifiers(int i) {
@@ -110,14 +121,17 @@ protected:
         
         // step 1. read declaration-specifiers
         int i = read_type_specifiers(0);
+        printf("%d\n", i);
         if (i == 0)
             error("type list expected", 0);
+        
+        error("not yet implemented", i);
     }
     
     [[noreturn]] void error(const std::string &message, int offset) {
         //TextPosition start_pos = pos;
         //consume(offset);
-        throw message;
+        throw ParserError(message);
     }
 };
 

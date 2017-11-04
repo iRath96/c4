@@ -71,8 +71,16 @@ void tokenize(const char *filename) {
 }
 
 void parse(const char *filename) {
-    Parser parser(create_lexer(filename));
-    parser.parse();
+    try {
+        Parser parser(create_lexer(filename));
+        parser.parse();
+    } catch (LexerError e) {
+        fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
+        exit(1);
+    } catch (ParserError e) {
+        fprintf(stderr, "%s: parser error: %s\n", filename, e.message.c_str());
+        exit(1);
+    }
 }
 
 int main(int argc, const char *argv[]) {

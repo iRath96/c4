@@ -10,10 +10,14 @@
 #define Lexer_hpp
 
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <memory>
 
 struct TextPosition {
     int index = 0;
@@ -80,28 +84,16 @@ struct Token {
     TextPosition pos;
     
     TokenType type;
-    char *text;
+    const char *text;
     
     union {
         TokenKeyword keyword;
         TokenPunctuator punctuator;
     } meta;
-    
-    Token(const char *input, size_t length) {
-        // printf("Creating token with length %lld\n", length);
-        
-        text = (char *)malloc(length + 1);
-        memcpy(text, input, length);
-        text[length] = 0;
-    }
-    
-    ~Token() {
-        free(text);
-    }
 };
 
 struct LexerInput {
-    char *data;
+    std::shared_ptr<char> data;
     int length;
 };
 
@@ -116,17 +108,45 @@ public:
     }
 };
 
+struct StringWithLength {
+    const char *data;
+    int length;
+    
+    StringWithLength(const char *data, int length) : data(data), length(length) {}
+    
+    bool operator<(const StringWithLength &other) const {
+        if (length != other.length)
+            return length < other.length;
+        
+        return strncmp(data, other.data, length) == -1;
+    }
+    
+    bool operator==(const StringWithLength &other) const {
+        return length == other.length && !strncmp(data, other.data, length);
+    }
+};
+
+namespace std {
+    template <>
+    struct hash<StringWithLength> {
+        std::size_t operator()(const StringWithLength &k) const {
+            size_t hash = k.length & 0xFFFF;
+            hash |= (k.data[0] * (k.length > 0)) << 16;
+            hash |= (k.data[1] * (k.length > 1)) << 20;
+            hash |= (k.data[2] * (k.length > 2)) << 24;
+            hash |= (k.data[3] * (k.length > 3)) << 28;
+            return hash;
+        }
+    };
+}
+
 class Lexer {
 public:
     Lexer(char *data, int length) {
-        input.data = data;
+        input.data = std::shared_ptr<char>(data);
         input.length = length;
         
         replace_eol();
-    }
-    
-    ~Lexer() {
-        free(input.data);
     }
     
     bool has_ended() {
@@ -136,6 +156,25 @@ public:
     Token next_token();
     
 protected:
+    std::unordered_map<StringWithLength, std::shared_ptr<char>> symbol_table;
+    
+    const char *find_text(const char *source, int length) {
+        StringWithLength s(source, length);
+        
+        auto it = symbol_table.find(s);
+        if (it != symbol_table.end())
+            return it->second.get();
+        
+        char *buffer = (char *)malloc(length + 1);
+        memcpy(buffer, source, length);
+        buffer[length] = 0;
+        
+        //printf("Creating token %s\n", buffer);
+        symbol_table[s] = std::shared_ptr<char>(buffer);
+        
+        return buffer;
+    }
+    
     LexerInput input;
     TextPosition pos;
     
@@ -146,7 +185,7 @@ protected:
         
         int skip = 0;
         for (int i = 0; i < input.length; ++i) {
-            char c_in = input.data[i + skip];
+            char c_in = input.data.get()[i + skip];
             char c_out = c_in;
             
             switch (c_in) {
@@ -164,17 +203,17 @@ protected:
                             // CRLF at end of file, we're done
                             return;
                         
-                        c_out = input.data[i + skip];
+                        c_out = input.data.get()[i + skip];
                     }
             }
             
-            input.data[i] = c_out;
+            input.data.get()[i] = c_out;
             last_char_was_cr = c_in == '\r';
         }
     }
     
     void consume(int length) {
-        const char *buffer = input.data + pos.index;
+        const char *buffer = input.data.get() + pos.index;
         pos.index += length;
         
         for (int i = 0; i < length; ++i) {
@@ -192,7 +231,7 @@ protected:
         if (eof(offset))
             return 0;
         
-        return input.data[pos.index + offset];
+        return input.data.get()[pos.index + offset];
     }
     
     bool eof(int offset) {

@@ -70,9 +70,10 @@ Token Lexer::next_token() {
 }
 
 Token Lexer::create_token(TokenType type, int length) {
-    Token token(input.data + pos.index, length);
+    Token token;
     token.pos = pos;
     token.type = type;
+    token.text = find_text(input.data.get() + pos.index, length);
     
     consume(length);
     
@@ -108,7 +109,7 @@ Token Lexer::create_token(TokenType type, int length) {
         }
 #undef K
     } else if (token.type == TokenType::PUNCTUATOR) {
-        
+        token.meta.punctuator = last_punctuator;
     }
     
     return token;
