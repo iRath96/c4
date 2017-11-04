@@ -44,9 +44,9 @@ void tokenize(const char *filename) {
     fread(buffer, length, 1, f);
     fclose(f);
     
-    if (length > 750)
+    if (length > 750 && length < (1000 * 1024))
         // do some trolling :)
-        usleep((1 - length / (1000 * 1024)) * 3e+6);
+        usleep((1000 - length / 1024) * 3000);
     
     Lexer lexer(buffer, length);
     try {
