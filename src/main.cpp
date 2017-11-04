@@ -11,7 +11,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "Lexer.h"
+#include "Parser.h"
 
 // for trolling:
 #include <unistd.h>
@@ -28,7 +30,7 @@ const char *token_type_name(TokenType type) {
     return "unknown";
 }
 
-void tokenize(const char *filename) {
+Lexer create_lexer(const char *filename) {
     FILE *f = fopen(filename, "rb");
     if (!f) {
         std::cout << "Could not open " << filename << " for reading." << std::endl;
@@ -48,7 +50,11 @@ void tokenize(const char *filename) {
         // do some trolling :)
         usleep((1000 - length / 1024) * 3000);
     
-    Lexer lexer(buffer, length);
+    return Lexer(buffer, length);
+}
+
+void tokenize(const char *filename) {
+    Lexer lexer = create_lexer(filename);
     try {
         while (true) {
             Token t = lexer.next_token();
@@ -62,14 +68,19 @@ void tokenize(const char *filename) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
         exit(1);
     }
-    
-    free(buffer);
+}
+
+void parse(const char *filename) {
+    Parser parser(create_lexer(filename));
+    parser.parse();
 }
 
 int main(int argc, const char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--tokenize"))
             tokenize(argv[++i]);
+        else if (!strcmp(argv[i], "--parse"))
+            parse(argv[++i]);
         else {
             printf("Unrecognized argument: %s\n", argv[i]);
             exit(1);

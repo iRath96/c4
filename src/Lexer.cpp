@@ -77,29 +77,38 @@ Token Lexer::create_token(TokenType type, int length) {
     consume(length);
     
     if (token.type == TokenType::IDENTIFIER) {
-#define K(x, y) if (length == y && !strcmp(token.text, x)) token.type = TokenType::KEYWORD; else
+#define K(x, y, z) if (length == z && !strcmp(token.text, x)) {\
+    token.type = TokenType::KEYWORD; \
+    token.meta.keyword = TokenKeyword::y; \
+} else
         switch (token.text[0]) {
-            case 'a': K("auto", 4) {}; break;
-            case 'b': K("break", 5) {}; break;
-            case 'c': K("case", 4) K("char", 4) K("const", 5) K("continue", 8) {}; break;
-            case 'd': K("default", 7) K("do", 2) K("double", 6) {}; break;
-            case 'e': K("else", 4) K("enum", 4) K("extern", 6) {}; break;
-            case 'f': K("float", 5) K("for", 3) {}; break;
-            case 'g': K("goto", 4) {}; break;
-            case 'i': K("if", 2) K("inline", 6) K("int", 3) {}; break;
-            case 'l': K("long", 4) {}; break;
-            case 'r': K("register", 8) K("restrict", 8) K("return", 6) {}; break;
-            case 's': K("short", 5) K("signed", 6) K("sizeof", 6) K("static", 6) K("struct", 6) K("switch", 6) {}; break;
-            case 't': K("typedef", 7) {}; break;
-            case 'u': K("union", 5) K("unsigned", 8) {}; break;
-            case 'v': K("void", 4) K("volatile", 8) {}; break;
-            case 'w': K("while", 5) {}; break;
+            case 'a': K("auto", AUTO, 4) {}; break;
+            case 'b': K("break", BREAK, 5) {}; break;
+            case 'c': K("case", CASE, 4) K("char", CHAR, 4) K("const", CONST, 5) K("continue", CONTINUE, 8) {}; break;
+            case 'd': K("default", DEFAULT, 7) K("do", DO, 2) K("double", DOUBLE, 6) {}; break;
+            case 'e': K("else", ELSE, 4) K("enum", ENUM, 4) K("extern", EXTERN, 6) {}; break;
+            case 'f': K("float", FLOAT, 5) K("for", FOR, 3) {}; break;
+            case 'g': K("goto", GOTO, 4) {}; break;
+            case 'i': K("if", IF, 2) K("inline", INLINE, 6) K("int", INT, 3) {}; break;
+            case 'l': K("long", LONG, 4) {}; break;
+            case 'r': K("register", REGISTER, 8) K("restrict", RESTRICT, 8) K("return", RETURN, 6) {}; break;
+            case 's':
+                K("short", SHORT, 5) K("signed", SIGNED, 6) K("sizeof", SIZEOF, 6)
+                K("static", STATIC, 6) K("struct", STRUCT, 6) K("switch", SWITCH, 6) {}; break;
+            case 't': K("typedef", TYPEDEF, 7) {}; break;
+            case 'u': K("union", UNION, 5) K("unsigned", UNSIGNED, 8) {}; break;
+            case 'v': K("void", VOID, 4) K("volatile", VOLATILE, 8) {}; break;
+            case 'w': K("while", WHILE, 5) {}; break;
             case '_':
-                K("_Alignas", 8) K("_Alignof", 8) K("_Atomic", 7) K("_Bool", 5) K("_Complex", 8)
-                K("_Generic", 8) K("_Imaginary", 10) K("_Noreturn", 9) K("_Static_assert", 14) K("_Thread_local", 13)
+                K("_Alignas", _ALIGNAS, 8) K("_Alignof", _ALIGNOF, 8) K("_Atomic", _ATOMIC, 7)
+                K("_Bool", _BOOL, 5) K("_Complex", _COMPLEX, 8) K("_Generic", _GENERIC, 8)
+                K("_Imaginary", _IMAGINARY, 10) K("_Noreturn", _NORETURN, 9) K("_Static_assert", _STATIC_ASSERT, 14)
+                K("_Thread_local", _THREAD_LOCAL, 13)
                 {}; break;
         }
 #undef K
+    } else if (token.type == TokenType::PUNCTUATOR) {
+        
     }
     
     return token;
@@ -221,47 +230,69 @@ int Lexer::read_comment() {
 }
 
 int Lexer::read_punctuator() {
+#define RET(x, y) { last_punctuator = TokenPunctuator::x; return y; }
+    
     char c = peek(0), d = peek(1);
     
     // punctuators of length 4
     
     if (c == '%' && d == ':' && peek(2) == '%' && peek(3) == ':')
-        return 4;
+        RET(DOUBLE_HASH, 4)
     
     // punctuators of length 3
     
-    if (c == '.' && d == '.' && peek(2) == '.')
-        return 3;
-    if (c == '>' && d == '>' && peek(2) == '=')
-        return 3;
-    if (c == '<' && d == '<' && peek(2) == '=')
-        return 3;
+    if (c == '.' && d == '.' && peek(2) == '.') RET(ELIPSES, 3)
+    if (c == '>' && d == '>' && peek(2) == '=') RET(RSHIFT_ASSIGN, 3)
+    if (c == '<' && d == '<' && peek(2) == '=') RET(LSHIFT_ASSIGN, 3)
     
     // punctuators of length 2
-    bool is_bitwise = c == '&' || c == '|' || c == '^' || c == '!'; // not ~, because there is no ~=
-    bool is_arithmetic = c == '*' || c == '/' || c == '%' || c == '+' || c == '-';
-    bool is_comparison = c == '<' || c == '>';
     
-    if (c == '-' && d == '>') return 2;
-    if ((c == '+' || c == '-' || c == '&' || c == '|' || c == '<' || c == '>' || c == '#')
-        && d == c)
-        return 2;
+#define P(x, y, z) if (c == x && d == y) RET(z, 2)
+    P('#', '#', DOUBLE_HASH)
     
-    if ((is_arithmetic || is_bitwise || is_comparison || c == '=') && d == '=')
-        return 2;
+    P('+', '+', PLUSPLUS) P('-', '-', MINUSMINUS)
+    P('&', '&', LOG_AND) P('|', '|', LOG_OR)
+    P('<', '<', LSHIFT) P('>', '>', RSHIFT)
+    P('<', '=', CMP_LTE) P('>', '=', CMP_GTE) P('=', '=', CMP_EQ) P('!', '=', CMP_NEQ)
     
-    if (c == '<' && (d == ':' || d == '%')) return 2;
-    if ((c == ':' || c == '%') && d == '>') return 2;
-    if (c == '%' && d == ':') return 2;
+    P('+', '=', PLUS_ASSIGN) P('-', '=', MINUS_ASSIGN)
+    P('*', '=', MUL_ASSIGN) P('/', '=', DIV_ASSIGN)
+    P('%', '=', MODULO_ASSIGN)
+        
+    P('&', '=', BIT_AND_ASSIGN) P('|', '=', BIT_OR_ASSIGN) P('^', '=', BIT_XOR_ASSIGN)
+        
+    P('-', '>', ARROW)
+    
+    P('<', '%', CB_OPEN)
+    P('%', '>', CB_CLOSE)
+    
+    P('<', ':', SB_OPEN)
+    P(':', '>', SB_CLOSE)
+    
+    P('%', ':', HASH)
+#undef P
     
     // punctuators of length 1
     
-    if (c == '[' || c == ']' || c == '(' || c == ')' || c == '{' || c == '}') return 1; // brackets
-    if (c == '#' || c == ',' || c == '=' || c == '?' || c == ':' || c == ';') return 1; // weird stuff
-    if (is_arithmetic || is_bitwise || is_comparison || c == '~') return 1;
-    if (c == '.') return 1; // subscript
+#define P(x, y) case x: RET(y, 1)
+    switch (c) {
+        P('{', CB_OPEN) P('}', CB_CLOSE)
+        P('[', SB_OPEN) P(']', SB_CLOSE)
+        P('(', RB_OPEN) P(')', RB_CLOSE)
+        P('<', AB_OPEN) P('>', AB_CLOSE)
+            
+        P('.', SUBSCRIPT) P('#', HASH) P(',', COMMA) P('=', ASSIGN) P('?', QMARK) P(':', COLON) P(';', SEMICOLON)
+            
+        P('+', PLUS) P('-', MINUS) P('*', ASTERISK) P('/', SLASH) P('%', MODULO)
+            
+        P('&', BIT_AND) P('|', BIT_OR) P('^', BIT_XOR) P('~', BIT_NOT)
+        P('!', LOG_NOT)
+    }
+#undef P
     
     return 0;
+    
+#undef RET
 }
 
 int Lexer::read_identifier() {

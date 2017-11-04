@@ -21,6 +21,56 @@ struct TextPosition {
     int column = 1;
 };
 
+enum TokenKeyword {
+    AUTO,
+    BREAK,
+    CASE, CHAR, CONST, CONTINUE,
+    DEFAULT, DO, DOUBLE,
+    ELSE, ENUM, EXTERN,
+    FLOAT, FOR,
+    GOTO,
+    IF, INLINE, INT,
+    LONG,
+    REGISTER, RESTRICT, RETURN,
+    SHORT, SIGNED, SIZEOF, STATIC, STRUCT, SWITCH,
+    TYPEDEF,
+    UNION, UNSIGNED,
+    VOID, VOLATILE,
+    WHILE,
+    
+    _ALIGNAS, _ALIGNOF, _ATOMIC, _BOOL, _COMPLEX,
+    _GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
+};
+
+enum TokenPunctuator {
+    CB_OPEN /* { */, CB_CLOSE /* } */,
+    SB_OPEN /* [ */, SB_CLOSE /* ] */,
+    RB_OPEN /* ( */, RB_CLOSE /* ) */,
+    AB_OPEN /* < */, AB_CLOSE /* > */,
+    
+    CMP_LTE /* <= */, CMP_GTE /* >= */, CMP_EQ /* == */, CMP_NEQ /* != */,
+    
+    DOUBLE_HASH /* ## */, HASH /* # */,
+    ELIPSES /* ... */,
+    
+    SUBSCRIPT /* . */, COMMA /* , */, COLON /* : */, QMARK /* ? */, SEMICOLON /* ; */,
+    
+    ARROW /* -> */,
+    
+    PLUSPLUS /* ++ */, MINUSMINUS /* -- */,
+    PLUS /* + */, MINUS /* - */, ASTERISK /* * */, SLASH /* / */, MODULO /* % */,
+    
+    BIT_AND /* & */, BIT_OR /* | */, BIT_XOR /* ^ */, BIT_NOT /* ~ */,
+    LOG_AND /* && */, LOG_OR /* || */, LOG_NOT /* ! */,
+    
+    RSHIFT /* >> */, LSHIFT /* << */,
+    
+    PLUS_ASSIGN /* += */, MINUS_ASSIGN /* -= */, MUL_ASSIGN /* *= */, DIV_ASSIGN /* /= */, MODULO_ASSIGN /* %= */,
+    BIT_OR_ASSIGN /* |= */, BIT_AND_ASSIGN /* &= */, BIT_XOR_ASSIGN /* ^= */,
+    RSHIFT_ASSIGN /* >>= */, LSHIFT_ASSIGN /* <<= */,
+    ASSIGN /* = */
+};
+
 enum TokenType {
     KEYWORD, IDENTIFIER, CONSTANT, STRING_LITERAL, PUNCTUATOR,
     END
@@ -32,7 +82,14 @@ struct Token {
     TokenType type;
     char *text;
     
+    union {
+        TokenKeyword keyword;
+        TokenPunctuator punctuator;
+    } meta;
+    
     Token(const char *input, size_t length) {
+        // printf("Creating token with length %lld\n", length);
+        
         text = (char *)malloc(length + 1);
         memcpy(text, input, length);
         text[length] = 0;
@@ -68,10 +125,21 @@ public:
         replace_eol();
     }
     
+    ~Lexer() {
+        free(input.data);
+    }
+    
+    bool has_ended() {
+        return eof(0);
+    }
+    
+    Token next_token();
+    
 protected:
     LexerInput input;
-    
     TextPosition pos;
+    
+    TokenPunctuator last_punctuator;
     
     void replace_eol() {
         bool last_char_was_cr = false;
@@ -130,9 +198,6 @@ protected:
     bool eof(int offset) {
         return pos.index + offset >= input.length;
     }
-    
-public:
-    Token next_token();
     
 protected:
     Token create_token(TokenType type, int length);

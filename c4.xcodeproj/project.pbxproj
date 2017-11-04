@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA6431861FAD924D00ABFB9D /* Parser.cpp */; };
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
 /* End PBXBuildFile section */
@@ -24,6 +25,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA6431861FAD924D00ABFB9D /* Parser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Parser.cpp; sourceTree = "<group>"; };
+		FA6431871FAD924D00ABFB9D /* Parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parser.h; sourceTree = "<group>"; };
 		FA74D4F01FA2576600D7CA2E /* c4 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = c4; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Lexer.cpp; sourceTree = "<group>"; };
 		FA74D4FE1FA257A000D7CA2E /* Lexer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Lexer.h; sourceTree = "<group>"; };
@@ -41,6 +44,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FA6431891FAD925400ABFB9D /* parser */ = {
+			isa = PBXGroup;
+			children = (
+				FA6431861FAD924D00ABFB9D /* Parser.cpp */,
+				FA6431871FAD924D00ABFB9D /* Parser.h */,
+			);
+			name = parser;
+			sourceTree = "<group>";
+		};
 		FA74D4E71FA2576600D7CA2E = {
 			isa = PBXGroup;
 			children = (
@@ -60,6 +72,7 @@
 		FA74D4FB1FA2579300D7CA2E /* src */ = {
 			isa = PBXGroup;
 			children = (
+				FA6431891FAD925400ABFB9D /* parser */,
 				FA74D4FC1FA2579300D7CA2E /* lexer */,
 				FA74D5001FA257CC00D7CA2E /* main.cpp */,
 			);
@@ -133,6 +146,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
+				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
