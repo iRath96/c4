@@ -73,16 +73,17 @@ Token Lexer::create_token(TokenType type, int length) {
     Token token;
     token.pos = pos;
     token.type = type;
-    token.text = find_text(input.data.get() + pos.index, length);
+    token.text = NULL;
     
-    consume(length);
+    const char *raw_text = input.data.get() + pos.index;
     
     if (token.type == TokenType::IDENTIFIER) {
-#define K(x, y, z) if (length == z && !strcmp(token.text, x)) {\
+#define K(x, y, z) if (length == z && !strncmp(raw_text, x, length)) {\
     token.type = TokenType::KEYWORD; \
+    token.text = x; \
     token.meta.keyword = TokenKeyword::y; \
 } else
-        switch (token.text[0]) {
+        switch (raw_text[0]) {
             case 'a': K("auto", AUTO, 4) {}; break;
             case 'b': K("break", BREAK, 5) {}; break;
             case 'c': K("case", CASE, 4) K("char", CHAR, 4) K("const", CONST, 5) K("continue", CONTINUE, 8) {}; break;
@@ -111,6 +112,11 @@ Token Lexer::create_token(TokenType type, int length) {
     } else if (token.type == TokenType::PUNCTUATOR) {
         token.meta.punctuator = last_punctuator;
     }
+    
+    if (token.text == NULL)
+        token.text = find_text(raw_text, length);
+    
+    consume(length);
     
     return token;
 }

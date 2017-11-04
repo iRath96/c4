@@ -130,11 +130,11 @@ namespace std {
     template <>
     struct hash<StringWithLength> {
         std::size_t operator()(const StringWithLength &k) const {
-            size_t hash = k.length & 0xFFFF;
-            hash |= (k.data[0] * (k.length > 0)) << 16;
-            hash |= (k.data[1] * (k.length > 1)) << 20;
-            hash |= (k.data[2] * (k.length > 2)) << 24;
-            hash |= (k.data[3] * (k.length > 3)) << 28;
+            size_t hash = std::hash<int>()(k.length);
+            hash ^= (k.data[0] * (k.length > 0)) << 2;
+            hash ^= (k.data[1] * (k.length > 1)) << 3;
+            hash ^= (k.data[2] * (k.length > 2)) << 5;
+            hash ^= (k.data[3] * (k.length > 3)) << 7;
             return hash;
         }
     };
@@ -145,6 +145,8 @@ public:
     Lexer(char *data, int length) {
         input.data = std::shared_ptr<char>(data);
         input.length = length;
+        
+        symbol_table.reserve(1024);
         
         replace_eol();
     }
