@@ -167,6 +167,15 @@ protected:
         return false;
     }
     
+    bool read_keyword(int &i, TokenKeyword keyword) {
+        if (peek(i).keyword == keyword) {
+            ++i;
+            return true;
+        }
+        
+        return false;
+    }
+    
     template<typename T>
     bool read_list(int &i, bool (Parser::*method)(int &, T &node), std::vector<T> &result) {
         int initial_i = i;
@@ -478,22 +487,38 @@ protected:
 #pragma mark - Statements
     
     bool read_statement(int &i) {
-        // @todo not yet implemented
-        return false;
+        if (read_labeled_statement(i)) {
+        } else if (read_compound_statement(i)) {
+        } else if (read_expression_statement(i)) {
+        } else if (read_selection_statement(i)) {
+        } else if (read_iteration_statement(i)) {
+        } else if (read_jump_statement(i)) {
+        } else
+            return false;
+        
+        return true;
+    }
+    
+    bool read_labeled_statement(int &i) {
+        if (read_keyword(i, TokenKeyword::CASE)) {
+        } else if (read_keyword(i, TokenKeyword::DEFAULT)) {
+        } else if (peek(i).type == TokenType::IDENTIFIER && peek(i + 1).punctuator == TokenPunctuator::COLON) {
+        } else
+            return false;
+        
+        read_statement(i);
+        return true;
     }
     
     bool read_block_item(int &i, NodeBlockItem &node) {
         NodeDeclaration declaration;
         
         if (read_declaration(i, declaration)) {
-            std::cout << "@todo" << std::endl;
-            return true;
         } else if (read_statement(i)) {
-            std::cout << "@todo" << std::endl;
-            return true;
-        }
+        } else
+            return false;
         
-        return false;
+        return true;
     }
     
     bool read_block_item_list(int &i, std::vector<NodeBlockItem> &node) {
@@ -505,9 +530,66 @@ protected:
         
         NON_EMPTY_RET(read_punctuator(i, TokenPunctuator::CB_OPEN));
         read_block_item_list(i, block_items);
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::CB_CLOSE), "bracket after compound statement expected");
+        NON_EMPTY(read_punctuator(i, TokenPunctuator::CB_CLOSE), "closing bracket after compound statement expected");
         
         return true;
+    }
+    
+    bool read_expression_statement(int &i) {
+        int j = i;
+        
+        read_expression(j);
+        NON_EMPTY_RET(read_punctuator(j, TokenPunctuator::SEMICOLON));
+        
+        i = j;
+        
+        return true;
+    }
+    
+    bool read_selection_statement(int &i) {
+        NON_EMPTY_RET(read_keyword(i, TokenKeyword::IF));
+        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_OPEN), "opening bracket expected");
+        NON_EMPTY(read_expression(i), "expression expected");
+        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_CLOSE), "closing bracket expected");
+        NON_EMPTY(read_statement(i), "statement expected");
+        
+        if (read_keyword(i, TokenKeyword::ELSE))
+            NON_EMPTY(read_statement(i), "statement expected");
+        
+        return true;
+    }
+    
+    bool read_iteration_statement(int &i) {
+        NON_EMPTY_RET(read_keyword(i, TokenKeyword::WHILE));
+        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_OPEN), "opening bracket expected");
+        NON_EMPTY(read_expression(i), "expression expected");
+        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_CLOSE), "closing bracket expected");
+        NON_EMPTY(read_statement(i), "statement expected");
+        
+        return true;
+    }
+    
+    bool read_jump_statement(int &i) {
+        if (read_keyword(i, TokenKeyword::GOTO)) {
+            const char *target;
+            NON_EMPTY(read_identifier(i, target), "identifier expected");
+        } else if (read_keyword(i, TokenKeyword::CONTINUE)) {
+        } else if (read_keyword(i, TokenKeyword::BREAK)) {
+        } else if (read_keyword(i, TokenKeyword::RETURN)) {
+            read_expression(i);
+        } else
+            return false;
+        
+        NON_EMPTY(read_punctuator(i, TokenPunctuator::SEMICOLON), "semicolon expected");
+        
+        return true;
+    }
+    
+#pragma mark - Expressions
+    
+    bool read_expression(int &i) {
+        // @todo
+        return false;
     }
 };
 
