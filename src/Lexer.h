@@ -26,6 +26,8 @@ struct TextPosition {
 };
 
 enum TokenKeyword {
+    NOT_A_KEYWORD = 0,
+    
     AUTO,
     BREAK,
     CASE, CHAR, CONST, CONTINUE,
@@ -47,6 +49,8 @@ enum TokenKeyword {
 };
 
 enum TokenPunctuator {
+    NOT_A_PUNCTUATOR = 0,
+    
     CB_OPEN /* { */, CB_CLOSE /* } */,
     SB_OPEN /* [ */, SB_CLOSE /* ] */,
     RB_OPEN /* ( */, RB_CLOSE /* ) */,
@@ -86,10 +90,8 @@ struct Token {
     TokenType type;
     const char *text;
     
-    union {
-        TokenKeyword keyword;
-        TokenPunctuator punctuator;
-    } meta;
+    TokenKeyword keyword = TokenKeyword::NOT_A_KEYWORD;
+    TokenPunctuator punctuator = TokenPunctuator::NOT_A_PUNCTUATOR;
 };
 
 struct LexerInput {

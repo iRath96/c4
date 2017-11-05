@@ -81,7 +81,7 @@ Token Lexer::create_token(TokenType type, int length) {
 #define K(x, y, z) if (length == z && !strncmp(raw_text, x, length)) {\
     token.type = TokenType::KEYWORD; \
     token.text = x; \
-    token.meta.keyword = TokenKeyword::y; \
+    token.keyword = TokenKeyword::y; \
 } else
         switch (raw_text[0]) {
             case 'a': K("auto", AUTO, 4) {}; break;
@@ -110,7 +110,7 @@ Token Lexer::create_token(TokenType type, int length) {
         }
 #undef K
     } else if (token.type == TokenType::PUNCTUATOR) {
-        token.meta.punctuator = last_punctuator;
+        token.punctuator = last_punctuator;
     }
     
     if (token.text == NULL)

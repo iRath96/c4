@@ -65,11 +65,11 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "--tokenize"
+            argument = "--parse"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "/Users/alex/Desktop/test-large.c"
+            argument = "/Users/alex/Desktop/test.c"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

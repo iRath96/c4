@@ -78,7 +78,7 @@ void parse(const char *filename) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
         exit(1);
     } catch (ParserError e) {
-        fprintf(stderr, "%s: parser error: %s\n", filename, e.message.c_str());
+        fprintf(stderr, "%s:%d:%d: parser error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
         exit(1);
     }
 }
