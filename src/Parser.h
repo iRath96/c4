@@ -344,8 +344,62 @@ protected:
         return i;
     }
     
+    int read_initializer(int i) {
+        error("not yet implemented", i);
+    }
+    
+    int read_init_declarator(int i) {
+        NON_EMPTY_RET(i, read_declarator(i));
+        
+        if (peek(i).punctuator == TokenPunctuator::ASSIGN) {
+            // also read initializer
+            NON_EMPTY(i, read_initializer(i), "initializer expected");
+        }
+        
+        return i;
+    }
+    
+    int read_init_declarator_list(int i) {
+        return read_separated_list(i, &Parser::read_init_declarator, TokenPunctuator::COMMA);
+    }
+    
     int read_external_declaration(int i) {
-        NON_EMPTY(i, read_list(i, &Parser::read_type_specifier), "type list expected");
+        NON_EMPTY(i, read_declaration_specifiers(i), "type list expected");
+        NON_EMPTY(i, read_declarator(i), "declarator expected");
+        
+        bool needs_declaration_list = peek(i).punctuator == TokenPunctuator::COMMA;
+        bool needs_initialization = peek(i).punctuator == TokenPunctuator::ASSIGN;
+        bool is_declaration = needs_initialization || needs_declaration_list || peek(i).punctuator == TokenPunctuator::SEMICOLON;
+        
+        if (is_declaration) {
+            // declaration: ... (',' init-declarator-list(opt))(opt) ;
+            
+            if (needs_initialization) {
+                ++i; // consume assign
+                read_initializer(i);
+                
+                needs_initialization = peek(i).punctuator == TokenPunctuator::COMMA;
+            }
+            
+            if (needs_declaration_list) {
+                ++i; // jump over comma
+                i = read_init_declarator_list(i);
+            }
+            
+            if (peek(i).punctuator != TokenPunctuator::SEMICOLON)
+                error("semicolon expected", i);
+            
+            std::cout << "read a declaration" << std::endl;
+            
+            return i;
+        } else {
+            // function definition: ... declaration-list(opt) compound-statement
+            error("function-definition not yet implemented", i);
+        }
+        
+        // init-declarator-list: read_list(init-declarator, ',')
+        // init-declarator: declarator
+        //                | declarator '=' initializer
         
         for (auto &child : *current_stack)
             child->dump("");
