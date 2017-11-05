@@ -39,9 +39,6 @@ public:
 
 class Node {
 public:
-    virtual void dump(const std::string &indent) {
-        std::cout << indent << "not yet implemented" << std::endl;
-    }
 };
 
 class NodeIdentifier : public Node {
@@ -63,10 +60,6 @@ public:
 class NodePointer : public Node {
 public:
     std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
-    
-    virtual void dump(const std::string &indent) {
-        std::cout << indent << "Pointer" << std::endl;
-    }
 };
 
 class NodeDeclarator : public Node {
@@ -120,26 +113,27 @@ public:
     }
     
     void parse() {
-        int i = 0;
         std::vector<std::shared_ptr<NodeExternalDeclaration>> declarations;
-        read_list(i, &Parser::read_external_declaration, declarations);
+        read_list(&Parser::read_external_declaration, declarations);
         
-        for (auto &child : declarations)
-            child->dump("");
-        
-        if (!eof(i))
+        if (!eof())
             error("declaration expected", i);
     }
     
 protected:
+    int i;
+    
     Lexer lexer;
     std::vector<Token> token_queue;
     
-    bool eof(int i) {
-        return (lexer.has_ended() && (int)token_queue.size() < i) || peek(i).type == TokenType::END;
+    bool eof(int offset = 0) {
+        int i = this->i + offset;
+        return (lexer.has_ended() && (int)token_queue.size() < i) || peek(offset).type == TokenType::END;
     }
     
-    Token &peek(int i) {
+    Token &peek(int offset = 0) {
+        int i = this->i + offset;
+        
         if (i < (int)token_queue.size())
             return token_queue[i];
         
@@ -158,8 +152,8 @@ protected:
     
 #pragma mark - Helpers
     
-    bool read_punctuator(int &i, TokenPunctuator punctuator) {
-        if (peek(i).punctuator == punctuator) {
+    bool read_punctuator(TokenPunctuator punctuator) {
+        if (peek().punctuator == punctuator) {
             ++i;
             return true;
         }
@@ -167,8 +161,8 @@ protected:
         return false;
     }
     
-    bool read_keyword(int &i, TokenKeyword keyword) {
-        if (peek(i).keyword == keyword) {
+    bool read_keyword(TokenKeyword keyword) {
+        if (peek().keyword == keyword) {
             ++i;
             return true;
         }
@@ -177,12 +171,12 @@ protected:
     }
     
     template<typename T>
-    bool read_list(int &i, bool (Parser::*method)(int &, T &node), std::vector<T> &result) {
+    bool read_list(bool (Parser::*method)(T &node), std::vector<T> &result) {
         int initial_i = i;
         
-        while (!eof(i)) {
+        while (!eof()) {
             T temp;
-            if (!(this->*method)(i, temp))
+            if (!(this->*method)(temp))
                 break;
             
             result.push_back(temp);
@@ -192,19 +186,19 @@ protected:
     }
     
     template<typename T>
-    bool read_separated_list(int &i, bool (Parser::*method)(int &, T &node), TokenPunctuator separator, std::vector<T> &result) {
+    bool read_separated_list(bool (Parser::*method)(T &node), TokenPunctuator separator, std::vector<T> &result) {
         int initial_i = i;
         int last_good_i = i;
         
-        while (!eof(i)) {
+        while (!eof()) {
             T temp;
-            if (!(this->*method)(i, temp))
+            if (!(this->*method)(temp))
                 break;
             
             result.push_back(temp);
             last_good_i = i;
             
-            if(!read_punctuator(i, separator))
+            if(!read_punctuator(separator))
                 break;
         }
         
@@ -214,55 +208,55 @@ protected:
     
 #pragma mark - Declarations
     
-    bool read_declarator(int &i, NodeDeclarator &node) {
-        read_pointer(i, node);
-        NON_EMPTY(read_direct_declarator(i, node), "direct declarator expected");
+    bool read_declarator(NodeDeclarator &node) {
+        read_pointer(node);
+        NON_EMPTY(read_direct_declarator(node), "direct declarator expected");
         return true;
     }
     
-    bool read_declaration_specifiers(int &i, std::vector<std::shared_ptr<NodeTypeSpecifier>> &node) {
-        NON_EMPTY_RET(read_list(i, &Parser::read_type_specifier, node));
+    bool read_declaration_specifiers(std::vector<std::shared_ptr<NodeTypeSpecifier>> &node) {
+        NON_EMPTY_RET(read_list(&Parser::read_type_specifier, node));
         return true;
     }
     
-    bool read_direct_declarator_prefix(int &i, NodeDeclarator &node) {
+    bool read_direct_declarator_prefix(NodeDeclarator &node) {
         // case 1
-        if (read_identifier(i, node.name))
+        if (read_identifier(node.name))
             return true;
         
         // case 2: function pointer
-        if (read_punctuator(i, TokenPunctuator::RB_OPEN)) {
+        if (read_punctuator(TokenPunctuator::RB_OPEN)) {
             NodeDeclarator declarator;
-            read_declarator(i, declarator);
+            read_declarator(declarator);
             node.name = declarator.name;
-            std::cout << "@todo" << std::endl;
-            NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_CLOSE), "closing bracket expected");
+            
+            // @todo
+            
+            NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), "closing bracket expected");
             return true;
         }
         
         return false;
     }
     
-    bool read_direct_declarator(int &i, NodeDeclarator &node) {
-        NON_EMPTY(read_direct_declarator_prefix(i, node), "direct declarator expected");
+    bool read_direct_declarator(NodeDeclarator &node) {
+        NON_EMPTY(read_direct_declarator_prefix(node), "direct declarator expected");
         
         int last_good_i = i;
         
-        while (!eof(i)) {
+        while (!eof()) {
             // try reading parameter-list / identifier-list
             std::vector<NodeParameterDeclaration> parameter_list;
             std::vector<const char *> identifier_list;
             
-            if (!read_punctuator(i, TokenPunctuator::RB_OPEN))
+            if (!read_punctuator(TokenPunctuator::RB_OPEN))
                 break;
             
-            if (read_parameter_list(i, parameter_list)) {
-                std::cout << "@todo" << std::endl;
-            } else if (read_identifier_list(i, identifier_list)) {
-                std::cout << "@todo" << std::endl;
+            if (read_parameter_list(parameter_list)) {
+            } else if (read_identifier_list(identifier_list)) {
             }
             
-            if (!read_punctuator(i, TokenPunctuator::RB_CLOSE))
+            if (!read_punctuator(TokenPunctuator::RB_CLOSE))
                 break;
             
             last_good_i = i;
@@ -272,9 +266,9 @@ protected:
         return true;
     }
     
-    bool read_identifier(int &i, const char *&text) {
-        if (peek(i).type == TokenType::IDENTIFIER) {
-            text = peek(i).text;
+    bool read_identifier(const char *&text) {
+        if (peek().type == TokenType::IDENTIFIER) {
+            text = peek().text;
             ++i;
             
             return true;
@@ -283,73 +277,73 @@ protected:
         return false;
     }
     
-    bool read_identifier_list(int &i, std::vector<const char *> &node) {
-        return read_separated_list(i, &Parser::read_identifier, TokenPunctuator::COMMA, node);
+    bool read_identifier_list(std::vector<const char *> &node) {
+        return read_separated_list(&Parser::read_identifier, TokenPunctuator::COMMA, node);
     }
     
-    bool read_parameter_list(int &i, std::vector<NodeParameterDeclaration> &node) {
-        NON_EMPTY(read_separated_list(i, &Parser::read_parameter_declaration, TokenPunctuator::COMMA, node),
+    bool read_parameter_list(std::vector<NodeParameterDeclaration> &node) {
+        NON_EMPTY(read_separated_list(&Parser::read_parameter_declaration, TokenPunctuator::COMMA, node),
                   "parameter list expected");
         return true;
     }
     
-    bool read_parameter_declaration(int &i, NodeParameterDeclaration &node) {
-        NON_EMPTY(read_declaration_specifiers(i, node.specifiers), "declaration specifiers expected");
-        NON_EMPTY(read_declarator(i, node.declarator), "declarator expected");
+    bool read_parameter_declaration(NodeParameterDeclaration &node) {
+        NON_EMPTY(read_declaration_specifiers(node.specifiers), "declaration specifiers expected");
+        NON_EMPTY(read_declarator(node.declarator), "declarator expected");
         return true;
     }
     
-    bool read_pointer_single(int &i, NodePointer &node) {
-        NON_EMPTY_RET(read_punctuator(i, TokenPunctuator::ASTERISK));
-        read_type_qualifier_list(i, node.specifiers);
+    bool read_pointer_single(NodePointer &node) {
+        NON_EMPTY_RET(read_punctuator(TokenPunctuator::ASTERISK));
+        read_type_qualifier_list(node.specifiers);
         
         return true;
     }
     
-    bool read_pointer(int &i, NodeDeclarator &node) {
-        return read_list(i, &Parser::read_pointer_single, node.pointers);
+    bool read_pointer(NodeDeclarator &node) {
+        return read_list(&Parser::read_pointer_single, node.pointers);
     }
     
-    bool read_type_qualifier_list(int &i, std::vector<std::shared_ptr<NodeTypeSpecifier>> &node) {
-        return read_list(i, &Parser::read_type_specifier, node);
+    bool read_type_qualifier_list(std::vector<std::shared_ptr<NodeTypeSpecifier>> &node) {
+        return read_list(&Parser::read_type_specifier, node);
     }
     
-    bool read_specifier_qualifier_list(int &i, std::vector<std::shared_ptr<NodeTypeSpecifier>> &node) {
-        return read_list(i, &Parser::read_type_specifier, node);
+    bool read_specifier_qualifier_list(std::vector<std::shared_ptr<NodeTypeSpecifier>> &node) {
+        return read_list(&Parser::read_type_specifier, node);
     }
     
 #pragma mark - Structs
     
-    bool read_struct_declarator(int &i, NodeDeclarator &node) {
-        return read_declarator(i, node);
+    bool read_struct_declarator(NodeDeclarator &node) {
+        return read_declarator(node);
     }
     
-    bool read_struct_declarator_list(int &i, std::vector<NodeDeclarator> &node) {
-        return read_separated_list(i, &Parser::read_struct_declarator, TokenPunctuator::COMMA, node);
+    bool read_struct_declarator_list(std::vector<NodeDeclarator> &node) {
+        return read_separated_list(&Parser::read_struct_declarator, TokenPunctuator::COMMA, node);
     }
     
-    bool read_struct_declaration(int &i, NodeDeclaration &node) {
-        NON_EMPTY_RET(read_specifier_qualifier_list(i, node.specifiers));
-        read_struct_declarator_list(i, node.declarators);
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::SEMICOLON), "semicolon expected after struct/union member");
+    bool read_struct_declaration(NodeDeclaration &node) {
+        NON_EMPTY_RET(read_specifier_qualifier_list(node.specifiers));
+        read_struct_declarator_list(node.declarators);
+        NON_EMPTY(read_punctuator(TokenPunctuator::SEMICOLON), "semicolon expected after struct/union member");
         return true;
     }
     
-    bool read_struct_declaration_list(int &i, std::vector<NodeDeclaration> &node) {
-        return read_list(i, &Parser::read_struct_declaration, node);
+    bool read_struct_declaration_list(std::vector<NodeDeclaration> &node) {
+        return read_list(&Parser::read_struct_declaration, node);
     }
     
-    bool read_struct_body(int &i, NodeTypeComposed &node) {
-        NON_EMPTY_RET(read_punctuator(i, TokenPunctuator::CB_OPEN));
+    bool read_struct_body(NodeTypeComposed &node) {
+        NON_EMPTY_RET(read_punctuator(TokenPunctuator::CB_OPEN));
         
-        NON_EMPTY(read_struct_declaration_list(i, node.declarations), "declaration list expected");
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::CB_CLOSE), "missing closing bracket");
+        NON_EMPTY(read_struct_declaration_list(node.declarations), "declaration list expected");
+        NON_EMPTY(read_punctuator(TokenPunctuator::CB_CLOSE), "missing closing bracket");
         
         return true;
     }
     
-    bool read_type_specifier(int &i, std::shared_ptr<NodeTypeSpecifier> &node) {
-        Token &token = peek(i);
+    bool read_type_specifier(std::shared_ptr<NodeTypeSpecifier> &node) {
+        Token &token = peek();
         switch (token.keyword) {
             case TokenKeyword::VOID:
             case TokenKeyword::CHAR:
@@ -376,14 +370,14 @@ protected:
                 
                 n->type = token.keyword;
                 
-                bool has_identifier = read_identifier(i, n->name);
-                bool has_body = peek(i).punctuator == TokenPunctuator::CB_OPEN;
+                bool has_identifier = read_identifier(n->name);
+                bool has_body = peek().punctuator == TokenPunctuator::CB_OPEN;
                 
                 if (!has_body && !has_identifier)
                     error("struct/union without identifier or body", i);
                 
                 if (has_body)
-                    NON_EMPTY(read_struct_body(i, *n), "struct/union body expected");
+                    NON_EMPTY(read_struct_body(*n), "struct/union body expected");
                 
                 return true;
             }
@@ -395,47 +389,47 @@ protected:
         return false;
     }
     
-    bool read_initializer(int &i, NodeDeclarator &node) {
+    bool read_initializer(NodeDeclarator &node) {
         error("not yet implemented", i);
     }
     
-    bool read_init_declarator(int &i, NodeDeclarator &node) {
-        NON_EMPTY_RET(read_declarator(i, node));
+    bool read_init_declarator(NodeDeclarator &node) {
+        NON_EMPTY_RET(read_declarator(node));
         
-        if (read_punctuator(i, TokenPunctuator::ASSIGN)) {
+        if (read_punctuator(TokenPunctuator::ASSIGN)) {
             // also read initializer
-            NON_EMPTY(read_initializer(i, node), "initializer expected");
+            NON_EMPTY(read_initializer(node), "initializer expected");
         }
         
         return true;
     }
     
-    bool read_init_declarator_list(int &i, std::vector<NodeDeclarator> &node) {
-        return read_separated_list(i, &Parser::read_init_declarator, TokenPunctuator::COMMA, node);
+    bool read_init_declarator_list(std::vector<NodeDeclarator> &node) {
+        return read_separated_list(&Parser::read_init_declarator, TokenPunctuator::COMMA, node);
     }
     
-    bool read_declaration(int &i, NodeDeclaration &node) {
-        NON_EMPTY_RET(read_declaration_specifiers(i, node.specifiers));
-        read_init_declarator_list(i, node.declarators);
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::SEMICOLON), "semicolon expected");
+    bool read_declaration(NodeDeclaration &node) {
+        NON_EMPTY_RET(read_declaration_specifiers(node.specifiers));
+        read_init_declarator_list(node.declarators);
+        NON_EMPTY(read_punctuator(TokenPunctuator::SEMICOLON), "semicolon expected");
         
         return true;
     }
     
-    bool read_declaration_list(int &i, std::vector<NodeDeclaration> &node) {
-        return read_list(i, &Parser::read_declaration, node);
+    bool read_declaration_list(std::vector<NodeDeclaration> &node) {
+        return read_list(&Parser::read_declaration, node);
     }
     
-    bool read_external_declaration(int &i, std::shared_ptr<NodeExternalDeclaration> &node) {
+    bool read_external_declaration(std::shared_ptr<NodeExternalDeclaration> &node) {
         std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
         NodeDeclarator declarator;
         
-        NON_EMPTY_RET(read_declaration_specifiers(i, specifiers));
-        NON_EMPTY(read_declarator(i, declarator), "declarator expected");
+        NON_EMPTY_RET(read_declaration_specifiers(specifiers));
+        NON_EMPTY(read_declarator(declarator), "declarator expected");
         
-        bool needs_declaration_list = peek(i).punctuator == TokenPunctuator::COMMA;
-        bool needs_initialization = peek(i).punctuator == TokenPunctuator::ASSIGN;
-        bool is_declaration = needs_initialization || needs_declaration_list || peek(i).punctuator == TokenPunctuator::SEMICOLON;
+        bool needs_declaration_list = peek().punctuator == TokenPunctuator::COMMA;
+        bool needs_initialization = peek().punctuator == TokenPunctuator::ASSIGN;
+        bool is_declaration = needs_initialization || needs_declaration_list || peek().punctuator == TokenPunctuator::SEMICOLON;
         
         if (is_declaration) {
             // declaration: ... (',' init-declarator-list(opt))(opt) ;
@@ -447,19 +441,19 @@ protected:
             
             if (needs_initialization) {
                 ++i; // consume assign
-                read_initializer(i, declarator);
+                read_initializer(declarator);
                 
-                needs_initialization = peek(i).punctuator == TokenPunctuator::COMMA;
+                needs_initialization = peek().punctuator == TokenPunctuator::COMMA;
             }
             
             node->declarators.push_back(std::move(declarator));
             
             if (needs_declaration_list) {
                 ++i; // jump over comma
-                read_init_declarator_list(i, node->declarators);
+                read_init_declarator_list(node->declarators);
             }
             
-            NON_EMPTY(read_punctuator(i, TokenPunctuator::SEMICOLON), "semicolon expected");
+            NON_EMPTY(read_punctuator(TokenPunctuator::SEMICOLON), "semicolon expected");
             
             return true;
         } else {
@@ -471,8 +465,8 @@ protected:
             node->specifiers = std::move(specifiers);
             node->declarators.push_back(std::move(declarator));
             
-            read_declaration_list(i, n->declarations);
-            NON_EMPTY(read_compound_statement(i), "compound statement expected");
+            read_declaration_list(n->declarations);
+            NON_EMPTY(read_compound_statement(), "compound statement expected");
             
             return true;
         }
@@ -486,108 +480,110 @@ protected:
     
 #pragma mark - Statements
     
-    bool read_statement(int &i) {
-        if (read_labeled_statement(i)) {
-        } else if (read_compound_statement(i)) {
-        } else if (read_expression_statement(i)) {
-        } else if (read_selection_statement(i)) {
-        } else if (read_iteration_statement(i)) {
-        } else if (read_jump_statement(i)) {
+    bool read_statement() {
+        if (read_labeled_statement()) {
+        } else if (read_compound_statement()) {
+        } else if (read_expression_statement()) {
+        } else if (read_selection_statement()) {
+        } else if (read_iteration_statement()) {
+        } else if (read_jump_statement()) {
         } else
             return false;
         
         return true;
     }
     
-    bool read_labeled_statement(int &i) {
-        if (read_keyword(i, TokenKeyword::CASE)) {
-        } else if (read_keyword(i, TokenKeyword::DEFAULT)) {
-        } else if (peek(i).type == TokenType::IDENTIFIER && peek(i + 1).punctuator == TokenPunctuator::COLON) {
+    bool read_labeled_statement() {
+        if (read_keyword(TokenKeyword::CASE)) {
+        } else if (read_keyword(TokenKeyword::DEFAULT)) {
+        } else if (peek(0).type == TokenType::IDENTIFIER && peek(1).punctuator == TokenPunctuator::COLON) {
         } else
             return false;
         
-        read_statement(i);
+        read_statement();
         return true;
     }
     
-    bool read_block_item(int &i, NodeBlockItem &node) {
+    bool read_block_item(NodeBlockItem &node) {
         NodeDeclaration declaration;
         
-        if (read_declaration(i, declaration)) {
-        } else if (read_statement(i)) {
+        if (read_declaration(declaration)) {
+        } else if (read_statement()) {
         } else
             return false;
         
         return true;
     }
     
-    bool read_block_item_list(int &i, std::vector<NodeBlockItem> &node) {
-        return read_list(i, &Parser::read_block_item, node);
+    bool read_block_item_list(std::vector<NodeBlockItem> &node) {
+        return read_list(&Parser::read_block_item, node);
     }
     
-    bool read_compound_statement(int &i) {
+    bool read_compound_statement() {
         std::vector<NodeBlockItem> block_items;
         
-        NON_EMPTY_RET(read_punctuator(i, TokenPunctuator::CB_OPEN));
-        read_block_item_list(i, block_items);
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::CB_CLOSE), "closing bracket after compound statement expected");
+        NON_EMPTY_RET(read_punctuator(TokenPunctuator::CB_OPEN));
+        read_block_item_list(block_items);
+        NON_EMPTY(read_punctuator(TokenPunctuator::CB_CLOSE), "closing bracket after compound statement expected");
         
         return true;
     }
     
-    bool read_expression_statement(int &i) {
-        int j = i;
+    bool read_expression_statement() {
+        int last_good_i = i;
         
-        read_expression(j);
-        NON_EMPTY_RET(read_punctuator(j, TokenPunctuator::SEMICOLON));
+        read_expression();
         
-        i = j;
-        
-        return true;
-    }
-    
-    bool read_selection_statement(int &i) {
-        NON_EMPTY_RET(read_keyword(i, TokenKeyword::IF));
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_OPEN), "opening bracket expected");
-        NON_EMPTY(read_expression(i), "expression expected");
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_CLOSE), "closing bracket expected");
-        NON_EMPTY(read_statement(i), "statement expected");
-        
-        if (read_keyword(i, TokenKeyword::ELSE))
-            NON_EMPTY(read_statement(i), "statement expected");
+        if (!read_punctuator(TokenPunctuator::SEMICOLON)) {
+            i = last_good_i;
+            return false;
+        }
         
         return true;
     }
     
-    bool read_iteration_statement(int &i) {
-        NON_EMPTY_RET(read_keyword(i, TokenKeyword::WHILE));
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_OPEN), "opening bracket expected");
-        NON_EMPTY(read_expression(i), "expression expected");
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::RB_CLOSE), "closing bracket expected");
-        NON_EMPTY(read_statement(i), "statement expected");
+    bool read_selection_statement() {
+        NON_EMPTY_RET(read_keyword(TokenKeyword::IF));
+        NON_EMPTY(read_punctuator(TokenPunctuator::RB_OPEN), "opening bracket expected");
+        NON_EMPTY(read_expression(), "expression expected");
+        NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), "closing bracket expected");
+        NON_EMPTY(read_statement(), "statement expected");
+        
+        if (read_keyword(TokenKeyword::ELSE))
+            NON_EMPTY(read_statement(), "statement expected");
         
         return true;
     }
     
-    bool read_jump_statement(int &i) {
-        if (read_keyword(i, TokenKeyword::GOTO)) {
+    bool read_iteration_statement() {
+        NON_EMPTY_RET(read_keyword(TokenKeyword::WHILE));
+        NON_EMPTY(read_punctuator(TokenPunctuator::RB_OPEN), "opening bracket expected");
+        NON_EMPTY(read_expression(), "expression expected");
+        NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), "closing bracket expected");
+        NON_EMPTY(read_statement(), "statement expected");
+        
+        return true;
+    }
+    
+    bool read_jump_statement() {
+        if (read_keyword(TokenKeyword::GOTO)) {
             const char *target;
-            NON_EMPTY(read_identifier(i, target), "identifier expected");
-        } else if (read_keyword(i, TokenKeyword::CONTINUE)) {
-        } else if (read_keyword(i, TokenKeyword::BREAK)) {
-        } else if (read_keyword(i, TokenKeyword::RETURN)) {
-            read_expression(i);
+            NON_EMPTY(read_identifier(target), "identifier expected");
+        } else if (read_keyword(TokenKeyword::CONTINUE)) {
+        } else if (read_keyword(TokenKeyword::BREAK)) {
+        } else if (read_keyword(TokenKeyword::RETURN)) {
+            read_expression();
         } else
             return false;
         
-        NON_EMPTY(read_punctuator(i, TokenPunctuator::SEMICOLON), "semicolon expected");
+        NON_EMPTY(read_punctuator(TokenPunctuator::SEMICOLON), "semicolon expected");
         
         return true;
     }
     
 #pragma mark - Expressions
     
-    bool read_expression(int &i) {
+    bool read_expression() {
         // @todo
         return false;
     }
@@ -597,3 +593,4 @@ protected:
 #undef NON_EMPTY_RET
 
 #endif /* Parser_hpp */
+
