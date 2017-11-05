@@ -15,9 +15,6 @@
 #include "Lexer.h"
 #include "Parser.h"
 
-// for trolling:
-#include <unistd.h>
-
 const char *token_type_name(TokenType type) {
     switch (type) {
         case TokenType::KEYWORD: return "keyword";
@@ -45,10 +42,6 @@ Lexer create_lexer(const char *filename) {
     fseek(f, 0, SEEK_SET);
     fread(buffer, length, 1, f);
     fclose(f);
-    
-    if (length > 750 && length < (1000 * 1024))
-        // do some trolling :)
-        usleep((1000 - length / 1024) * 3000);
     
     return Lexer(buffer, length);
 }
