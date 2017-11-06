@@ -849,10 +849,21 @@ protected:
     }
     
     bool read_unary_operator(TokenPunctuator &op) { DEBUG_HOOK
-        NON_EMPTY_RET(PRECEDENCE(peek().punctuator) == Precedence::UNARY)
-        op = peek().punctuator;
-        
-        shift();
+        switch (peek().punctuator) {
+            case TokenPunctuator::BIT_AND:
+            case TokenPunctuator::ASTERISK:
+            case TokenPunctuator::PLUS:
+            case TokenPunctuator::MINUS:
+            case TokenPunctuator::BIT_NOT:
+            case TokenPunctuator::LOG_NOT:
+                op = peek().punctuator;
+                shift();
+                
+                break;
+                
+            default:
+                DENY
+        }
         
         ACCEPT
     }
