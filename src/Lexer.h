@@ -49,50 +49,51 @@ enum TokenKeyword {
 };
 
 enum Precedence {
-    NONE = 0,
+    NONE = 15,
     
-    ASSIGNMENT = 1,
-    CONDITIONAL = 2,
-    LOGICAL_OR = 3,
-    LOGICAL_AND = 4,
-    INCLUSIVE_OR = 5,
-    EXCLUSIVE_OR = 6,
-    AND = 7,
-    EQUALITY = 8,
-    RELATIONAL = 9,
-    SHIFT = 10,
-    ADDITIVE = 11,
-    MULTIPLICATIVE = 12,
+    ASSIGNMENT     = 13,
+    CONDITIONAL    = 12,
+    LOGICAL_OR     = 11,
+    LOGICAL_AND    = 10,
+    INCLUSIVE_OR   = 9,
+    EXCLUSIVE_OR   = 8,
+    AND            = 7,
+    EQUALITY       = 6,
+    RELATIONAL     = 5,
+    SHIFT          = 4,
+    ADDITIVE       = 3,
+    MULTIPLICATIVE = 2,
     
-    UNARY = 14,
-    MAX = 15
+    UNARY = 1,
+    MAX   = 0
 };
 
-#define ID(name, id, precedence, token) name = (precedence << 8) | id,
+#define PRECEDENCE(punctuator) ((Precedence)(char)punctuator)
+#define ID(name, id, precedence, token) name = (id << 8) | precedence,
 enum TokenPunctuator {
-    NOT_A_PUNCTUATOR = 0,
+    ID(NOT_A_PUNCTUATOR, 0, Precedence::NONE, "+")
     
-    ID(CB_OPEN,  0, Precedence::NONE, "{")
-    ID(CB_CLOSE, 1, Precedence::NONE, "}")
-    ID(SB_OPEN,  2, Precedence::NONE, "[")
-    ID(SB_CLOSE, 3, Precedence::NONE, "]")
-    ID(RB_OPEN,  4, Precedence::NONE, "(")
-    ID(RB_CLOSE, 5, Precedence::NONE, ")")
+    ID(CB_OPEN,  10, Precedence::NONE, "{")
+    ID(CB_CLOSE, 11, Precedence::NONE, "}")
+    ID(SB_OPEN,  12, Precedence::NONE, "[")
+    ID(SB_CLOSE, 13, Precedence::NONE, "]")
+    ID(RB_OPEN,  14, Precedence::NONE, "(")
+    ID(RB_CLOSE, 15, Precedence::NONE, ")")
     
-    ID(PLUS_ASSIGN,    10, Precedence::ASSIGNMENT, "+=")
-    ID(MINUS_ASSIGN,   11, Precedence::ASSIGNMENT, "-=")
-    ID(MUL_ASSIGN,     12, Precedence::ASSIGNMENT, "*=")
-    ID(DIV_ASSIGN,     13, Precedence::ASSIGNMENT, "/=")
-    ID(MODULO_ASSIGN,  14, Precedence::ASSIGNMENT, "%=")
-    ID(BIT_OR_ASSIGN,  15, Precedence::ASSIGNMENT, "|=")
-    ID(BIT_AND_ASSIGN, 16, Precedence::ASSIGNMENT, "&=")
-    ID(BIT_XOR_ASSIGN, 17, Precedence::ASSIGNMENT, "^=")
-    ID(RSHIFT_ASSIGN,  18, Precedence::ASSIGNMENT, ">>=")
-    ID(LSHIFT_ASSIGN,  19, Precedence::ASSIGNMENT, "<<=")
-    ID(ASSIGN,         20, Precedence::ASSIGNMENT, "=")
-
-    ID(QMARK, 30, Precedence::CONDITIONAL, "?")
-    ID(COLON, 31, Precedence::NONE, ":")
+    ID(QMARK, 16, Precedence::CONDITIONAL, "?")
+    ID(COLON, 17, Precedence::NONE, ":")
+    
+    ID(PLUS_ASSIGN,    20, Precedence::ASSIGNMENT, "+=")
+    ID(MINUS_ASSIGN,   21, Precedence::ASSIGNMENT, "-=")
+    ID(MUL_ASSIGN,     22, Precedence::ASSIGNMENT, "*=")
+    ID(DIV_ASSIGN,     23, Precedence::ASSIGNMENT, "/=")
+    ID(MODULO_ASSIGN,  24, Precedence::ASSIGNMENT, "%=")
+    ID(BIT_OR_ASSIGN,  25, Precedence::ASSIGNMENT, "|=")
+    ID(BIT_AND_ASSIGN, 26, Precedence::ASSIGNMENT, "&=")
+    ID(BIT_XOR_ASSIGN, 27, Precedence::ASSIGNMENT, "^=")
+    ID(RSHIFT_ASSIGN,  28, Precedence::ASSIGNMENT, ">>=")
+    ID(LSHIFT_ASSIGN,  29, Precedence::ASSIGNMENT, "<<=")
+    ID(ASSIGN,         30, Precedence::ASSIGNMENT, "=")
     
     ID(LOG_OR,  40, Precedence::LOGICAL_OR,   "||")
     ID(LOG_AND, 41, Precedence::LOGICAL_AND,  "&&")
