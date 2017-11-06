@@ -48,36 +48,90 @@ enum TokenKeyword {
     _GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
 };
 
+enum Precedence {
+    NONE = 0,
+    
+    ASSIGNMENT = 1,
+    CONDITIONAL = 2,
+    LOGICAL_OR = 3,
+    LOGICAL_AND = 4,
+    INCLUSIVE_OR = 5,
+    EXCLUSIVE_OR = 6,
+    AND = 7,
+    EQUALITY = 8,
+    RELATIONAL = 9,
+    SHIFT = 10,
+    ADDITIVE = 11,
+    MULTIPLICATIVE = 12,
+    
+    UNARY = 14,
+    MAX = 15
+};
+
+#define ID(name, id, precedence, token) name = (precedence << 8) | id,
 enum TokenPunctuator {
     NOT_A_PUNCTUATOR = 0,
     
-    CB_OPEN /* { */, CB_CLOSE /* } */,
-    SB_OPEN /* [ */, SB_CLOSE /* ] */,
-    RB_OPEN /* ( */, RB_CLOSE /* ) */,
-    AB_OPEN /* < */, AB_CLOSE /* > */,
+    ID(CB_OPEN,  0, Precedence::NONE, "{")
+    ID(CB_CLOSE, 1, Precedence::NONE, "}")
+    ID(SB_OPEN,  2, Precedence::NONE, "[")
+    ID(SB_CLOSE, 3, Precedence::NONE, "]")
+    ID(RB_OPEN,  4, Precedence::NONE, "(")
+    ID(RB_CLOSE, 5, Precedence::NONE, ")")
     
-    CMP_LTE /* <= */, CMP_GTE /* >= */, CMP_EQ /* == */, CMP_NEQ /* != */,
+    ID(PLUS_ASSIGN,    10, Precedence::ASSIGNMENT, "+=")
+    ID(MINUS_ASSIGN,   11, Precedence::ASSIGNMENT, "-=")
+    ID(MUL_ASSIGN,     12, Precedence::ASSIGNMENT, "*=")
+    ID(DIV_ASSIGN,     13, Precedence::ASSIGNMENT, "/=")
+    ID(MODULO_ASSIGN,  14, Precedence::ASSIGNMENT, "%=")
+    ID(BIT_OR_ASSIGN,  15, Precedence::ASSIGNMENT, "|=")
+    ID(BIT_AND_ASSIGN, 16, Precedence::ASSIGNMENT, "&=")
+    ID(BIT_XOR_ASSIGN, 17, Precedence::ASSIGNMENT, "^=")
+    ID(RSHIFT_ASSIGN,  18, Precedence::ASSIGNMENT, ">>=")
+    ID(LSHIFT_ASSIGN,  19, Precedence::ASSIGNMENT, "<<=")
+    ID(ASSIGN,         20, Precedence::ASSIGNMENT, "=")
+
+    ID(QMARK, 30, Precedence::CONDITIONAL, "?")
+    ID(COLON, 31, Precedence::NONE, ":")
     
-    DOUBLE_HASH /* ## */, HASH /* # */,
-    ELIPSES /* ... */,
+    ID(LOG_OR,  40, Precedence::LOGICAL_OR,   "||")
+    ID(LOG_AND, 41, Precedence::LOGICAL_AND,  "&&")
+    ID(BIT_OR,  42, Precedence::INCLUSIVE_OR, "|")
+    ID(BIT_XOR, 43, Precedence::EXCLUSIVE_OR, "^")
+    ID(BIT_AND, 44, Precedence::AND,          "&")
     
-    PERIOD /* . */, COMMA /* , */, COLON /* : */, QMARK /* ? */, SEMICOLON /* ; */,
+    ID(CMP_EQ,   50, Precedence::EQUALITY, "==")
+    ID(CMP_NEQ,  51, Precedence::EQUALITY, "!=")
     
-    ARROW /* -> */,
+    ID(AB_OPEN,  60, Precedence::RELATIONAL, "<")
+    ID(AB_CLOSE, 61, Precedence::RELATIONAL, ">")
+    ID(CMP_LTE,  62, Precedence::RELATIONAL, "<=")
+    ID(CMP_GTE,  63, Precedence::RELATIONAL, ">=")
     
-    PLUSPLUS /* ++ */, MINUSMINUS /* -- */,
-    PLUS /* + */, MINUS /* - */, ASTERISK /* * */, SLASH /* / */, MODULO /* % */,
+    ID(RSHIFT, 70, Precedence::SHIFT, ">>")
+    ID(LSHIFT, 71, Precedence::SHIFT, ">>")
     
-    BIT_AND /* & */, BIT_OR /* | */, BIT_XOR /* ^ */, BIT_NOT /* ~ */,
-    LOG_AND /* && */, LOG_OR /* || */, LOG_NOT /* ! */,
+    ID(PLUS,  80, Precedence::ADDITIVE, "+")
+    ID(MINUS, 81, Precedence::ADDITIVE, "-")
     
-    RSHIFT /* >> */, LSHIFT /* << */,
+    ID(ASTERISK, 90, Precedence::MULTIPLICATIVE, "*")
+    ID(SLASH,    91, Precedence::MULTIPLICATIVE, "/")
+    ID(MODULO,   92, Precedence::MULTIPLICATIVE, "%")
     
-    PLUS_ASSIGN /* += */, MINUS_ASSIGN /* -= */, MUL_ASSIGN /* *= */, DIV_ASSIGN /* /= */, MODULO_ASSIGN /* %= */,
-    BIT_OR_ASSIGN /* |= */, BIT_AND_ASSIGN /* &= */, BIT_XOR_ASSIGN /* ^= */,
-    RSHIFT_ASSIGN /* >>= */, LSHIFT_ASSIGN /* <<= */,
-    ASSIGN /* = */
+    ID(PLUSPLUS,   100, Precedence::UNARY, "++")
+    ID(MINUSMINUS, 101, Precedence::UNARY, "--")
+    ID(BIT_NOT,    102, Precedence::UNARY, "~")
+    ID(LOG_NOT,    103, Precedence::UNARY, "!")
+    
+    ID(DOUBLE_HASH, 110, Precedence::NONE, "##")
+    ID(HASH,        111, Precedence::NONE, "#")
+    ID(ELIPSES,     112, Precedence::NONE, "...")
+    ID(PERIOD,      113, Precedence::NONE, ".")
+    ID(COMMA,       114, Precedence::NONE, ",")
+    ID(SEMICOLON,   115, Precedence::NONE, ";")
+    ID(ARROW,       116, Precedence::NONE, "->")
 };
+#undef ID
 
 enum TokenType {
     KEYWORD, IDENTIFIER, CONSTANT, STRING_LITERAL, PUNCTUATOR,
