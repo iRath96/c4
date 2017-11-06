@@ -12,6 +12,8 @@ DebugTree dbg_tree_root;
 DebugTree *dbg_tree_current = &dbg_tree_root;
 
 void DebugTree::dump(Parser *parser, std::string indent) {
+    //if (has_returned && !ret_val) return;
+    
     std::cout << indent << function;
     if (has_returned)
         std::cout << " = " << (ret_val ? "ACCEPT" : "DENY");

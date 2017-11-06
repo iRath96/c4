@@ -182,8 +182,7 @@ public:
 
 class ExpressionBinary : public Expression {
 public:
-    std::shared_ptr<Expression> lhs;
-    std::shared_ptr<Expression> rhs;
+    std::shared_ptr<Expression> lhs, rhs;
     TokenPunctuator op;
     
     virtual void dump() {
@@ -191,6 +190,21 @@ public:
         lhs->dump();
         std::cout << operator_name(op);
         rhs->dump();
+        std::cout << ")";
+    }
+};
+
+class ExpressionConditional : public Expression {
+public:
+    std::shared_ptr<Expression> condition, when_true, when_false;
+    
+    virtual void dump() {
+        std::cout << "(";
+        condition->dump();
+        std::cout << " ? ";
+        when_true->dump();
+        std::cout << " : ";
+        when_false->dump();
         std::cout << ")";
     }
 };
@@ -224,8 +238,7 @@ public:
         if (!eof())
             error("declaration expected");
         
-        dbg_tree_root.dump(this);
-        std::cout << "done" << std::endl;
+        //dbg_tree_root.dump(this);
     }
     
     void print_context(int index) {
@@ -270,7 +283,7 @@ protected:
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
         TextPosition start_pos = peek(offset).pos;
-        dbg_tree_root.dump(this);
+        //dbg_tree_root.dump(this);
         print_context(i);
         throw ParserError(message, start_pos);
     }
@@ -306,7 +319,7 @@ protected:
         return true;
     }
     
-    bool read_type_name(NodeTypeNamed &node) {
+    bool read_type_specifier_keyword(NodeTypeNamed &node) {
         switch (peek().keyword) {
             case TokenKeyword::VOID:
             case TokenKeyword::CHAR:
@@ -366,8 +379,11 @@ protected:
 #pragma mark - Declarations
     
     bool read_declarator(NodeDeclarator &node) { DEBUG_HOOK
-        read_pointer(node);
-        NON_EMPTY(read_direct_declarator(node), "direct declarator expected");
+        if (read_pointer(node))
+            NON_EMPTY(read_direct_declarator(node), "direct declarator expected")
+        else
+            NON_EMPTY_RET(read_direct_declarator(node))
+        
         ACCEPT
     }
     
@@ -393,7 +409,7 @@ protected:
     }
     
     bool read_direct_declarator(NodeDeclarator &node) { DEBUG_HOOK
-        NON_EMPTY(read_direct_declarator_prefix(node), "direct declarator expected");
+        NON_EMPTY_RET(read_direct_declarator_prefix(node));
         
         int last_good_i = i;
         
@@ -406,7 +422,7 @@ protected:
             if (!read_punctuator(TokenPunctuator::RB_OPEN))
                 break;
             
-            if (read_parameter_list(parameter_list)) {
+            if (read_parameter_type_list()) {
             } else if (read_identifier_list(identifier_list)) {
             }
             
@@ -435,6 +451,51 @@ protected:
         ACCEPT
     }
     
+    bool read_type_name() { DEBUG_HOOK
+        std::vector<std::shared_ptr<NodeTypeSpecifier>> sql;
+        NON_EMPTY_RET(read_specifier_qualifier_list(sql))
+        read_abstract_declarator();
+        ACCEPT
+    }
+    
+    bool read_abstract_declarator() { DEBUG_HOOK
+        NodeDeclarator ptr;
+        if (read_pointer(ptr))
+            read_direct_abstract_declarator();
+        else
+            NON_EMPTY_RET(read_direct_abstract_declarator());
+        
+        ACCEPT
+    }
+    
+    bool read_direct_abstract_declarator() { DEBUG_HOOK
+        int initial_i = i;
+        
+        if (read_punctuator(TokenPunctuator::RB_OPEN)) {
+            NON_EMPTY(read_abstract_declarator(), "abstract declarator expected");
+            NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
+        }
+        
+        while (!eof()) {
+            if (read_punctuator(TokenPunctuator::SB_OPEN)) {
+                NON_EMPTY(read_punctuator(TokenPunctuator::ASTERISK), "* expected");
+                NON_EMPTY(read_punctuator(TokenPunctuator::SB_CLOSE), "] expected");
+            } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
+                read_parameter_type_list();
+                NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
+            } else
+                break;
+        }
+        
+        return i != initial_i;
+    }
+    
+    bool read_parameter_type_list() { DEBUG_HOOK
+        std::vector<NodeParameterDeclaration> pd;
+        NON_EMPTY_RET(read_parameter_list(pd))
+        ACCEPT
+    }
+    
     bool read_parameter_list(std::vector<NodeParameterDeclaration> &node) { DEBUG_HOOK
         NON_EMPTY(read_separated_list(&Parser::read_parameter_declaration, TokenPunctuator::COMMA, node),
                   "parameter list expected");
@@ -443,7 +504,9 @@ protected:
     
     bool read_parameter_declaration(NodeParameterDeclaration &node) { DEBUG_HOOK
         NON_EMPTY(read_declaration_specifiers(node.specifiers), "declaration specifiers expected");
-        NON_EMPTY(read_declarator(node.declarator), "declarator expected");
+        if (read_declarator(node.declarator)) {
+        } else if (read_abstract_declarator()) {
+        }
         ACCEPT
     }
     
@@ -501,7 +564,7 @@ protected:
     
     bool read_type_specifier(std::shared_ptr<NodeTypeSpecifier> &node) { DEBUG_HOOK
         NodeTypeNamed type_name;
-        if (read_type_name(type_name)) {
+        if (read_type_specifier_keyword(type_name)) {
             node = std::make_shared<NodeTypeNamed>(type_name);
             ACCEPT
         }
@@ -579,7 +642,9 @@ protected:
     
     bool read_designator(int &node) { DEBUG_HOOK
         if (read_punctuator(TokenPunctuator::SB_OPEN)) {
-            error("constant expression not implemented");
+            std::shared_ptr<Expression> expr;
+            NON_EMPTY(read_constant_expression(expr), "constant expression expected");
+            NON_EMPTY(read_punctuator(TokenPunctuator::SB_CLOSE), "] expected");
         } else if (read_punctuator(TokenPunctuator::PERIOD)) {
             const char *id;
             NON_EMPTY(read_identifier(id), "identifier expected");
@@ -797,6 +862,7 @@ protected:
         } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
             NON_EMPTY(read_expression(*list), "expression expected");
             NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), "closing bracket expected");
+            node = list;
         } else
             DENY
         
@@ -812,10 +878,13 @@ protected:
     bool read_postfix_expression(std::shared_ptr<Expression> &node) { DEBUG_HOOK
         if (read_primary_expression(node)) {
         } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
-            NodeTypeNamed type_name;
             std::vector<NodeDeclarator> initializers;
             
-            NON_EMPTY(read_type_name(type_name), "type-name expected");
+            auto constant = std::make_shared<ExpressionConstant>();
+            constant->text = "@todo";
+            node = constant;
+            
+            NON_EMPTY(read_type_name(), "type-name expected");
             NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
             
             NON_EMPTY(read_punctuator(TokenPunctuator::CB_OPEN), "{ expected");
@@ -891,9 +960,8 @@ protected:
     bool read_cast_expression(std::shared_ptr<Expression> &node) { DEBUG_HOOK
         int last_good_i = i;
         
-        NodeTypeNamed type_name;
         if (read_punctuator(TokenPunctuator::RB_OPEN) &&
-            read_type_name(type_name) &&
+            read_type_name() &&
             read_punctuator(TokenPunctuator::RB_CLOSE)) {
             NON_EMPTY(read_cast_expression(node), "cast expression expected");
             ACCEPT
@@ -918,14 +986,33 @@ protected:
             if (right_precedence >= left_precedence)
                 break;
             
-            auto tree = std::make_shared<ExpressionBinary>();
-            tree->op = peek().punctuator;
-            tree->lhs = root;
-            root = tree;
-            
-            shift();
-            
-            NON_EMPTY(read_expression_with_precedence(right_precedence, tree->rhs), "expression expected");
+            if (peek().punctuator == TokenPunctuator::QMARK) {
+                // conditional operator
+                
+                auto tree = std::make_shared<ExpressionConditional>();
+                tree->condition = root;
+                root = tree;
+                
+                shift();
+                
+                auto elist = std::make_shared<ExpressionList>();
+                tree->when_true = elist;
+                
+                NON_EMPTY(read_expression(*elist), "expression expected");
+                NON_EMPTY(read_punctuator(TokenPunctuator::COLON), "colon expected");
+                NON_EMPTY(read_expression_with_precedence((Precedence)(right_precedence - 1), tree->when_false), "expression expected");
+            } else {
+                // ordinary operator
+                
+                auto tree = std::make_shared<ExpressionBinary>();
+                tree->op = peek().punctuator;
+                tree->lhs = root;
+                root = tree;
+                
+                shift();
+                
+                NON_EMPTY(read_expression_with_precedence(right_precedence, tree->rhs), "expression expected");
+            }
         }
         
         node = root;
@@ -935,8 +1022,11 @@ protected:
     
     bool read_assignment_expression(std::shared_ptr<Expression> &node) { DEBUG_HOOK
         NON_EMPTY_RET(read_expression_with_precedence(Precedence::NONE, node))
-        node->dump();
-        std::cout << std::endl;
+        ACCEPT
+    }
+    
+    bool read_constant_expression(std::shared_ptr<Expression> &node) { DEBUG_HOOK
+        NON_EMPTY_RET(read_expression_with_precedence(Precedence::ASSIGNMENT, node))
         ACCEPT
     }
 };
