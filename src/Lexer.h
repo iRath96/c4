@@ -61,7 +61,7 @@ enum TokenPunctuator {
     DOUBLE_HASH /* ## */, HASH /* # */,
     ELIPSES /* ... */,
     
-    SUBSCRIPT /* . */, COMMA /* , */, COLON /* : */, QMARK /* ? */, SEMICOLON /* ; */,
+    PERIOD /* . */, COMMA /* , */, COLON /* : */, QMARK /* ? */, SEMICOLON /* ; */,
     
     ARROW /* -> */,
     

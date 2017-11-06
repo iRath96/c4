@@ -18,7 +18,7 @@
 
 #define NON_EMPTY(stmt, err) {\
     if (!stmt) \
-        error(err, i); \
+        error(err); \
 }
 
 #define NON_EMPTY_RET(stmt) {\
@@ -54,7 +54,6 @@ public:
 class NodeTypeNamed : public NodeTypeSpecifier {
 public:
     const char *name;
-    NodeTypeNamed(const char *name) : name(name) {}
 };
 
 class NodePointer : public Node {
@@ -117,11 +116,16 @@ public:
         read_list(&Parser::read_external_declaration, declarations);
         
         if (!eof())
-            error("declaration expected", i);
+            error("declaration expected");
     }
     
 protected:
     int i;
+    
+    bool shift(bool condition = true) {
+        i += condition ? 1 : 0;
+        return condition;
+    }
     
     Lexer lexer;
     std::vector<Token> token_queue;
@@ -145,29 +149,57 @@ protected:
         return token_queue[token_queue.size() - 1]; // size() <= i+1
     }
     
-    [[noreturn]] void error(const std::string &message, int offset) {
+    [[noreturn]] void error(const std::string &message, int offset = 0) {
         TextPosition start_pos = peek(offset).pos;
+        
+        for (int j = -(i >= 3 ? 3 : i); j <= 3; ++j) {
+            if (!j)
+                std::cout << "(here) ";
+            std::cout << peek(j).text << " ";
+        }
+        
+        std::cout << std::endl;
+        
         throw ParserError(message, start_pos);
     }
     
 #pragma mark - Helpers
     
     bool read_punctuator(TokenPunctuator punctuator) {
-        if (peek().punctuator == punctuator) {
-            ++i;
-            return true;
-        }
-        
-        return false;
+        return shift(peek().punctuator == punctuator);
     }
     
     bool read_keyword(TokenKeyword keyword) {
-        if (peek().keyword == keyword) {
-            ++i;
-            return true;
+        return shift(peek().keyword == keyword);
+    }
+    
+    bool read_constant() {
+        return shift(peek().type == TokenType::CONSTANT);
+    }
+    
+    bool read_string_literal() {
+        return shift(peek().type == TokenType::STRING_LITERAL);
+    }
+    
+    bool read_type_name(NodeTypeNamed &node) {
+        switch (peek().keyword) {
+            case TokenKeyword::VOID:
+            case TokenKeyword::CHAR:
+            case TokenKeyword::SHORT:
+            case TokenKeyword::INT:
+            case TokenKeyword::LONG:
+            case TokenKeyword::FLOAT:
+            case TokenKeyword::DOUBLE:
+            case TokenKeyword::SIGNED:
+            case TokenKeyword::UNSIGNED:
+            case TokenKeyword::_BOOL:
+            case TokenKeyword::_COMPLEX:
+                node.name = peek().text;
+                return shift();
+                
+            default:
+                return false;
         }
-        
-        return false;
     }
     
     template<typename T>
@@ -246,6 +278,7 @@ protected:
         
         while (!eof()) {
             // try reading parameter-list / identifier-list
+            
             std::vector<NodeParameterDeclaration> parameter_list;
             std::vector<const char *> identifier_list;
             
@@ -269,9 +302,7 @@ protected:
     bool read_identifier(const char *&text) {
         if (peek().type == TokenType::IDENTIFIER) {
             text = peek().text;
-            ++i;
-            
-            return true;
+            return shift();
         }
         
         return false;
@@ -343,27 +374,17 @@ protected:
     }
     
     bool read_type_specifier(std::shared_ptr<NodeTypeSpecifier> &node) {
+        NodeTypeNamed type_name;
+        if (read_type_name(type_name)) {
+            node = std::make_shared<NodeTypeNamed>(type_name);
+            return true;
+        }
+        
         Token &token = peek();
         switch (token.keyword) {
-            case TokenKeyword::VOID:
-            case TokenKeyword::CHAR:
-            case TokenKeyword::SHORT:
-            case TokenKeyword::INT:
-            case TokenKeyword::LONG:
-            case TokenKeyword::FLOAT:
-            case TokenKeyword::DOUBLE:
-            case TokenKeyword::SIGNED:
-            case TokenKeyword::UNSIGNED:
-            case TokenKeyword::_BOOL:
-            case TokenKeyword::_COMPLEX:
-                ++i;
-                node = std::make_shared<NodeTypeNamed>(token.text);
-                
-                return true;
-                
             case TokenKeyword::STRUCT:
             case TokenKeyword::UNION: {
-                ++i;
+                shift();
                 
                 NodeTypeComposed *n = new NodeTypeComposed();
                 node.reset(n);
@@ -374,7 +395,7 @@ protected:
                 bool has_body = peek().punctuator == TokenPunctuator::CB_OPEN;
                 
                 if (!has_body && !has_identifier)
-                    error("struct/union without identifier or body", i);
+                    error("struct/union without identifier or body");
                 
                 if (has_body)
                     NON_EMPTY(read_struct_body(*n), "struct/union body expected");
@@ -390,7 +411,54 @@ protected:
     }
     
     bool read_initializer(NodeDeclarator &node) {
-        error("not yet implemented", i);
+        int assignment_expr;
+        
+        if (read_punctuator(TokenPunctuator::CB_OPEN)) {
+            std::vector<NodeDeclarator> initializer_list;
+            NON_EMPTY(read_initializer_list(initializer_list), "initializer list expected");
+            read_punctuator(TokenPunctuator::COMMA);
+            NON_EMPTY(read_punctuator(TokenPunctuator::CB_CLOSE), "} expected");
+        } else if (read_assignment_expression(assignment_expr)) {
+        } else
+            return false;
+        
+        return true;
+    }
+    
+    bool read_designation_initializer_pair(NodeDeclarator &node) {
+        if (read_designation()) {
+            NON_EMPTY(read_initializer(node), "initializer expected after designation");
+        } else
+            return read_initializer(node);
+        
+        return true;
+    }
+    
+    bool read_initializer_list(std::vector<NodeDeclarator> &node) {
+        return read_separated_list(&Parser::read_designation_initializer_pair, TokenPunctuator::COMMA, node);
+    }
+    
+    bool read_designation() {
+        NON_EMPTY_RET(read_designator_list());
+        NON_EMPTY(read_punctuator(TokenPunctuator::ASSIGN), "= expected");
+        return true;
+    }
+    
+    bool read_designator_list() {
+        std::vector<int> node;
+        return read_list(&Parser::read_designator, node);
+    }
+    
+    bool read_designator(int &node) {
+        if (read_punctuator(TokenPunctuator::SB_OPEN)) {
+            error("constant expression not implemented");
+        } else if (read_punctuator(TokenPunctuator::PERIOD)) {
+            const char *id;
+            NON_EMPTY(read_identifier(id), "identifier expected");
+        } else
+            return false;
+        
+        return true;
     }
     
     bool read_init_declarator(NodeDeclarator &node) {
@@ -440,7 +508,7 @@ protected:
             node->specifiers = std::move(specifiers);
             
             if (needs_initialization) {
-                ++i; // consume assign
+                shift(); // consume assign
                 read_initializer(declarator);
                 
                 needs_initialization = peek().punctuator == TokenPunctuator::COMMA;
@@ -449,7 +517,7 @@ protected:
             node->declarators.push_back(std::move(declarator));
             
             if (needs_declaration_list) {
-                ++i; // jump over comma
+                shift(); // jump over comma
                 read_init_declarator_list(node->declarators);
             }
             
@@ -471,11 +539,7 @@ protected:
             return true;
         }
         
-        // init-declarator-list: read_list(init-declarator, ',')
-        // init-declarator: declarator
-        //                | declarator '=' initializer
-        
-        error("not yet implemented", i);
+        return false;
     }
     
 #pragma mark - Statements
@@ -586,6 +650,112 @@ protected:
     bool read_expression() {
         // @todo
         return false;
+    }
+    
+    bool read_primary_expression() {
+        const char *id;
+        
+        if (read_identifier(id)) {
+        } else if (read_constant()) {
+        } else if (read_string_literal()) {
+        } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
+            NON_EMPTY(read_expression(), "expression expected");
+            NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), "closing bracket expected");
+        } else
+            return false;
+        
+        return true;
+    }
+    
+    bool read_argument_expression_list() {
+        std::vector<int> node;
+        return read_separated_list(&Parser::read_assignment_expression, TokenPunctuator::COMMA, node);
+    }
+    
+    bool read_postfix_expression() {
+        if (read_primary_expression()) {
+        } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
+            NodeTypeNamed type_name;
+            std::vector<NodeDeclarator> initializers;
+            
+            NON_EMPTY(read_type_name(type_name), "type-name expected");
+            NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
+            
+            NON_EMPTY(read_punctuator(TokenPunctuator::CB_OPEN), "{ expected");
+            NON_EMPTY(read_initializer_list(initializers), "initializer list expected");
+            read_punctuator(TokenPunctuator::COMMA);
+            NON_EMPTY(read_punctuator(TokenPunctuator::CB_CLOSE), "} expected");
+        } else
+            return false;
+        
+        while (!eof()) {
+            if (read_punctuator(TokenPunctuator::SB_OPEN)) {
+                NON_EMPTY(read_expression(), "expression expected");
+                NON_EMPTY(read_punctuator(TokenPunctuator::SB_CLOSE), "] expected");
+            } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
+                read_argument_expression_list();
+                NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
+            } else if (read_punctuator(TokenPunctuator::PERIOD)) {
+                const char *id;
+                NON_EMPTY(read_identifier(id), "subscript expected");
+            } else if (read_punctuator(TokenPunctuator::ARROW)) {
+                const char *id;
+                NON_EMPTY(read_identifier(id), "subscript expected");
+            } else if (read_punctuator(TokenPunctuator::PLUSPLUS)) {
+            } else if (read_punctuator(TokenPunctuator::MINUSMINUS)) {
+            } else
+                break;
+        }
+        
+        return true;
+    }
+    
+    bool read_unary_operator() {
+        switch (peek().punctuator) {
+            case TokenPunctuator::BIT_AND:
+            case TokenPunctuator::ASTERISK:
+            case TokenPunctuator::PLUS:
+            case TokenPunctuator::MINUS:
+            case TokenPunctuator::BIT_NOT:
+            case TokenPunctuator::LOG_NOT:
+                return shift();
+                
+            default:
+                return false;
+        }
+    }
+    
+    bool read_unary_expression() {
+        if (read_punctuator(TokenPunctuator::PLUSPLUS) || read_punctuator(TokenPunctuator::MINUSMINUS)) {
+            NON_EMPTY(read_unary_expression(), "unary expression expected");
+        } else if (read_unary_operator()) {
+            NON_EMPTY(read_cast_expression(), "cast expression expected");
+        } else if (read_postfix_expression()) {
+        } else
+            return false;
+        
+        return true;
+    }
+    
+    bool read_cast_expression() {
+        int last_good_i = i;
+        
+        NodeTypeNamed type_name;
+        if (read_punctuator(TokenPunctuator::RB_OPEN) &&
+            read_type_name(type_name) &&
+            read_punctuator(TokenPunctuator::RB_CLOSE)) {
+            NON_EMPTY(read_cast_expression(), "cast expression expected");
+            return true;
+        } else {
+            // backtrack
+            i = last_good_i;
+        }
+        
+        return read_unary_expression();
+    }
+    
+    bool read_assignment_expression(int &node) {
+        return read_cast_expression(); // @todo
     }
 };
 

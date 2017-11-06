@@ -288,7 +288,7 @@ int Lexer::read_punctuator() {
         P('(', RB_OPEN) P(')', RB_CLOSE)
         P('<', AB_OPEN) P('>', AB_CLOSE)
             
-        P('.', SUBSCRIPT) P('#', HASH) P(',', COMMA) P('=', ASSIGN) P('?', QMARK) P(':', COLON) P(';', SEMICOLON)
+        P('.', PERIOD) P('#', HASH) P(',', COMMA) P('=', ASSIGN) P('?', QMARK) P(':', COLON) P(';', SEMICOLON)
             
         P('+', PLUS) P('-', MINUS) P('*', ASTERISK) P('/', SLASH) P('%', MODULO)
             
