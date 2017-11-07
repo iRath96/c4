@@ -401,9 +401,11 @@ public:
         if (!eof())
             error("declaration expected");
         
+        /*
         for (auto &decl : declarations) {
             decl->describe(std::cout, "");
         }
+        */
         
         //dbg_tree_root.dump(this);
     }
