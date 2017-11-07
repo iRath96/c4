@@ -295,7 +295,8 @@ protected:
     
 #pragma mark - Helpers
     
-    bool read_punctuator(TokenPunctuator punctuator) { DEBUG_HOOK
+    bool read_punctuator(TokenPunctuator punctuator) {
+        DEBUG_HOOK
         NON_EMPTY_RET(shift(peek().punctuator == punctuator))
         ACCEPT
     }
@@ -383,7 +384,9 @@ protected:
     
 #pragma mark - Declarations
     
-    bool read_declarator(NodeDeclarator &node) { DEBUG_HOOK
+    bool read_declarator(NodeDeclarator &node) {
+        DEBUG_HOOK
+        
         if (read_pointer(node))
             NON_EMPTY(read_direct_declarator(node), "direct declarator expected")
         else
@@ -428,11 +431,15 @@ protected:
     OPTION
         NON_OPTIONAL(read_identifier(node.name))
     ELSE_OPTION
+        NodeDeclarator node;
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
+        NON_OPTIONAL(read_declarator(node))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
     END_OPTION
     
-    bool read_direct_declarator(NodeDeclarator &node) { DEBUG_HOOK
+    bool read_direct_declarator(NodeDeclarator &node) {
+        DEBUG_HOOK
+        
         NON_EMPTY_RET(read_direct_declarator_prefix(node));
         
         int last_good_i = i;
@@ -654,7 +661,7 @@ protected:
     
     bool read_designation()
     OPTION
-        NON_OPTIONAL(read_designator_list());
+        NON_OPTIONAL(read_designator_list())
         NON_OPTIONAL(read_punctuator(TokenPunctuator::ASSIGN))
     END_OPTION
     
@@ -680,7 +687,7 @@ protected:
     
     bool read_init_declarator(NodeDeclarator &node)
     OPTION
-        NON_OPTIONAL(read_declarator(node));
+        NON_OPTIONAL(read_declarator(node))
         
         if (read_punctuator(TokenPunctuator::ASSIGN)) {
             // also read initializer
@@ -705,7 +712,9 @@ protected:
         NON_OPTIONAL(read_list(&Parser::read_declaration, node))
     END_OPTION
     
-    bool read_external_declaration(std::shared_ptr<NodeExternalDeclaration> &node) { DEBUG_HOOK
+    bool read_external_declaration(std::shared_ptr<NodeExternalDeclaration> &node) {
+        DEBUG_HOOK
+        
         std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
         NodeDeclarator declarator;
         
@@ -823,7 +832,7 @@ protected:
         NON_OPTIONAL(read_statement())
         
         if (read_keyword(TokenKeyword::ELSE))
-            NON_OPTIONAL(read_statement());
+            NON_OPTIONAL(read_statement())
     END_OPTION
     
     bool read_iteration_statement()
@@ -881,26 +890,31 @@ protected:
         NON_OPTIONAL(read_separated_list(&Parser::read_assignment_expression, TokenPunctuator::COMMA, node))
     END_OPTION
     
+    bool read_postfix_expression_prefix(std::shared_ptr<Expression> &node)
+    OPTION
+        NON_OPTIONAL(read_primary_expression(node))
+    ELSE_OPTION
+        std::vector<NodeDeclarator> initializers;
+    
+        auto constant = std::make_shared<ExpressionConstant>();
+        constant->text = "@todo";
+        node = constant;
+
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
+    
+        NON_OPTIONAL(read_type_name())
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
+
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_OPEN))
+        NON_OPTIONAL(read_initializer_list(initializers))
+        OPTIONAL(read_punctuator(TokenPunctuator::COMMA))
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_CLOSE))
+    END_OPTION
+    
     bool read_postfix_expression(std::shared_ptr<Expression> &node) {
         DEBUG_HOOK
         
-        if (read_primary_expression(node)) {
-        } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
-            std::vector<NodeDeclarator> initializers;
-            
-            auto constant = std::make_shared<ExpressionConstant>();
-            constant->text = "@todo";
-            node = constant;
-            
-            NON_EMPTY(read_type_name(), "type-name expected");
-            NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
-            
-            NON_EMPTY(read_punctuator(TokenPunctuator::CB_OPEN), "{ expected");
-            NON_EMPTY(read_initializer_list(initializers), "initializer list expected");
-            read_punctuator(TokenPunctuator::COMMA);
-            NON_EMPTY(read_punctuator(TokenPunctuator::CB_CLOSE), "} expected");
-        } else
-            DENY
+        NON_EMPTY_RET(read_postfix_expression_prefix(node))
         
         while (!eof()) {
             if (read_punctuator(TokenPunctuator::SB_OPEN)) {
@@ -977,27 +991,19 @@ protected:
         NON_OPTIONAL(read_postfix_expression(node))
     END_OPTION
     
-    bool read_cast_expression(std::shared_ptr<Expression> &node) {
-        DEBUG_HOOK
-        
-        int last_good_i = i;
-        
-        if (read_punctuator(TokenPunctuator::RB_OPEN) &&
-            read_type_name() &&
-            read_punctuator(TokenPunctuator::RB_CLOSE)) {
-            NON_EMPTY(read_cast_expression(node), "cast expression expected");
-            ACCEPT
-        } else {
-            // backtrack
-            i = last_good_i;
-        }
-        
-        NON_EMPTY_RET(read_unary_expression(node))
-        ACCEPT
-    }
+    bool read_cast_expression(std::shared_ptr<Expression> &node)
+    OPTION
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
+        NON_OPTIONAL(read_type_name())
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
     
-    bool read_expression_with_precedence(Precedence left_precedence, std::shared_ptr<Expression> &node) { DEBUG_HOOK
-        // we need a node (leaf for the sub-tree)
+        NON_OPTIONAL(read_cast_expression(node))
+    ELSE_OPTION
+        NON_OPTIONAL(read_unary_expression(node))
+    END_OPTION
+    
+    bool read_expression_with_precedence(Precedence left_precedence, std::shared_ptr<Expression> &node) {
+        DEBUG_HOOK
         
         std::shared_ptr<Expression> root;
         NON_EMPTY_RET(read_cast_expression(root));
