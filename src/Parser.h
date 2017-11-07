@@ -301,6 +301,13 @@ public:
 class ExpressionConditional : public Expression {
 public:
     std::shared_ptr<Expression> condition, when_true, when_false;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionConditional" << std::endl;
+        condition->describe(s, indent + "  ");
+        when_true->describe(s, indent + "  ");
+        when_false->describe(s, indent + "  ");
+    }
 };
 
 class ExpressionList : public Expression {
@@ -394,11 +401,9 @@ public:
         if (!eof())
             error("declaration expected");
         
-        /*
         for (auto &decl : declarations) {
             decl->describe(std::cout, "");
         }
-        */
         
         //dbg_tree_root.dump(this);
     }
@@ -422,6 +427,11 @@ public:
     
 protected:
     int i;
+    
+    struct {
+        int i = 0;
+        std::vector<Token> tokens;
+    } error_loc;
     
     bool shift(bool condition = true) {
         i += condition ? 1 : 0;
@@ -451,41 +461,97 @@ protected:
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
-        TextPosition start_pos = peek(offset).pos;
+        TextPosition start_pos = peek(error_loc.i - i).pos;
         throw ParserError(message, start_pos);
     }
     
-#pragma mark - Helpers
+#pragma mark - Terminals
+    
+    void report_error(Token expected_token) {
+        if (i < error_loc.i)
+            return;
+        
+        if (i > error_loc.i) {
+            error_loc.i = i;
+            error_loc.tokens.clear();
+        }
+        
+        error_loc.tokens.push_back(expected_token);
+    }
     
     bool read_punctuator(TokenPunctuator punctuator) {
         DEBUG_HOOK
-        NON_EMPTY_RET(shift(peek().punctuator == punctuator))
+        
+        if (peek().punctuator != punctuator) {
+            report_error((Token){ .type = TokenType::PUNCTUATOR, .punctuator = punctuator });
+            DENY
+        }
+        
+        shift();
         ACCEPT
     }
     
     bool read_keyword(TokenKeyword keyword) {
-        return shift(peek().keyword == keyword);
-    }
-    
-    bool read_constant(const char *&text) {
-        if (peek().type == TokenType::CONSTANT) {
-            text = peek().text;
-            shift();
-        } else
-            return false;
+        DEBUG_HOOK
         
-        return true;
+        if (peek().keyword != keyword) {
+            report_error((Token){ .type = TokenType::KEYWORD, .keyword = keyword });
+            DENY
+        }
+        
+        shift();
+        ACCEPT
     }
     
-    bool read_string_literal(const char *&text) {
-        if (peek().type == TokenType::STRING_LITERAL) {
-            text = peek().text;
-            shift();
-        } else
+    bool read_unary_operator(TokenPunctuator &op) {
+        DEBUG_HOOK
+        
+        switch (peek().punctuator) {
+            case TokenPunctuator::BIT_AND:
+            case TokenPunctuator::ASTERISK:
+            case TokenPunctuator::PLUS:
+            case TokenPunctuator::MINUS:
+            case TokenPunctuator::BIT_NOT:
+            case TokenPunctuator::LOG_NOT:
+                op = peek().punctuator;
+                shift();
+                
+                break;
+                
+            default:
+                report_error((Token){ .type = TokenType::PUNCTUATOR, .punctuator = TokenPunctuator::LOG_NOT });
+                DENY
+        }
+        
+        ACCEPT
+    }
+    
+    bool read_token(TokenType type, const char *&text) {
+        if (peek().type != type) {
+            report_error((Token){ .type = type });
             return false;
-    
-        return true;
+        }
+        
+        text = peek().text;
+        return shift();
     }
+    
+    bool read_identifier(const char *&text)
+    OPTION
+        NON_OPTIONAL(read_token(TokenType::IDENTIFIER, text))
+    END_OPTION
+    
+    bool read_constant(const char *&text)
+    OPTION
+        NON_OPTIONAL(read_token(TokenType::CONSTANT, text))
+    END_OPTION
+    
+    bool read_string_literal(const char *&text)
+    OPTION
+        NON_OPTIONAL(read_token(TokenType::STRING_LITERAL, text))
+    END_OPTION
+    
+#pragma mark - Other stuff
     
     bool read_type_specifier_keyword(NodeTypeNamed &node) {
         switch (peek().keyword) {
@@ -601,14 +667,6 @@ protected:
         i = last_good_i;
         ACCEPT
     }
-    
-    bool read_identifier(const char *&text)
-    OPTION
-        NON_OPTIONAL(peek().type == TokenType::IDENTIFIER)
-    
-        text = peek().text;
-        shift();
-    END_OPTION
     
     bool read_identifier_list(std::vector<const char *> &node)
     OPTION
@@ -928,14 +986,14 @@ protected:
             label = n;
         } else if (read_keyword(TokenKeyword::DEFAULT)) {
             label = std::make_shared<DefaultLabel>();
-        } else if (peek(0).type == TokenType::IDENTIFIER && peek(1).punctuator == TokenPunctuator::COLON) {
+        } else if (peek(0).type == TokenType::IDENTIFIER) {
             auto n = std::make_shared<IdentifierLabel>();
             read_identifier(n->id);
-            shift();
             label = n;
         } else
             DENY
         
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::COLON))
         NON_OPTIONAL(read_statement(node))
         
         node->labels.push_back(label);
@@ -1092,28 +1150,6 @@ protected:
         ACCEPT
     }
     
-    bool read_unary_operator(TokenPunctuator &op) {
-        DEBUG_HOOK
-        
-        switch (peek().punctuator) {
-            case TokenPunctuator::BIT_AND:
-            case TokenPunctuator::ASTERISK:
-            case TokenPunctuator::PLUS:
-            case TokenPunctuator::MINUS:
-            case TokenPunctuator::BIT_NOT:
-            case TokenPunctuator::LOG_NOT:
-                op = peek().punctuator;
-                shift();
-                
-                break;
-                
-            default:
-                DENY
-        }
-        
-        ACCEPT
-    }
-    
     bool read_unary_expression(std::shared_ptr<Expression> &node)
     OPTION
         auto unary_node = std::make_shared<ExpressionUnary>();
@@ -1171,9 +1207,13 @@ protected:
         NON_EMPTY_RET(read_cast_expression(root));
         
         while (!eof()) {
-            Precedence right_precedence = PRECEDENCE(peek().punctuator);
+            TokenPunctuator op = peek().punctuator;
+            Precedence right_precedence = PRECEDENCE(op);
             
-            if (right_precedence >= left_precedence)
+            if (op == TokenPunctuator::QMARK ?
+                (right_precedence == left_precedence) : // right-assoc
+                (right_precedence >= left_precedence)   // left-assoc
+                )
                 break;
             
             if (peek().punctuator == TokenPunctuator::QMARK) {
