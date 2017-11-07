@@ -13,6 +13,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <sstream>
 
 #include "Lexer.h"
 
@@ -73,6 +74,35 @@ extern DebugTree *dbg_tree_current;
         DEBUG_RETURN(false); \
 }
 
+#define OPTION { \
+    DEBUG_HOOK \
+    int _initial_i = i; \
+    { \
+        __label__ deny;
+
+#define ELSE_OPTION \
+        ACCEPT \
+        deny: \
+        i = _initial_i; \
+    } \
+    { \
+        __label__ deny;
+
+#define END_OPTION \
+        ACCEPT \
+        deny: \
+        i = _initial_i; \
+    } \
+    DENY \
+}
+
+#define NON_OPTIONAL(stmt) \
+    if (!(stmt)) goto deny;
+#define OPTIONAL(stmt) \
+    stmt;
+
+const char *operator_name(TokenPunctuator punctuator);
+
 class ParserError {
 public:
     std::string message;
@@ -86,12 +116,61 @@ public:
 
 class Node {
 public:
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "not implemented" << std::endl;
+    }
+};
+
+class Expression : public Node {
+public:
+};
+
+class Label : public Node {
+public:
+};
+
+class NodeBlockItem : public Node {
+public:
+};
+
+class Statement : public NodeBlockItem {
+public:
+    std::vector<std::shared_ptr<Label>> labels;
+};
+
+class CaseLabel : public Label {
+public:
+    std::shared_ptr<Expression> expression;
+};
+
+class DefaultLabel : public Label {
+public:
+};
+
+class IdentifierLabel : public Label {
+public:
+    const char *id;
+};
+
+class CompoundStatement : public Statement {
+public:
+    std::vector<std::shared_ptr<NodeBlockItem>> items;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "CompoundStatement" << std::endl;
+        for (auto &item : items)
+            item->describe(s, indent + "  ");
+    }
 };
 
 class NodeIdentifier : public Node {
 public:
     const char *id;
     NodeIdentifier(const char *id) : id(id) {}
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << "id(" << id << ")";
+    }
 };
 
 class NodeTypeSpecifier : public Node {
@@ -101,6 +180,10 @@ public:
 class NodeTypeNamed : public NodeTypeSpecifier {
 public:
     const char *name;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << name << std::endl;
+    }
 };
 
 class NodePointer : public Node {
@@ -112,18 +195,32 @@ class NodeDeclarator : public Node {
 public:
     const char *name;
     std::vector<NodePointer> pointers;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "NodeDeclarator[" << name << ", " << pointers.size() << "]" << std::endl;
+    }
 };
 
-class NodeDeclaration : public Node {
+class NodeDeclaration : public NodeBlockItem {
 public:
     std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
     std::vector<NodeDeclarator> declarators;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "NodeDeclaration" << std::endl;
+        
+        s << indent << "  types:" << std::endl;
+        for (auto &specifier : specifiers)
+            specifier->describe(s, indent + "    ");
+        
+        s << indent << "  declarators:" << std::endl;
+        for (auto &decl : declarators)
+            decl.describe(s, indent + "    ");
+    }
 };
 
-class NodeExternalDeclaration : public Node {
+class NodeExternalDeclaration : public NodeDeclaration {
 public:
-    std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
-    std::vector<NodeDeclarator> declarators;
 };
 
 class NodeExternalDeclarationVariable : public NodeExternalDeclaration {
@@ -133,6 +230,17 @@ public:
 class NodeExternalDeclarationFunction : public NodeExternalDeclaration {
 public:
     std::vector<NodeDeclaration> declarations;
+    CompoundStatement body;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        NodeDeclaration::describe(s, indent);
+        
+        s << indent << "  declarations:" << std::endl;
+        for (auto &decl : declarations)
+            decl.describe(s, indent + "    ");
+        
+        body.describe(s, indent + "  ");
+    }
 };
 
 class NodeParameterDeclaration : public Node {
@@ -147,25 +255,21 @@ public:
     std::vector<NodeDeclaration> declarations;
     
     const char *name = NULL;
-};
-
-class NodeBlockItem : public Node {
-public:
-};
-
-const char *operator_name(TokenPunctuator punctuator);
-
-class Expression : public Node {
-public:
-    virtual void dump() = 0;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << (type == TokenKeyword::STRUCT ? "struct" : "union") << std::endl;
+        
+        for (auto &decl : declarations)
+            decl.describe(s, indent + "  ");
+    }
 };
 
 class ExpressionConstant : public Expression {
 public:
     const char *text;
     
-    virtual void dump() {
-        std::cout << text;
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionConstant(" << text << ")" << std::endl;
     }
 };
 
@@ -174,9 +278,10 @@ public:
     std::shared_ptr<Expression> operand;
     TokenPunctuator op;
     
-    virtual void dump() {
-        std::cout << operator_name(op);
-        operand->dump();
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionUnary" << std::endl;
+        std::cout << indent << "  " << operator_name(op) << std::endl;
+        operand->describe(s, indent + "  ");
     }
 };
 
@@ -185,43 +290,94 @@ public:
     std::shared_ptr<Expression> lhs, rhs;
     TokenPunctuator op;
     
-    virtual void dump() {
-        std::cout << "(";
-        lhs->dump();
-        std::cout << operator_name(op);
-        rhs->dump();
-        std::cout << ")";
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionBinary" << std::endl;
+        lhs->describe(s, indent + "  ");
+        std::cout << indent << "  " << operator_name(op) << std::endl;
+        rhs->describe(s, indent + "  ");
     }
 };
 
 class ExpressionConditional : public Expression {
 public:
     std::shared_ptr<Expression> condition, when_true, when_false;
-    
-    virtual void dump() {
-        std::cout << "(";
-        condition->dump();
-        std::cout << " ? ";
-        when_true->dump();
-        std::cout << " : ";
-        when_false->dump();
-        std::cout << ")";
-    }
 };
 
 class ExpressionList : public Expression {
 public:
     std::vector<std::shared_ptr<Expression>> children;
     
-    virtual void dump() {
-        bool first = true;
-        for (auto &child : children) {
-            if (first)
-                first = false;
-            else
-                std::cout << ", ";
-            
-            child->dump();
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionList" << std::endl;
+        for (auto &child : children)
+            child->describe(s, indent + "  ");
+    }
+};
+
+class ExpressionCall : public Expression {
+public:
+    std::shared_ptr<Expression> function;
+    std::vector<std::shared_ptr<Expression>> arguments;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionCall" << std::endl;
+        function->describe(s, indent + "  ");
+        
+        for (auto &arg : arguments) {
+            arg->describe(s, indent + "  ");
+        }
+    }
+};
+
+class ExpressionStatement : public Statement {
+public:
+    ExpressionList expressions;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "ExpressionStatement" << std::endl;
+        expressions.describe(s, indent + "  ");
+    }
+};
+
+class SizeofExpression : public Expression {
+public:
+};
+
+class SizeofExpressionUnary : public SizeofExpression {
+public:
+    std::shared_ptr<Expression> expression;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "SizeofExpressionUnary" << std::endl;
+        expression->describe(s, indent + "  ");
+    }
+};
+
+class TypeName : public Node {
+public:
+    std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
+};
+
+class SizeofExpressionTypeName : public SizeofExpression {
+public:
+    TypeName type;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "SizeofExpressionTypeName" << std::endl;
+    }
+};
+
+class InitializerExpression : public Expression {
+public:
+    TypeName type;
+    std::vector<NodeDeclarator> initializers;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "InitializerExpression" << std::endl;
+        type.describe(s, indent + "  ");
+        
+        for (auto &i : initializers) {
+            i.describe(s, indent + "  ");
         }
     }
 };
@@ -238,7 +394,13 @@ public:
         if (!eof())
             error("declaration expected");
         
-        dbg_tree_root.dump(this);
+        /*
+        for (auto &decl : declarations) {
+            decl->describe(std::cout, "");
+        }
+        */
+        
+        //dbg_tree_root.dump(this);
     }
     
     void print_context(int index = -1) {
@@ -395,33 +557,6 @@ protected:
         ACCEPT
     }
     
-#define OPTION { \
-    DEBUG_HOOK \
-    int _initial_i = i; \
-    { \
-        __label__ deny;
-    
-#define ELSE_OPTION \
-        ACCEPT \
-        deny: \
-        i = _initial_i; \
-    } \
-    { \
-        __label__ deny;
-    
-#define END_OPTION \
-        ACCEPT \
-        deny: \
-        i = _initial_i; \
-    } \
-    DENY \
-}
-    
-#define NON_OPTIONAL(stmt) \
-    if (!(stmt)) goto deny;
-#define OPTIONAL(stmt) \
-    stmt;
-    
     bool read_declaration_specifiers(std::vector<std::shared_ptr<NodeTypeSpecifier>> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
@@ -480,11 +615,9 @@ protected:
         NON_OPTIONAL(read_separated_list(&Parser::read_identifier, TokenPunctuator::COMMA, node))
     END_OPTION
     
-    bool read_type_name()
+    bool read_type_name(TypeName &node)
     OPTION
-        std::vector<std::shared_ptr<NodeTypeSpecifier>> sql;
-    
-        NON_OPTIONAL(read_specifier_qualifier_list(sql))
+        NON_OPTIONAL(read_specifier_qualifier_list(node.specifiers))
         OPTIONAL(read_abstract_declarator())
     END_OPTION
     
@@ -758,7 +891,7 @@ protected:
             node->declarators.push_back(std::move(declarator));
             
             read_declaration_list(n->declarations);
-            NON_EMPTY(read_compound_statement(), "compound statement expected");
+            NON_EMPTY(read_compound_statement(n->body), "compound statement expected");
         }
         
         ACCEPT
@@ -766,13 +899,17 @@ protected:
     
 #pragma mark - Statements
     
-    bool read_statement()
+    bool read_statement(std::shared_ptr<Statement> &node)
     OPTION
-        NON_OPTIONAL(read_labeled_statement())
+        NON_OPTIONAL(read_labeled_statement(node))
     ELSE_OPTION
-        NON_OPTIONAL(read_compound_statement())
+        auto c = std::make_shared<CompoundStatement>();
+        NON_OPTIONAL(read_compound_statement(*c))
+        node = c;
     ELSE_OPTION
-        NON_OPTIONAL(read_expression_statement())
+        auto e = std::make_shared<ExpressionStatement>();
+        NON_OPTIONAL(read_expression_statement(*e))
+        node = e;
     ELSE_OPTION
         NON_OPTIONAL(read_selection_statement())
     ELSE_OPTION
@@ -781,69 +918,83 @@ protected:
         NON_OPTIONAL(read_jump_statement())
     END_OPTION
     
-    bool read_labeled_statement()
+    bool read_labeled_statement(std::shared_ptr<Statement> &node)
     OPTION
+        std::shared_ptr<Label> label;
+    
         if (read_keyword(TokenKeyword::CASE)) {
+            auto n = std::make_shared<CaseLabel>();
+            NON_OPTIONAL(read_constant_expression(n->expression))
+            label = n;
         } else if (read_keyword(TokenKeyword::DEFAULT)) {
+            label = std::make_shared<DefaultLabel>();
         } else if (peek(0).type == TokenType::IDENTIFIER && peek(1).punctuator == TokenPunctuator::COLON) {
+            auto n = std::make_shared<IdentifierLabel>();
+            read_identifier(n->id);
+            shift();
+            label = n;
         } else
             DENY
         
-        NON_OPTIONAL(read_statement())
+        NON_OPTIONAL(read_statement(node))
+        
+        node->labels.push_back(label);
     END_OPTION
     
-    bool read_block_item(NodeBlockItem &node)
+    bool read_block_item(std::shared_ptr<NodeBlockItem> &node)
     OPTION
-        NodeDeclaration declaration;
-        NON_OPTIONAL(read_declaration(declaration))
+        auto n = std::make_shared<NodeDeclaration>();
+        NON_OPTIONAL(read_declaration(*n))
+        node = n;
     ELSE_OPTION
-        NON_OPTIONAL(read_statement())
+        std::shared_ptr<Statement> stmt;
+        NON_OPTIONAL(read_statement(stmt))
+        node = stmt;
     END_OPTION
     
-    bool read_block_item_list(std::vector<NodeBlockItem> &node)
+    bool read_block_item_list(std::vector<std::shared_ptr<NodeBlockItem>> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_block_item, node))
     END_OPTION
     
-    bool read_compound_statement()
+    bool read_compound_statement(CompoundStatement &node)
     OPTION
-        std::vector<NodeBlockItem> block_items;
-        
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_OPEN))
-        OPTIONAL(read_block_item_list(block_items))
+        OPTIONAL(read_block_item_list(node.items))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_CLOSE))
     END_OPTION
     
-    bool read_expression_statement()
+    bool read_expression_statement(ExpressionStatement &node)
     OPTION
-        ExpressionList list;
-        NON_OPTIONAL(read_expression(list))
+        NON_OPTIONAL(read_expression(node.expressions))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     END_OPTION
     
     bool read_selection_statement()
     OPTION
-        ExpressionList list;
+        ExpressionList condition;
+        std::shared_ptr<Statement> when_true, when_false;
         
         NON_OPTIONAL(read_keyword(TokenKeyword::IF))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-        NON_OPTIONAL(read_expression(list))
+        NON_OPTIONAL(read_expression(condition))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
-        NON_OPTIONAL(read_statement())
+        NON_OPTIONAL(read_statement(when_true))
         
         if (read_keyword(TokenKeyword::ELSE))
-            NON_OPTIONAL(read_statement())
+            NON_OPTIONAL(read_statement(when_false))
     END_OPTION
     
     bool read_iteration_statement()
     OPTION
-        ExpressionList list;
+        ExpressionList condition;
+        std::shared_ptr<Statement> body;
         
         NON_OPTIONAL(read_keyword(TokenKeyword::WHILE))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-        NON_OPTIONAL(read_expression(list))
+        NON_OPTIONAL(read_expression(condition))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
-        NON_OPTIONAL(read_statement())
+        NON_OPTIONAL(read_statement(body))
     END_OPTION
     
     bool read_jump_statement()
@@ -884,9 +1035,8 @@ protected:
         node = list;
     END_OPTION
     
-    bool read_argument_expression_list()
+    bool read_argument_expression_list(std::vector<std::shared_ptr<Expression>> &node)
     OPTION
-        std::vector<std::shared_ptr<Expression>> node;
         NON_OPTIONAL(read_separated_list(&Parser::read_assignment_expression, TokenPunctuator::COMMA, node))
     END_OPTION
     
@@ -894,21 +1044,19 @@ protected:
     OPTION
         NON_OPTIONAL(read_primary_expression(node))
     ELSE_OPTION
-        std::vector<NodeDeclarator> initializers;
-    
-        auto constant = std::make_shared<ExpressionConstant>();
-        constant->text = "@todo";
-        node = constant;
+        auto initializer = std::make_shared<InitializerExpression>();
 
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
     
-        NON_OPTIONAL(read_type_name())
+        NON_OPTIONAL(read_type_name(initializer->type))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
 
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_OPEN))
-        NON_OPTIONAL(read_initializer_list(initializers))
+        NON_OPTIONAL(read_initializer_list(initializer->initializers))
         OPTIONAL(read_punctuator(TokenPunctuator::COMMA))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_CLOSE))
+    
+        node = initializer;
     END_OPTION
     
     bool read_postfix_expression(std::shared_ptr<Expression> &node) {
@@ -922,8 +1070,13 @@ protected:
                 NON_EMPTY(read_expression(list), "expression expected");
                 NON_EMPTY(read_punctuator(TokenPunctuator::SB_CLOSE), "] expected");
             } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
-                read_argument_expression_list();
+                auto n = std::make_shared<ExpressionCall>();
+                n->function = node;
+                
+                read_argument_expression_list(n->arguments);
                 NON_EMPTY(read_punctuator(TokenPunctuator::RB_CLOSE), ") expected");
+                
+                node = n;
             } else if (read_punctuator(TokenPunctuator::PERIOD)) {
                 const char *id;
                 NON_EMPTY(read_identifier(id), "subscript expected");
@@ -978,14 +1131,21 @@ protected:
         NON_OPTIONAL(read_keyword(TokenKeyword::SIZEOF))
     
         if (read_unary_expression(u)) {
+            auto s = std::make_shared<SizeofExpressionUnary>();
+            s->expression = u;
+            node = s;
         } else if (read_punctuator(TokenPunctuator::RB_OPEN)) {
-            NON_OPTIONAL(read_type_name())
+            auto s = std::make_shared<SizeofExpressionTypeName>();
+            NON_OPTIONAL(read_type_name(s->type))
             NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
+            node = s;
         }
     ELSE_OPTION
+        TypeName type_name;
+    
         NON_OPTIONAL(read_keyword(TokenKeyword::_ALIGNOF))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-        NON_OPTIONAL(read_type_name())
+        NON_OPTIONAL(read_type_name(type_name))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
     ELSE_OPTION
         NON_OPTIONAL(read_postfix_expression(node))
@@ -993,8 +1153,10 @@ protected:
     
     bool read_cast_expression(std::shared_ptr<Expression> &node)
     OPTION
+        TypeName type_name;
+    
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-        NON_OPTIONAL(read_type_name())
+        NON_OPTIONAL(read_type_name(type_name))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
     
         NON_OPTIONAL(read_cast_expression(node))
