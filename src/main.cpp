@@ -63,6 +63,8 @@ void tokenize(const char *filename) {
     }
 }
 
+bool print_ast = false;
+
 void parse(const char *filename) {
     Parser parser(create_lexer(filename));
     try {
@@ -77,12 +79,20 @@ void parse(const char *filename) {
         fprintf(stderr, "%s:%d:%d: parser error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
         exit(1);
     }
+    
+    if (print_ast) {
+        for (auto &decl : parser.declarations) {
+            decl->describe(std::cout, "");
+        }
+    }
 }
 
 int main(int argc, const char *argv[]) {
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--tokenize"))
             tokenize(argv[++i]);
+        else if (!strcmp(argv[i], "--ast"))
+            print_ast = true;
         else if (!strcmp(argv[i], "--parse"))
             parse(argv[++i]);
         else {

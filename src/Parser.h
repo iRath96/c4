@@ -193,11 +193,20 @@ public:
 
 class NodeDeclarator : public Node {
 public:
-    const char *name;
+    const char *name = NULL;
+    bool is_function = false; // function pointer
+    
     std::vector<NodePointer> pointers;
+    std::shared_ptr<Expression> initializer;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        s << indent << "NodeDeclarator[" << name << ", " << pointers.size() << "]" << std::endl;
+        s << indent << "NodeDeclarator["
+          << (is_function ? "function " : "")
+          << (name ? name : "(unnamed)")
+          << ", " << pointers.size() << "]" << std::endl;
+        
+        if (initializer.get())
+            initializer->describe(s, indent + "  ");
     }
 };
 
@@ -363,6 +372,12 @@ public:
 class TypeName : public Node {
 public:
     std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "TypeName" << std::endl;
+        for (auto &d : specifiers)
+            d->describe(s, indent + "  ");
+    }
 };
 
 class SizeofExpressionTypeName : public SizeofExpression {
@@ -374,38 +389,80 @@ public:
     }
 };
 
+class Designator : public Node {
+public:
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "Designator" << std::endl;
+    }
+};
+
+class DesignatorWithIdentifier : public Designator {
+public:
+    const char *id;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "DesignatorWithIdentifier[" << id << "]" << std::endl;
+    }
+};
+
+class DesignatorWithExpression : public Designator {
+public:
+    std::shared_ptr<Expression> expression;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "DesignatorWithExpression" << std::endl;
+        expression->describe(s, indent + "  ");
+    }
+};
+
+class Initializer : public Node {
+public:
+    std::vector<std::shared_ptr<Designator>> designators;
+    NodeDeclarator declarator;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "Initializer" << std::endl;
+        for (auto &d : designators)
+            d->describe(s, indent + "  ");
+        declarator.describe(s, indent + "  ");
+    }
+};
+
+class InitializerList : public Expression { // @todo really inherit from Expression?
+public:
+    std::vector<Initializer> initializers;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        std::cout << indent << "InitializerList" << std::endl;
+        for (auto &i : initializers)
+            i.describe(s, indent + "  ");
+    }
+};
+
 class InitializerExpression : public Expression {
 public:
     TypeName type;
-    std::vector<NodeDeclarator> initializers;
+    InitializerList initializers;
     
     virtual void describe(std::ostream &s, std::string indent) {
         std::cout << indent << "InitializerExpression" << std::endl;
         type.describe(s, indent + "  ");
-        
-        for (auto &i : initializers) {
-            i.describe(s, indent + "  ");
-        }
+        initializers.describe(s, indent + "  ");
     }
 };
 
 class Parser {
 public:
+    std::vector<std::shared_ptr<NodeExternalDeclaration>> declarations;
+    
     Parser(Lexer lexer) : lexer(lexer) {
     }
     
     void parse() {
-        std::vector<std::shared_ptr<NodeExternalDeclaration>> declarations;
         read_list(&Parser::read_external_declaration, declarations);
         
         if (!eof())
             error("declaration expected");
-        
-        /*
-        for (auto &decl : declarations) {
-            decl->describe(std::cout, "");
-        }
-        */
         
         //dbg_tree_root.dump(this);
     }
@@ -634,10 +691,11 @@ protected:
     OPTION
         NON_OPTIONAL(read_identifier(node.name))
     ELSE_OPTION
-        NodeDeclarator node;
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
         NON_OPTIONAL(read_declarator(node))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
+    
+        node.is_function = true;
     END_OPTION
     
     bool read_direct_declarator(NodeDeclarator &node) {
@@ -827,55 +885,63 @@ protected:
     
     bool read_initializer(NodeDeclarator &node)
     OPTION
-        std::vector<NodeDeclarator> initializer_list;
+        auto initializer_list = std::make_shared<InitializerList>();
     
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_OPEN))
-        NON_OPTIONAL(read_initializer_list(initializer_list))
+        NON_OPTIONAL(read_initializer_list(*initializer_list))
         OPTIONAL(read_punctuator(TokenPunctuator::COMMA))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_CLOSE))
+    
+        node.initializer = initializer_list;
     ELSE_OPTION
         std::shared_ptr<Expression> assignment_expr;
+    
         NON_OPTIONAL(read_assignment_expression(assignment_expr))
+    
+        node.initializer = assignment_expr;
     END_OPTION
     
-    bool read_designation_initializer_pair(NodeDeclarator &node)
+    bool read_designation_initializer_pair(Initializer &node)
     OPTION
-        if (read_designation()) {
-            NON_OPTIONAL(read_initializer(node))
-        } else {
-            OPTIONAL(read_initializer(node))
-        }
+        if (read_designation(node.designators)) {
+            NON_OPTIONAL(read_initializer(node.declarator))
+        } else if (read_initializer(node.declarator)) {
+        } else
+            DENY
     END_OPTION
     
-    bool read_initializer_list(std::vector<NodeDeclarator> &node)
+    bool read_initializer_list(InitializerList &node)
     OPTION
-        NON_OPTIONAL(read_separated_list(&Parser::read_designation_initializer_pair, TokenPunctuator::COMMA, node))
+        NON_OPTIONAL(read_separated_list(&Parser::read_designation_initializer_pair, TokenPunctuator::COMMA, node.initializers))
     END_OPTION
     
-    bool read_designation()
+    bool read_designation(std::vector<std::shared_ptr<Designator>> &node)
     OPTION
-        NON_OPTIONAL(read_designator_list())
+        NON_OPTIONAL(read_designator_list(node))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::ASSIGN))
     END_OPTION
     
-    bool read_designator_list()
+    bool read_designator_list(std::vector<std::shared_ptr<Designator>> &node)
     OPTION
-        std::vector<int> node;
         NON_OPTIONAL(read_list(&Parser::read_designator, node))
     END_OPTION
     
-    bool read_designator(int &node)
+    bool read_designator(std::shared_ptr<Designator> &node)
     OPTION
-        std::shared_ptr<Expression> expr;
+        auto d = std::make_shared<DesignatorWithExpression>();
     
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SB_OPEN))
-        NON_OPTIONAL(read_constant_expression(expr))
+        NON_OPTIONAL(read_constant_expression(d->expression))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SB_CLOSE))
+    
+        node = d;
     ELSE_OPTION
-        const char *id;
+        auto d = std::make_shared<DesignatorWithIdentifier>();
     
         NON_OPTIONAL(read_punctuator(TokenPunctuator::PERIOD))
-        NON_OPTIONAL(read_identifier(id))
+        NON_OPTIONAL(read_identifier(d->id))
+    
+        node = d;
     END_OPTION
     
     bool read_init_declarator(NodeDeclarator &node)
