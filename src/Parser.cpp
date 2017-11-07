@@ -98,4 +98,6 @@ const char *operator_name(TokenPunctuator punctuator) {
         case TokenPunctuator::SEMICOLON: return ";";
         case TokenPunctuator::ARROW: return "->";
     }
+    
+    return "(error)";
 }
