@@ -110,7 +110,7 @@ enum TokenPunctuator {
     ID(CMP_GTE,  63, Precedence::RELATIONAL, ">=")
     
     ID(RSHIFT, 70, Precedence::SHIFT, ">>")
-    ID(LSHIFT, 71, Precedence::SHIFT, ">>")
+    ID(LSHIFT, 71, Precedence::SHIFT, "<<")
     
     ID(PLUS,  80, Precedence::ADDITIVE, "+")
     ID(MINUS, 81, Precedence::ADDITIVE, "-")
