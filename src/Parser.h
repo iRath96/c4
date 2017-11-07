@@ -542,7 +542,11 @@ protected:
         DEBUG_HOOK
         
         if (peek().punctuator != punctuator) {
-            report_error((Token){ .type = TokenType::PUNCTUATOR, .punctuator = punctuator });
+            Token error_token;
+            error_token.type = TokenType::PUNCTUATOR;
+            error_token.punctuator = punctuator;
+            report_error(error_token);
+            
             DENY
         }
         
@@ -554,7 +558,11 @@ protected:
         DEBUG_HOOK
         
         if (peek().keyword != keyword) {
-            report_error((Token){ .type = TokenType::KEYWORD, .keyword = keyword });
+            Token error_token;
+            error_token.type = TokenType::KEYWORD;
+            error_token.keyword = keyword;
+            report_error(error_token);
+            
             DENY
         }
         
@@ -578,7 +586,11 @@ protected:
                 break;
                 
             default:
-                report_error((Token){ .type = TokenType::PUNCTUATOR, .punctuator = TokenPunctuator::LOG_NOT });
+                Token error_token;
+                error_token.type = TokenType::PUNCTUATOR;
+                error_token.punctuator = TokenPunctuator::LOG_NOT;
+                report_error(error_token);
+                
                 DENY
         }
         
@@ -587,7 +599,10 @@ protected:
     
     bool read_token(TokenType type, const char *&text) {
         if (peek().type != type) {
-            report_error((Token){ .type = type });
+            Token error_token;
+            error_token.type = type;
+            report_error(error_token);
+            
             return false;
         }
         
