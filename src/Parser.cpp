@@ -76,7 +76,7 @@ const char *operator_name(TokenPunctuator punctuator) {
         case TokenPunctuator::CMP_GTE: return ">=";
             
         case TokenPunctuator::RSHIFT: return ">>";
-        case TokenPunctuator::LSHIFT: return ">>";
+        case TokenPunctuator::LSHIFT: return "<<";
             
         case TokenPunctuator::PLUS: return "+";
         case TokenPunctuator::MINUS: return "-";

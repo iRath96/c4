@@ -1117,7 +1117,7 @@ protected:
     bool read_unary_expression(std::shared_ptr<Expression> &node)
     OPTION
         auto unary_node = std::make_shared<ExpressionUnary>();
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::PLUSPLUS) || read_punctuator(TokenPunctuator::PLUSPLUS))
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::PLUSPLUS) || read_punctuator(TokenPunctuator::MINUSMINUS))
         NON_OPTIONAL(read_unary_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
