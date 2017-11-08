@@ -55,11 +55,11 @@ Token Lexer::next_token() {
         }
         else if ((length = read_punctuator()))
             return create_token(TokenType::PUNCTUATOR, length);
-        else if ((length = read_string()) || (length = read_char()))
+        else if ((length = read_string()))
             return create_token(TokenType::STRING_LITERAL, length);
         else if ((length = read_identifier()))
             return create_token(TokenType::IDENTIFIER, length);
-        else if ((length = read_constant()))
+        else if ((length = read_constant()) || (length = read_char()))
             return create_token(TokenType::CONSTANT, length);
         
         // no token was found
