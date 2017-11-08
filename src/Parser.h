@@ -123,6 +123,9 @@ public:
 
 class Expression : public Node {
 public:
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "Expression" << std::endl;
+    }
 };
 
 class Label : public Node {
@@ -136,6 +139,10 @@ public:
 class Statement : public NodeBlockItem {
 public:
     std::vector<std::shared_ptr<Label>> labels;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "Statement" << std::endl;
+    }
 };
 
 class CaseLabel : public Label {
@@ -453,14 +460,34 @@ public:
 
 class JumpStatement : public Statement {
 public:
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "JumpStatement" << std::endl;
+    }
 };
 
 class IterationStatement : public Statement {
 public:
+    ExpressionList condition;
+    std::shared_ptr<Statement> body;
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "IterationStatement" << std::endl;
+        condition.describe(s, indent + "  ");
+        body->describe(s, indent + "  ");
+    }
 };
 
 class SelectionStatement : public Statement {
 public:
+    ExpressionList condition;
+    std::shared_ptr<Statement> when_true, when_false;
+    
+    virtual void describe(std::ostream &s, std::string indent) {
+        s << indent << "SelectionStatement" << std::endl;
+        condition.describe(s, indent + "  ");
+        when_true->describe(s, indent + "  ");
+        if (when_false.get())
+            when_false->describe(s, indent + "  ");
+    }
 };
 
 class GotoStatement : public JumpStatement {};
@@ -1135,33 +1162,27 @@ protected:
     
     bool read_selection_statement(std::shared_ptr<SelectionStatement> &node)
     OPTION
-        ExpressionList condition;
-        std::shared_ptr<Statement> when_true, when_false;
-        
         NON_OPTIONAL(read_keyword(TokenKeyword::IF))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-        NON_OPTIONAL(read_expression(condition))
+    
+        node = std::make_shared<SelectionStatement>();
+        NON_OPTIONAL(read_expression(node->condition))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
-        NON_OPTIONAL(read_statement(when_true))
+        NON_OPTIONAL(read_statement(node->when_true))
         
         if (read_keyword(TokenKeyword::ELSE))
-            NON_OPTIONAL(read_statement(when_false))
-        
-        node = std::make_shared<SelectionStatement>();
+            NON_OPTIONAL(read_statement(node->when_false))
     END_OPTION
     
     bool read_iteration_statement(std::shared_ptr<IterationStatement> &node)
     OPTION
-        ExpressionList condition;
-        std::shared_ptr<Statement> body;
-        
         NON_OPTIONAL(read_keyword(TokenKeyword::WHILE))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-        NON_OPTIONAL(read_expression(condition))
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
-        NON_OPTIONAL(read_statement(body))
     
         node = std::make_shared<IterationStatement>();
+        NON_OPTIONAL(read_expression(node->condition))
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
+        NON_OPTIONAL(read_statement(node->body))
     END_OPTION
     
     bool read_jump_statement(std::shared_ptr<JumpStatement> &node)
