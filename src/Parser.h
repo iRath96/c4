@@ -504,7 +504,7 @@ public:
     void parse() {
         read_list(&Parser::read_external_declaration, declarations);
         
-        if (!eof())
+        if (!eof() || declarations.empty())
             error("declaration expected");
         
         //dbg_tree_root.dump(this);
@@ -545,7 +545,7 @@ protected:
     
     bool eof(int offset = 0) {
         int i = this->i + offset;
-        return (lexer.has_ended() && (int)token_queue.size() < i) || peek(offset).type == TokenType::END;
+        return (lexer.has_ended() && (int)token_queue.size() <= i) || peek(offset).type == TokenType::END;
     }
     
     Token &peek(int offset = 0) {
@@ -554,12 +554,12 @@ protected:
         if (i < (int)token_queue.size())
             return token_queue[i];
         
-        while (!lexer.has_ended() && (int)token_queue.size() <= i) {
+        while ((int)token_queue.size() <= i) {
             // printf("reading token...\n");
             token_queue.push_back(lexer.next_token());
         }
         
-        return token_queue[token_queue.size() - 1]; // size() <= i+1
+        return token_queue[i];
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
