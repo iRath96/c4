@@ -451,6 +451,22 @@ public:
     }
 };
 
+class JumpStatement : public Statement {
+public:
+};
+
+class IterationStatement : public Statement {
+public:
+};
+
+class SelectionStatement : public Statement {
+public:
+};
+
+class GotoStatement : public JumpStatement {};
+class ContinueStatement : public JumpStatement {};
+class ReturnStatement : public JumpStatement {};
+
 class Parser {
 public:
     std::vector<std::shared_ptr<NodeExternalDeclaration>> declarations;
@@ -1052,11 +1068,17 @@ protected:
         NON_OPTIONAL(read_expression_statement(*e))
         node = e;
     ELSE_OPTION
-        NON_OPTIONAL(read_selection_statement())
+        std::shared_ptr<SelectionStatement> s;
+        NON_OPTIONAL(read_selection_statement(s))
+        node = s;
     ELSE_OPTION
-        NON_OPTIONAL(read_iteration_statement())
+        std::shared_ptr<IterationStatement> stmt;
+        NON_OPTIONAL(read_iteration_statement(stmt))
+        node = stmt;
     ELSE_OPTION
-        NON_OPTIONAL(read_jump_statement())
+        std::shared_ptr<JumpStatement> j;
+        NON_OPTIONAL(read_jump_statement(j))
+        node = j;
     END_OPTION
     
     bool read_labeled_statement(std::shared_ptr<Statement> &node)
@@ -1107,11 +1129,11 @@ protected:
     
     bool read_expression_statement(ExpressionStatement &node)
     OPTION
-        NON_OPTIONAL(read_expression(node.expressions))
+        OPTIONAL(read_expression(node.expressions))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     END_OPTION
     
-    bool read_selection_statement()
+    bool read_selection_statement(std::shared_ptr<SelectionStatement> &node)
     OPTION
         ExpressionList condition;
         std::shared_ptr<Statement> when_true, when_false;
@@ -1124,9 +1146,11 @@ protected:
         
         if (read_keyword(TokenKeyword::ELSE))
             NON_OPTIONAL(read_statement(when_false))
+        
+        node = std::make_shared<SelectionStatement>();
     END_OPTION
     
-    bool read_iteration_statement()
+    bool read_iteration_statement(std::shared_ptr<IterationStatement> &node)
     OPTION
         ExpressionList condition;
         std::shared_ptr<Statement> body;
@@ -1136,24 +1160,34 @@ protected:
         NON_OPTIONAL(read_expression(condition))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
         NON_OPTIONAL(read_statement(body))
+    
+        node = std::make_shared<IterationStatement>();
     END_OPTION
     
-    bool read_jump_statement()
+    bool read_jump_statement(std::shared_ptr<JumpStatement> &node)
     OPTION
         const char *target;
     
         NON_OPTIONAL(read_keyword(TokenKeyword::GOTO))
         NON_OPTIONAL(read_identifier(target))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
+    
+        node = std::make_shared<GotoStatement>();
     ELSE_OPTION
+        TokenKeyword keyword = peek().keyword;
+    
         NON_OPTIONAL(read_keyword(TokenKeyword::CONTINUE) || read_keyword(TokenKeyword::BREAK))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
+    
+        node = std::make_shared<ContinueStatement>();
     ELSE_OPTION
         ExpressionList list;
     
         NON_OPTIONAL(read_keyword(TokenKeyword::RETURN))
         OPTIONAL(read_expression(list))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
+    
+        node = std::make_shared<ReturnStatement>();
     END_OPTION
     
 #pragma mark - Expressions
