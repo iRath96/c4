@@ -169,7 +169,7 @@ int Lexer::read_escape_seq(int i) {
         int max_i = i + 2; // two more octal digits are allowed
         
         // octal escape sequence
-        while (i <= max_i && is_octal(peek(i)))
+        while (i < max_i && is_octal(peek(i)))
             ++i;
         return i;
     }
