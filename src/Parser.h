@@ -52,7 +52,8 @@ public:
 extern DebugTree dbg_tree_root;
 extern DebugTree *dbg_tree_current;
 
-#define DEBUG_HOOK {\
+#define DEBUG_HOOK { \
+    /* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
     dbg_tree_current = dbg_tree_current->create_child(__PRETTY_FUNCTION__, i);\
 }
 
@@ -74,30 +75,58 @@ extern DebugTree *dbg_tree_current;
         DEBUG_RETURN(false); \
 }
 
+#define _OPTION_PREFIX \
+    { \
+        __label__ deny;
+
+#define _OPTION_SUFFIX \
+        ACCEPT \
+        deny: \
+        i = _initial_i; \
+        error_flag = _initial_ef; \
+    }
+
 #define OPTION { \
     DEBUG_HOOK \
     int _initial_i = i; \
-    { \
-        __label__ deny;
+    bool _initial_ef = error_flag; \
+    _OPTION_PREFIX;
 
-#define ELSE_OPTION \
-        ACCEPT \
-        deny: \
-        i = _initial_i; \
-    } \
-    { \
-        __label__ deny;
+#define ELSE_OPTION  \
+    _OPTION_SUFFIX \
+    _OPTION_PREFIX
 
 #define END_OPTION \
-        ACCEPT \
-        deny: \
-        i = _initial_i; \
-    } \
+    _OPTION_SUFFIX \
     DENY \
 }
 
+#define ERROR(error_message) if (error_flag) error(error_message, _initial_i);
+
+#define OTHERWISE_FAIL(error_message) \
+    _OPTION_SUFFIX \
+    ERROR(error_message) \
+    error_flag = _initial_ef; \
+    DENY \
+}
+
+#define ALLOW_FAILURE(stmt) \
+    { \
+        bool _prev_ef = error_flag; \
+        error_flag = false; \
+        if (!(stmt)) { \
+            goto deny; \
+        } \
+        error_flag = _prev_ef; \
+    }
+
 #define NON_OPTIONAL(stmt) \
     if (!(stmt)) goto deny;
+
+#define BEGIN_UNIQUE(stmt) \
+    if (!(stmt)) goto deny; \
+    else error_flag = true;
+
 #define OPTIONAL(stmt) \
     stmt;
 
@@ -529,11 +558,7 @@ public:
     
 protected:
     int i;
-    
-    struct {
-        int i = 0;
-        std::vector<Token> tokens;
-    } error_loc;
+    bool error_flag = false; // whtether errors will be thrown
     
     bool shift(bool condition = true) {
         i += condition ? 1 : 0;
@@ -563,59 +588,26 @@ protected:
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
-        TextPosition start_pos = peek(error_loc.i - i).pos;
+        TextPosition start_pos = peek().pos;
         throw ParserError(message, start_pos);
     }
     
 #pragma mark - Terminals
     
-    void report_error(Token expected_token) {
-        if (i < error_loc.i)
-            return;
-        
-        if (i > error_loc.i) {
-            error_loc.i = i;
-            error_loc.tokens.clear();
-        }
-        
-        error_loc.tokens.push_back(expected_token);
-    }
-    
-    bool read_punctuator(TokenPunctuator punctuator) {
-        DEBUG_HOOK
-        
-        if (peek().punctuator != punctuator) {
-            Token error_token;
-            error_token.type = TokenType::PUNCTUATOR;
-            error_token.punctuator = punctuator;
-            report_error(error_token);
-            
-            DENY
-        }
-        
+    bool read_punctuator(TokenPunctuator punctuator)
+    OPTION
+        NON_OPTIONAL(peek().punctuator == punctuator)
         shift();
-        ACCEPT
-    }
+    OTHERWISE_FAIL(std::string(operator_name(punctuator)) + " expected")
     
-    bool read_keyword(TokenKeyword keyword) {
-        DEBUG_HOOK
-        
-        if (peek().keyword != keyword) {
-            Token error_token;
-            error_token.type = TokenType::KEYWORD;
-            error_token.keyword = keyword;
-            report_error(error_token);
-            
-            DENY
-        }
-        
+    bool read_keyword(TokenKeyword keyword)
+    OPTION
+        NON_OPTIONAL(peek().keyword == keyword)
         shift();
-        ACCEPT
-    }
+    OTHERWISE_FAIL("keyword (@todo) expected");
     
-    bool read_unary_operator(TokenPunctuator &op) {
-        DEBUG_HOOK
-        
+    bool read_unary_operator(TokenPunctuator &op)
+    OPTION
         switch (peek().punctuator) {
             case TokenPunctuator::BIT_AND:
             case TokenPunctuator::ASTERISK:
@@ -625,48 +617,35 @@ protected:
             case TokenPunctuator::LOG_NOT:
                 op = peek().punctuator;
                 shift();
-                
                 break;
                 
             default:
-                Token error_token;
-                error_token.type = TokenType::PUNCTUATOR;
-                error_token.punctuator = TokenPunctuator::LOG_NOT;
-                report_error(error_token);
-                
                 DENY
         }
-        
-        ACCEPT
-    }
+    OTHERWISE_FAIL("unary operator expected")
     
-    bool read_token(TokenType type, const char *&text) {
-        if (peek().type != type) {
-            Token error_token;
-            error_token.type = type;
-            report_error(error_token);
-            
-            return false;
-        }
-        
+    bool read_token(TokenType type, const char *&text)
+    OPTION
+        NON_OPTIONAL(peek().type == type)
+    
         text = peek().text;
-        return shift();
-    }
+        shift();
+    END_OPTION
     
     bool read_identifier(const char *&text)
     OPTION
         NON_OPTIONAL(read_token(TokenType::IDENTIFIER, text))
-    END_OPTION
+    OTHERWISE_FAIL("identifier expected")
     
     bool read_constant(const char *&text)
     OPTION
         NON_OPTIONAL(read_token(TokenType::CONSTANT, text))
-    END_OPTION
+    OTHERWISE_FAIL("constant expected")
     
     bool read_string_literal(const char *&text)
     OPTION
         NON_OPTIONAL(read_token(TokenType::STRING_LITERAL, text))
-    END_OPTION
+    OTHERWISE_FAIL("string literal expected")
     
 #pragma mark - Other stuff
     
@@ -700,6 +679,8 @@ protected:
             if (!(this->*method)(temp))
                 break;
             
+            error_flag = false;
+            
             result.push_back(temp);
         }
         
@@ -719,7 +700,9 @@ protected:
             result.push_back(temp);
             last_good_i = i;
             
-            if(!read_punctuator(separator))
+            error_flag = false;
+            
+            if (!read_punctuator(separator))
                 break;
         }
         
@@ -1085,28 +1068,28 @@ protected:
     
     bool read_statement(std::shared_ptr<Statement> &node)
     OPTION
-        NON_OPTIONAL(read_labeled_statement(node))
+        ALLOW_FAILURE(read_labeled_statement(node))
     ELSE_OPTION
         auto c = std::make_shared<CompoundStatement>();
-        NON_OPTIONAL(read_compound_statement(*c))
+        ALLOW_FAILURE(read_compound_statement(*c))
         node = c;
     ELSE_OPTION
         auto e = std::make_shared<ExpressionStatement>();
-        NON_OPTIONAL(read_expression_statement(*e))
+        ALLOW_FAILURE(read_expression_statement(*e))
         node = e;
     ELSE_OPTION
         std::shared_ptr<SelectionStatement> s;
-        NON_OPTIONAL(read_selection_statement(s))
+        ALLOW_FAILURE(read_selection_statement(s))
         node = s;
     ELSE_OPTION
         std::shared_ptr<IterationStatement> stmt;
-        NON_OPTIONAL(read_iteration_statement(stmt))
+        ALLOW_FAILURE(read_iteration_statement(stmt))
         node = stmt;
     ELSE_OPTION
         std::shared_ptr<JumpStatement> j;
-        NON_OPTIONAL(read_jump_statement(j))
+        ALLOW_FAILURE(read_jump_statement(j))
         node = j;
-    END_OPTION
+    OTHERWISE_FAIL("statement expected")
     
     bool read_labeled_statement(std::shared_ptr<Statement> &node)
     OPTION
@@ -1156,30 +1139,33 @@ protected:
     
     bool read_expression_statement(ExpressionStatement &node)
     OPTION
-        OPTIONAL(read_expression(node.expressions))
+        bool has_expression = read_expression(node.expressions);
+        error_flag = error_flag || has_expression;
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     END_OPTION
     
     bool read_selection_statement(std::shared_ptr<SelectionStatement> &node)
     OPTION
-        NON_OPTIONAL(read_keyword(TokenKeyword::IF))
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
+        BEGIN_UNIQUE(read_keyword(TokenKeyword::IF))
     
         node = std::make_shared<SelectionStatement>();
+    
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
         NON_OPTIONAL(read_expression(node->condition))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
         NON_OPTIONAL(read_statement(node->when_true))
-        
+    
         if (read_keyword(TokenKeyword::ELSE))
             NON_OPTIONAL(read_statement(node->when_false))
     END_OPTION
     
     bool read_iteration_statement(std::shared_ptr<IterationStatement> &node)
     OPTION
-        NON_OPTIONAL(read_keyword(TokenKeyword::WHILE))
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
-    
+        BEGIN_UNIQUE(read_keyword(TokenKeyword::WHILE))
+        
         node = std::make_shared<IterationStatement>();
+        
+        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
         NON_OPTIONAL(read_expression(node->condition))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
         NON_OPTIONAL(read_statement(node->body))
@@ -1189,7 +1175,7 @@ protected:
     OPTION
         const char *target;
     
-        NON_OPTIONAL(read_keyword(TokenKeyword::GOTO))
+        BEGIN_UNIQUE(read_keyword(TokenKeyword::GOTO))
         NON_OPTIONAL(read_identifier(target))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     
@@ -1197,14 +1183,14 @@ protected:
     ELSE_OPTION
         TokenKeyword keyword = peek().keyword;
     
-        NON_OPTIONAL(read_keyword(TokenKeyword::CONTINUE) || read_keyword(TokenKeyword::BREAK))
+        BEGIN_UNIQUE(read_keyword(TokenKeyword::CONTINUE) || read_keyword(TokenKeyword::BREAK))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     
         node = std::make_shared<ContinueStatement>();
     ELSE_OPTION
         ExpressionList list;
     
-        NON_OPTIONAL(read_keyword(TokenKeyword::RETURN))
+        BEGIN_UNIQUE(read_keyword(TokenKeyword::RETURN))
         OPTIONAL(read_expression(list))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     
@@ -1313,7 +1299,8 @@ protected:
             NON_OPTIONAL(read_type_name(s->type))
             NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
             node = s;
-        }
+        } else
+            error("sizeof operand expected");
     ELSE_OPTION
         TypeName type_name;
     
@@ -1329,20 +1316,19 @@ protected:
     OPTION
         TypeName type_name;
     
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
+        ALLOW_FAILURE(read_punctuator(TokenPunctuator::RB_OPEN))
         NON_OPTIONAL(read_type_name(type_name))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
     
         NON_OPTIONAL(read_cast_expression(node))
     ELSE_OPTION
-        NON_OPTIONAL(read_unary_expression(node))
+        ALLOW_FAILURE(read_unary_expression(node))
     END_OPTION
     
-    bool read_expression_with_precedence(Precedence left_precedence, std::shared_ptr<Expression> &node) {
-        DEBUG_HOOK
-        
+    bool read_expression_with_precedence(Precedence left_precedence, std::shared_ptr<Expression> &node)
+    OPTION
         std::shared_ptr<Expression> root;
-        NON_EMPTY_RET(read_cast_expression(root));
+        BEGIN_UNIQUE(read_cast_expression(root))
         
         while (!eof()) {
             TokenPunctuator op = peek().punctuator;
@@ -1384,9 +1370,7 @@ protected:
         }
         
         node = root;
-        
-        ACCEPT
-    }
+    END_OPTION
     
     bool read_assignment_expression(std::shared_ptr<Expression> &node)
     OPTION
