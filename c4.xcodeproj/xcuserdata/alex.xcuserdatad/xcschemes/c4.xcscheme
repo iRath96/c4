@@ -65,7 +65,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "--ast"
+            argument = "--debug"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
