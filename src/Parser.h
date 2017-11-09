@@ -577,7 +577,7 @@ public:
     }
     
 protected:
-    int i;
+    int i = 0;
     bool error_flag = false; // whtether errors will be thrown
     
     bool shift(bool condition = true) {
