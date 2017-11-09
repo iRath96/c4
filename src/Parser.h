@@ -205,7 +205,7 @@ public:
     NodeIdentifier(const char *id) : id(id) {}
     
     virtual void describe(std::ostream &s, std::string indent) {
-        s << "id(" << id << ")";
+        s << indent << "NodeIdentifier(" << id << ")" << std::endl;
     }
 };
 
@@ -314,7 +314,7 @@ public:
     const char *text;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "ExpressionConstant(" << text << ")" << std::endl;
+        s << indent << "ExpressionConstant(" << text << ")" << std::endl;
     }
 };
 
@@ -324,8 +324,8 @@ public:
     TokenPunctuator op;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "ExpressionUnary" << std::endl;
-        std::cout << indent << "  " << operator_name(op) << std::endl;
+        s << indent << "ExpressionUnary" << std::endl;
+        s << indent << "  " << operator_name(op) << std::endl;
         operand->describe(s, indent + "  ");
     }
 };
@@ -336,9 +336,9 @@ public:
     TokenPunctuator op;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "ExpressionBinary" << std::endl;
+        s << indent << "ExpressionBinary" << std::endl;
         lhs->describe(s, indent + "  ");
-        std::cout << indent << "  " << operator_name(op) << std::endl;
+        s << indent << "  " << operator_name(op) << std::endl;
         rhs->describe(s, indent + "  ");
     }
 };
@@ -348,7 +348,7 @@ public:
     std::shared_ptr<Expression> condition, when_true, when_false;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "ExpressionConditional" << std::endl;
+        s << indent << "ExpressionConditional" << std::endl;
         condition->describe(s, indent + "  ");
         when_true->describe(s, indent + "  ");
         when_false->describe(s, indent + "  ");
@@ -360,7 +360,7 @@ public:
     std::vector<std::shared_ptr<Expression>> children;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "ExpressionList" << std::endl;
+        s << indent << "ExpressionList" << std::endl;
         for (auto &child : children)
             child->describe(s, indent + "  ");
     }
@@ -386,7 +386,7 @@ public:
     ExpressionList expressions;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "ExpressionStatement" << std::endl;
+        s << indent << "ExpressionStatement" << std::endl;
         expressions.describe(s, indent + "  ");
     }
 };
@@ -400,7 +400,7 @@ public:
     std::shared_ptr<Expression> expression;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "SizeofExpressionUnary" << std::endl;
+        s << indent << "SizeofExpressionUnary" << std::endl;
         expression->describe(s, indent + "  ");
     }
 };
@@ -410,7 +410,7 @@ public:
     std::vector<std::shared_ptr<NodeTypeSpecifier>> specifiers;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "TypeName" << std::endl;
+        s << indent << "TypeName" << std::endl;
         for (auto &d : specifiers)
             d->describe(s, indent + "  ");
     }
@@ -421,14 +421,14 @@ public:
     TypeName type;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "SizeofExpressionTypeName" << std::endl;
+        s << indent << "SizeofExpressionTypeName" << std::endl;
     }
 };
 
 class Designator : public Node {
 public:
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "Designator" << std::endl;
+        s << indent << "Designator" << std::endl;
     }
 };
 
@@ -437,7 +437,7 @@ public:
     const char *id;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "DesignatorWithIdentifier[" << id << "]" << std::endl;
+        s << indent << "DesignatorWithIdentifier[" << id << "]" << std::endl;
     }
 };
 
@@ -446,7 +446,7 @@ public:
     std::shared_ptr<Expression> expression;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "DesignatorWithExpression" << std::endl;
+        s << indent << "DesignatorWithExpression" << std::endl;
         expression->describe(s, indent + "  ");
     }
 };
@@ -457,7 +457,7 @@ public:
     NodeDeclarator declarator;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "Initializer" << std::endl;
+        s << indent << "Initializer" << std::endl;
         for (auto &d : designators)
             d->describe(s, indent + "  ");
         declarator.describe(s, indent + "  ");
@@ -469,7 +469,7 @@ public:
     std::vector<Initializer> initializers;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "InitializerList" << std::endl;
+        s << indent << "InitializerList" << std::endl;
         for (auto &i : initializers)
             i.describe(s, indent + "  ");
     }
@@ -481,7 +481,7 @@ public:
     InitializerList initializers;
     
     virtual void describe(std::ostream &s, std::string indent) {
-        std::cout << indent << "InitializerExpression" << std::endl;
+        s << indent << "InitializerExpression" << std::endl;
         type.describe(s, indent + "  ");
         initializers.describe(s, indent + "  ");
     }
@@ -520,7 +520,11 @@ public:
 };
 
 class GotoStatement : public JumpStatement {};
-class ContinueStatement : public JumpStatement {};
+class ContinueStatement : public JumpStatement {
+public:
+    TokenKeyword keyword; // BREAK or CONTINUE
+};
+
 class ReturnStatement : public JumpStatement {};
 
 class Parser {
@@ -588,7 +592,7 @@ protected:
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
-        TextPosition start_pos = peek().pos;
+        TextPosition start_pos = peek(offset).pos;
         throw ParserError(message, start_pos);
     }
     
@@ -620,7 +624,7 @@ protected:
                 break;
                 
             default:
-                DENY
+                NON_OPTIONAL(false)
         }
     OTHERWISE_FAIL("unary operator expected")
     
@@ -1182,11 +1186,14 @@ protected:
         node = std::make_shared<GotoStatement>();
     ELSE_OPTION
         TokenKeyword keyword = peek().keyword;
+        std::shared_ptr<ContinueStatement> c;
     
         BEGIN_UNIQUE(read_keyword(TokenKeyword::CONTINUE) || read_keyword(TokenKeyword::BREAK))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     
-        node = std::make_shared<ContinueStatement>();
+        c = std::make_shared<ContinueStatement>();
+        c->keyword = keyword;
+        node = c;
     ELSE_OPTION
         ExpressionList list;
     
