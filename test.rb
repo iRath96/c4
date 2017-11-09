@@ -29,10 +29,15 @@ end
 $start_time = Time.now
 
 $failures = []
-$tests = Dir["tests/lexer/*"]
+$tests = Dir["tests/*/*"]
 $tests.each do |test|
+  argument = case test.split("/")[1]
+  when "lexer" then "--tokenize"
+  when "parser" then "--parse"
+  end
+
   test_start_time = Time.now
-  stdout, stderr, status = Open3.capture3($BIN, "--tokenize", "#{test}/input.c")
+  stdout, stderr, status = Open3.capture3($BIN, argument, "#{test}/input.c")
   test_runtime = Time.now - test_start_time
 
   expected_stdout = File.read("#{test}/stdout")
