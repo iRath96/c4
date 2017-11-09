@@ -15,6 +15,9 @@
 #include "Lexer.h"
 #include "Parser.h"
 
+bool debug_mode = false;
+bool enable_output = true;
+
 const char *token_type_name(TokenType type) {
     switch (type) {
         case TokenType::KEYWORD: return "keyword";
@@ -55,15 +58,13 @@ void tokenize(const char *filename) {
             if (t.type == TokenType::END)
                 break;
         
-            printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
+            enable_output && printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
         }
     } catch (LexerError e) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
         exit(1);
     }
 }
-
-bool debug_mode = false;
 
 void parse(const char *filename) {
     Parser parser(create_lexer(filename));
@@ -95,6 +96,8 @@ int main(int argc, const char *argv[]) {
             tokenize(argv[++i]);
         else if (!strcmp(argv[i], "--debug"))
             debug_mode = true;
+        else if (!strcmp(argv[i], "--dry"))
+            enable_output = false;
         else if (!strcmp(argv[i], "--parse"))
             parse(argv[++i]);
         else {
