@@ -1368,16 +1368,16 @@ protected:
     
     bool read_expression_with_precedence(Precedence left_precedence, std::shared_ptr<Expression> &node)
     OPTION
-        std::shared_ptr<Expression> root;
+        std::shared_ptr<Expression> root; // @todo rename this to lhs
         BEGIN_UNIQUE(read_cast_expression(root))
         
         while (!eof()) {
             TokenPunctuator op = peek().punctuator;
             Precedence right_precedence = PRECEDENCE(op);
             
-            if (op == TokenPunctuator::QMARK ?
-                (right_precedence == left_precedence) : // right-assoc
-                (right_precedence >= left_precedence)   // left-assoc
+            if ((op == TokenPunctuator::QMARK || PRECEDENCE(op) == Precedence::ASSIGNMENT) ?
+                (right_precedence > left_precedence) : // right-assoc
+                (right_precedence >= left_precedence)  // left-assoc
                 )
                 break;
             
@@ -1398,6 +1398,11 @@ protected:
                 NON_EMPTY(read_expression_with_precedence((Precedence)(right_precedence - 1), tree->when_false), "expression expected");
             } else {
                 // ordinary operator
+                
+                if (dynamic_cast<ExpressionBinary *>(root.get())) {
+                    UNIQUE
+                    error("expression is not assignable");
+                }
                 
                 auto tree = std::make_shared<ExpressionBinary>();
                 tree->op = peek().punctuator;
