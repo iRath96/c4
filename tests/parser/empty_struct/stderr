@@ -1,0 +1,1 @@
+tests/parser/empty_struct/input.c:2:16: error: struct declaration list expected

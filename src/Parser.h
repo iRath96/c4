@@ -898,14 +898,14 @@ protected:
     bool read_struct_declaration_list(std::vector<NodeDeclaration> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_struct_declaration, node))
-    END_OPTION
+    OTHERWISE_FAIL("struct declaration list expected")
     
     bool read_struct_body(NodeTypeComposed &node)
     OPTION
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_OPEN))
         NON_OPTIONAL(read_struct_declaration_list(node.declarations))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_CLOSE))
-    END_OPTION
+    OTHERWISE_FAIL("struct body expected")
     
     bool read_type_specifier(std::shared_ptr<NodeTypeSpecifier> &node) {
         DEBUG_HOOK
@@ -927,14 +927,18 @@ protected:
                 
                 n->type = token.keyword;
                 
+                NON_UNIQUE
+                
                 bool has_identifier = read_identifier(n->name);
                 bool has_body = peek().punctuator == TokenPunctuator::CB_OPEN;
                 
                 if (!has_body && !has_identifier)
                     error("struct/union without identifier or body");
                 
-                if (has_body)
-                    NON_EMPTY(read_struct_body(*n), "struct/union body expected");
+                if (has_body) {
+                    UNIQUE
+                    NON_EMPTY_RET(read_struct_body(*n))
+                }
                 
                 break;
             }
