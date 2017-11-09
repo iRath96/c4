@@ -1,0 +1,1 @@
+tests/parser/missing_sizeof_semicolon/input.c:2:16: error: ; expected

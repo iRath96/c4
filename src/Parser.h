@@ -101,7 +101,7 @@ extern DebugTree *dbg_tree_current;
     DENY \
 }
 
-#define ERROR(error_message) if (error_flag) error(error_message, _initial_i);
+#define ERROR(error_message) if (error_flag) error(error_message);
 
 #define OTHERWISE_FAIL(error_message) \
     _OPTION_SUFFIX \
@@ -123,12 +123,23 @@ extern DebugTree *dbg_tree_current;
 #define NON_OPTIONAL(stmt) \
     if (!(stmt)) goto deny;
 
+#define UNIQUE \
+    error_flag = true;
+
+#define NON_UNIQUE \
+    error_flag = false;
+
 #define BEGIN_UNIQUE(stmt) \
     if (!(stmt)) goto deny; \
-    else error_flag = true;
+    else UNIQUE
 
 #define OPTIONAL(stmt) \
-    stmt;
+    { \
+        bool _prev_ef = error_flag; \
+        error_flag = false; \
+        stmt; \
+        error_flag = _prev_ef; \
+    }
 
 const char *operator_name(TokenPunctuator punctuator);
 
@@ -592,7 +603,10 @@ protected:
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
-        TextPosition start_pos = peek(offset).pos;
+        TextPosition start_pos = i + offset > 0 ?
+            peek(offset - 1).end_pos :
+            peek(offset).pos
+        ;
         throw ParserError(message, start_pos);
     }
     
@@ -677,6 +691,7 @@ protected:
     template<typename T>
     bool read_list(bool (Parser::*method)(T &node), std::vector<T> &result) {
         int initial_i = i;
+        bool _initial_ef = error_flag;
         
         while (!eof()) {
             T temp;
@@ -688,6 +703,7 @@ protected:
             result.push_back(temp);
         }
         
+        error_flag = _initial_ef;
         return i != initial_i;
     }
     
@@ -695,6 +711,7 @@ protected:
     bool read_separated_list(bool (Parser::*method)(T &node), TokenPunctuator separator, std::vector<T> &result) {
         int initial_i = i;
         int last_good_i = i;
+        bool _initial_ef = error_flag;
         
         while (!eof()) {
             T temp;
@@ -710,6 +727,7 @@ protected:
                 break;
         }
         
+        error_flag = _initial_ef;
         i = last_good_i;
         return i != initial_i;
     }
@@ -1006,7 +1024,7 @@ protected:
     
     bool read_declaration(NodeDeclaration &node)
     OPTION
-        NON_OPTIONAL(read_declaration_specifiers(node.specifiers))
+        BEGIN_UNIQUE(read_declaration_specifiers(node.specifiers))
         OPTIONAL(read_init_declarator_list(node.declarators))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::SEMICOLON))
     END_OPTION
@@ -1136,7 +1154,7 @@ protected:
     
     bool read_compound_statement(CompoundStatement &node)
     OPTION
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_OPEN))
+        BEGIN_UNIQUE(read_punctuator(TokenPunctuator::CB_OPEN))
         OPTIONAL(read_block_item_list(node.items))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::CB_CLOSE))
     END_OPTION
@@ -1159,8 +1177,11 @@ protected:
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
         NON_OPTIONAL(read_statement(node->when_true))
     
-        if (read_keyword(TokenKeyword::ELSE))
+        NON_UNIQUE
+        if (read_keyword(TokenKeyword::ELSE)) {
+            UNIQUE
             NON_OPTIONAL(read_statement(node->when_false))
+        }
     END_OPTION
     
     bool read_iteration_statement(std::shared_ptr<IterationStatement> &node)
@@ -1284,18 +1305,21 @@ protected:
     bool read_unary_expression(std::shared_ptr<Expression> &node)
     OPTION
         auto unary_node = std::make_shared<ExpressionUnary>();
-        NON_OPTIONAL(read_punctuator(TokenPunctuator::PLUSPLUS) || read_punctuator(TokenPunctuator::MINUSMINUS))
+        ALLOW_FAILURE(read_punctuator(TokenPunctuator::PLUSPLUS) || read_punctuator(TokenPunctuator::MINUSMINUS))
+        UNIQUE
         NON_OPTIONAL(read_unary_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
         auto unary_node = std::make_shared<ExpressionUnary>();
-        NON_OPTIONAL(read_unary_operator(unary_node->op))
+        ALLOW_FAILURE(read_unary_operator(unary_node->op))
+        UNIQUE
         NON_OPTIONAL(read_cast_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
         std::shared_ptr<Expression> u;
     
-        NON_OPTIONAL(read_keyword(TokenKeyword::SIZEOF))
+        ALLOW_FAILURE(read_keyword(TokenKeyword::SIZEOF))
+        NON_UNIQUE
     
         if (read_unary_expression(u)) {
             auto s = std::make_shared<SizeofExpressionUnary>();
@@ -1311,13 +1335,14 @@ protected:
     ELSE_OPTION
         TypeName type_name;
     
-        NON_OPTIONAL(read_keyword(TokenKeyword::_ALIGNOF))
+        ALLOW_FAILURE(read_keyword(TokenKeyword::_ALIGNOF))
+        UNIQUE
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_OPEN))
         NON_OPTIONAL(read_type_name(type_name))
         NON_OPTIONAL(read_punctuator(TokenPunctuator::RB_CLOSE))
     ELSE_OPTION
-        NON_OPTIONAL(read_postfix_expression(node))
-    END_OPTION
+        ALLOW_FAILURE(read_postfix_expression(node))
+    OTHERWISE_FAIL("unary expression expected")
     
     bool read_cast_expression(std::shared_ptr<Expression> &node)
     OPTION
@@ -1330,7 +1355,7 @@ protected:
         NON_OPTIONAL(read_cast_expression(node))
     ELSE_OPTION
         ALLOW_FAILURE(read_unary_expression(node))
-    END_OPTION
+    OTHERWISE_FAIL("cast expression expected")
     
     bool read_expression_with_precedence(Precedence left_precedence, std::shared_ptr<Expression> &node)
     OPTION

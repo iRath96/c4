@@ -1,0 +1,1 @@
+tests/parser/non_ending_expression/input.c:2:14: error: ) expected

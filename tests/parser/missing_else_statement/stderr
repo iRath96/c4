@@ -1,0 +1,1 @@
+tests/parser/missing_else_statement/input.c:2:20: error: statement expected

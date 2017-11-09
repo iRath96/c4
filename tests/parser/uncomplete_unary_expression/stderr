@@ -1,0 +1,1 @@
+tests/parser/uncomplete_unary_expression/input.c:2:13: error: cast expression expected

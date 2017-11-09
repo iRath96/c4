@@ -1,0 +1,1 @@
+tests/parser/uncomplete_binary_expression/input.c:2:14: error: cast expression expected

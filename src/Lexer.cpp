@@ -117,6 +117,7 @@ Token Lexer::create_token(TokenType type, int length) {
         token.text = find_text(raw_text, length);
     
     consume(length);
+    token.end_pos = pos;
     
     return token;
 }

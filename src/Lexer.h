@@ -140,7 +140,7 @@ enum TokenType {
 };
 
 struct Token {
-    TextPosition pos;
+    TextPosition pos, end_pos;
     
     TokenType type;
     const char *text;

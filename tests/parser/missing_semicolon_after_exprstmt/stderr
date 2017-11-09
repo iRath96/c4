@@ -1,0 +1,1 @@
+tests/parser/missing_semicolon_after_exprstmt/input.c:2:7: error: ; expected
