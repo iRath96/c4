@@ -17,6 +17,8 @@
 
 #include "Lexer.h"
 
+extern bool debug_mode;
+
 class Parser;
 
 struct DebugTree {
@@ -53,13 +55,16 @@ extern DebugTree dbg_tree_root;
 extern DebugTree *dbg_tree_current;
 
 #define DEBUG_HOOK { \
-    /* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
-    dbg_tree_current = dbg_tree_current->create_child(__PRETTY_FUNCTION__, i);\
+    if (debug_mode) { \
+        /* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
+        dbg_tree_current = dbg_tree_current->create_child(__PRETTY_FUNCTION__, i); \
+    } \
 }
 
-#define DEBUG_RETURN(x) {\
-    dbg_tree_current = dbg_tree_current->perform_return(x, i);\
-    return x;\
+#define DEBUG_RETURN(x) { \
+    if (debug_mode) \
+        dbg_tree_current = dbg_tree_current->perform_return(x, i); \
+    return x; \
 }
 
 #define ACCEPT DEBUG_RETURN(true)
