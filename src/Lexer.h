@@ -214,7 +214,7 @@ public:
     
     Token next_token();
     
-protected:
+private:
     std::unordered_map<StringWithLength, std::shared_ptr<char>> symbol_table;
     
     const char *find_text(const char *source, int length) {
@@ -286,18 +286,17 @@ protected:
         }
     }
     
-    char peek(int offset) {
+    __attribute__((always_inline)) inline char peek(int offset) const {
         if (eof(offset))
             return 0;
         
         return input.data.get()[pos.index + offset];
     }
     
-    bool eof(int offset) {
+    __attribute__((always_inline)) inline bool eof(int offset) const {
         return pos.index + offset >= input.length;
     }
     
-protected:
     Token create_token(TokenType type, int length);
     void error(const std::string &message, int offset);
     

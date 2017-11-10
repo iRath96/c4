@@ -48,19 +48,22 @@ Token Lexer::next_token() {
     
     while (!eof(0)) {
         int length = 0;
+        char c = peek(0);
+        
         if ((length = read_whitespace()) || (length = read_comment())) {
             // skip whitespace and comments
             consume(length);
             continue;
-        }
+        } else if (c == '"')
+            return create_token(TokenType::STRING_LITERAL, read_string());
+        else if (c == '\'')
+            return create_token(TokenType::CONSTANT, read_char());
+        else if (TEST_CHAR(is_alpha, c) || c == '_')
+            return create_token(TokenType::IDENTIFIER, read_identifier());
+        else if (isdigit(c))
+            return create_token(TokenType::CONSTANT, read_constant());
         else if ((length = read_punctuator()))
             return create_token(TokenType::PUNCTUATOR, length);
-        else if ((length = read_string()))
-            return create_token(TokenType::STRING_LITERAL, length);
-        else if ((length = read_identifier()))
-            return create_token(TokenType::IDENTIFIER, length);
-        else if ((length = read_constant()) || (length = read_char()))
-            return create_token(TokenType::CONSTANT, length);
         
         // no token was found
         error("unrecognized character", 0);
