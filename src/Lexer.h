@@ -19,174 +19,165 @@
 
 #include <memory>
 
+namespace lexer {
+
 struct TextPosition {
     int index = 0;
     int line = 1;
     int column = 1;
 };
 
-enum TokenKeyword {
-    NOT_A_KEYWORD = 0,
-    
-    AUTO,
-    BREAK,
-    CASE, CHAR, CONST, CONTINUE,
-    DEFAULT, DO, DOUBLE,
-    ELSE, ENUM, EXTERN,
-    FLOAT, FOR,
-    GOTO,
-    IF, INLINE, INT,
-    LONG,
-    REGISTER, RESTRICT, RETURN,
-    SHORT, SIGNED, SIZEOF, STATIC, STRUCT, SWITCH,
-    TYPEDEF,
-    UNION, UNSIGNED,
-    VOID, VOLATILE,
-    WHILE,
-    
-    _ALIGNAS, _ALIGNOF, _ATOMIC, _BOOL, _COMPLEX,
-    _GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
-};
-
-enum Precedence {
-    NONE = 15,
-    
-    ASSIGNMENT     = 13,
-    CONDITIONAL    = 12,
-    LOGICAL_OR     = 11,
-    LOGICAL_AND    = 10,
-    INCLUSIVE_OR   = 9,
-    EXCLUSIVE_OR   = 8,
-    AND            = 7,
-    EQUALITY       = 6,
-    RELATIONAL     = 5,
-    SHIFT          = 4,
-    ADDITIVE       = 3,
-    MULTIPLICATIVE = 2,
-    
-    UNARY = 1,
-    MAX   = 0
-};
-
-#define PRECEDENCE(punctuator) ((Precedence)(char)punctuator)
-#define ID(name, id, precedence, token) name = (id << 8) | precedence,
-enum TokenPunctuator {
-    ID(NOT_A_PUNCTUATOR, 0, Precedence::NONE, "+")
-    
-    ID(CB_OPEN,  10, Precedence::NONE, "{")
-    ID(CB_CLOSE, 11, Precedence::NONE, "}")
-    ID(SB_OPEN,  12, Precedence::NONE, "[")
-    ID(SB_CLOSE, 13, Precedence::NONE, "]")
-    ID(RB_OPEN,  14, Precedence::NONE, "(")
-    ID(RB_CLOSE, 15, Precedence::NONE, ")")
-    
-    ID(QMARK, 16, Precedence::CONDITIONAL, "?")
-    ID(COLON, 17, Precedence::NONE, ":")
-    
-    ID(PLUS_ASSIGN,    20, Precedence::ASSIGNMENT, "+=")
-    ID(MINUS_ASSIGN,   21, Precedence::ASSIGNMENT, "-=")
-    ID(MUL_ASSIGN,     22, Precedence::ASSIGNMENT, "*=")
-    ID(DIV_ASSIGN,     23, Precedence::ASSIGNMENT, "/=")
-    ID(MODULO_ASSIGN,  24, Precedence::ASSIGNMENT, "%=")
-    ID(BIT_OR_ASSIGN,  25, Precedence::ASSIGNMENT, "|=")
-    ID(BIT_AND_ASSIGN, 26, Precedence::ASSIGNMENT, "&=")
-    ID(BIT_XOR_ASSIGN, 27, Precedence::ASSIGNMENT, "^=")
-    ID(RSHIFT_ASSIGN,  28, Precedence::ASSIGNMENT, ">>=")
-    ID(LSHIFT_ASSIGN,  29, Precedence::ASSIGNMENT, "<<=")
-    ID(ASSIGN,         30, Precedence::ASSIGNMENT, "=")
-    
-    ID(LOG_OR,  40, Precedence::LOGICAL_OR,   "||")
-    ID(LOG_AND, 41, Precedence::LOGICAL_AND,  "&&")
-    ID(BIT_OR,  42, Precedence::INCLUSIVE_OR, "|")
-    ID(BIT_XOR, 43, Precedence::EXCLUSIVE_OR, "^")
-    ID(BIT_AND, 44, Precedence::AND,          "&")
-    
-    ID(CMP_EQ,   50, Precedence::EQUALITY, "==")
-    ID(CMP_NEQ,  51, Precedence::EQUALITY, "!=")
-    
-    ID(AB_OPEN,  60, Precedence::RELATIONAL, "<")
-    ID(AB_CLOSE, 61, Precedence::RELATIONAL, ">")
-    ID(CMP_LTE,  62, Precedence::RELATIONAL, "<=")
-    ID(CMP_GTE,  63, Precedence::RELATIONAL, ">=")
-    
-    ID(RSHIFT, 70, Precedence::SHIFT, ">>")
-    ID(LSHIFT, 71, Precedence::SHIFT, "<<")
-    
-    ID(PLUS,  80, Precedence::ADDITIVE, "+")
-    ID(MINUS, 81, Precedence::ADDITIVE, "-")
-    
-    ID(ASTERISK, 90, Precedence::MULTIPLICATIVE, "*")
-    ID(SLASH,    91, Precedence::MULTIPLICATIVE, "/")
-    ID(MODULO,   92, Precedence::MULTIPLICATIVE, "%")
-    
-    ID(PLUSPLUS,   100, Precedence::UNARY, "++")
-    ID(MINUSMINUS, 101, Precedence::UNARY, "--")
-    ID(BIT_NOT,    102, Precedence::UNARY, "~")
-    ID(LOG_NOT,    103, Precedence::UNARY, "!")
-    
-    ID(DOUBLE_HASH, 110, Precedence::NONE, "##")
-    ID(HASH,        111, Precedence::NONE, "#")
-    ID(ELIPSES,     112, Precedence::NONE, "...")
-    ID(PERIOD,      113, Precedence::NONE, ".")
-    ID(COMMA,       114, Precedence::NONE, ",")
-    ID(SEMICOLON,   115, Precedence::NONE, ";")
-    ID(ARROW,       116, Precedence::NONE, "->")
-};
-#undef ID
-
-enum TokenType {
-    KEYWORD, IDENTIFIER, CONSTANT, STRING_LITERAL, PUNCTUATOR,
-    END
-};
-
 struct Token {
+    enum class Precedence : uint8_t {
+        NONE = 15,
+        
+        ASSIGNMENT     = 13,
+        CONDITIONAL    = 12,
+        LOGICAL_OR     = 11,
+        LOGICAL_AND    = 10,
+        INCLUSIVE_OR   = 9,
+        EXCLUSIVE_OR   = 8,
+        AND            = 7,
+        EQUALITY       = 6,
+        RELATIONAL     = 5,
+        SHIFT          = 4,
+        ADDITIVE       = 3,
+        MULTIPLICATIVE = 2,
+        
+        UNARY = 1,
+        MAX   = 0
+    };
+
+#define ID(name, id, precedence, token) name = (id << 8) | (int)precedence,
+    enum class Punctuator : uint32_t {
+        ID(NOT_A_PUNCTUATOR, 0, Precedence::NONE, "+")
+        
+        ID(CB_OPEN,  10, Precedence::NONE, "{")
+        ID(CB_CLOSE, 11, Precedence::NONE, "}")
+        ID(SB_OPEN,  12, Precedence::NONE, "[")
+        ID(SB_CLOSE, 13, Precedence::NONE, "]")
+        ID(RB_OPEN,  14, Precedence::NONE, "(")
+        ID(RB_CLOSE, 15, Precedence::NONE, ")")
+        
+        ID(QMARK, 16, Precedence::CONDITIONAL, "?")
+        ID(COLON, 17, Precedence::NONE, ":")
+        
+        ID(PLUS_ASSIGN,    20, Precedence::ASSIGNMENT, "+=")
+        ID(MINUS_ASSIGN,   21, Precedence::ASSIGNMENT, "-=")
+        ID(MUL_ASSIGN,     22, Precedence::ASSIGNMENT, "*=")
+        ID(DIV_ASSIGN,     23, Precedence::ASSIGNMENT, "/=")
+        ID(MODULO_ASSIGN,  24, Precedence::ASSIGNMENT, "%=")
+        ID(BIT_OR_ASSIGN,  25, Precedence::ASSIGNMENT, "|=")
+        ID(BIT_AND_ASSIGN, 26, Precedence::ASSIGNMENT, "&=")
+        ID(BIT_XOR_ASSIGN, 27, Precedence::ASSIGNMENT, "^=")
+        ID(RSHIFT_ASSIGN,  28, Precedence::ASSIGNMENT, ">>=")
+        ID(LSHIFT_ASSIGN,  29, Precedence::ASSIGNMENT, "<<=")
+        ID(ASSIGN,         30, Precedence::ASSIGNMENT, "=")
+        
+        ID(LOG_OR,  40, Precedence::LOGICAL_OR,   "||")
+        ID(LOG_AND, 41, Precedence::LOGICAL_AND,  "&&")
+        ID(BIT_OR,  42, Precedence::INCLUSIVE_OR, "|")
+        ID(BIT_XOR, 43, Precedence::EXCLUSIVE_OR, "^")
+        ID(BIT_AND, 44, Precedence::AND,          "&")
+        
+        ID(CMP_EQ,   50, Precedence::EQUALITY, "==")
+        ID(CMP_NEQ,  51, Precedence::EQUALITY, "!=")
+        
+        ID(AB_OPEN,  60, Precedence::RELATIONAL, "<")
+        ID(AB_CLOSE, 61, Precedence::RELATIONAL, ">")
+        ID(CMP_LTE,  62, Precedence::RELATIONAL, "<=")
+        ID(CMP_GTE,  63, Precedence::RELATIONAL, ">=")
+        
+        ID(RSHIFT, 70, Precedence::SHIFT, ">>")
+        ID(LSHIFT, 71, Precedence::SHIFT, "<<")
+        
+        ID(PLUS,  80, Precedence::ADDITIVE, "+")
+        ID(MINUS, 81, Precedence::ADDITIVE, "-")
+        
+        ID(ASTERISK, 90, Precedence::MULTIPLICATIVE, "*")
+        ID(SLASH,    91, Precedence::MULTIPLICATIVE, "/")
+        ID(MODULO,   92, Precedence::MULTIPLICATIVE, "%")
+        
+        ID(PLUSPLUS,   100, Precedence::UNARY, "++")
+        ID(MINUSMINUS, 101, Precedence::UNARY, "--")
+        ID(BIT_NOT,    102, Precedence::UNARY, "~")
+        ID(LOG_NOT,    103, Precedence::UNARY, "!")
+        
+        ID(DOUBLE_HASH, 110, Precedence::NONE, "##")
+        ID(HASH,        111, Precedence::NONE, "#")
+        ID(ELIPSES,     112, Precedence::NONE, "...")
+        ID(PERIOD,      113, Precedence::NONE, ".")
+        ID(COMMA,       114, Precedence::NONE, ",")
+        ID(SEMICOLON,   115, Precedence::NONE, ";")
+        ID(ARROW,       116, Precedence::NONE, "->")
+    };
+#undef ID
+    
+    static inline Precedence precedence(Punctuator punctuator) {
+        return (Precedence)(char)punctuator;
+    }
+    
+    enum class Keyword : uint8_t {
+        NOT_A_KEYWORD = 0,
+        
+        AUTO,
+        BREAK,
+        CASE, CHAR, CONST, CONTINUE,
+        DEFAULT, DO, DOUBLE,
+        ELSE, ENUM, EXTERN,
+        FLOAT, FOR,
+        GOTO,
+        IF, INLINE, INT,
+        LONG,
+        REGISTER, RESTRICT, RETURN,
+        SHORT, SIGNED, SIZEOF, STATIC, STRUCT, SWITCH,
+        TYPEDEF,
+        UNION, UNSIGNED,
+        VOID, VOLATILE,
+        WHILE,
+        
+        _ALIGNAS, _ALIGNOF, _ATOMIC, _BOOL, _COMPLEX,
+        _GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
+    };
+
+    enum class Type : uint8_t {
+        KEYWORD, IDENTIFIER, CONSTANT, STRING_LITERAL, PUNCTUATOR,
+        END
+    };
+
     TextPosition pos, end_pos;
     
-    TokenType type;
     const char *text;
     
-    TokenKeyword keyword = TokenKeyword::NOT_A_KEYWORD;
-    TokenPunctuator punctuator = TokenPunctuator::NOT_A_PUNCTUATOR;
-};
-
-struct LexerInput {
-    std::shared_ptr<char> data;
-    int length;
-};
-
-class LexerError {
-public:
-    std::string message;
-    TextPosition start_pos, end_pos;
-    
-    LexerError(const std::string &message, TextPosition start_pos, TextPosition end_pos)
-    : message(message), start_pos(start_pos), end_pos(end_pos) {
-        
-    }
+    Type type;
+    Keyword keyword = Keyword::NOT_A_KEYWORD;
+    Punctuator punctuator = Punctuator::NOT_A_PUNCTUATOR;
 };
 
 struct StringWithLength {
     const char *data;
     int length;
-    
+
     StringWithLength(const char *data, int length) : data(data), length(length) {}
-    
+
     bool operator<(const StringWithLength &other) const {
         if (length != other.length)
             return length < other.length;
         
         return strncmp(data, other.data, length) == -1;
     }
-    
+
     bool operator==(const StringWithLength &other) const {
         return length == other.length && !strncmp(data, other.data, length);
     }
 };
 
+}
+
 namespace std {
     template <>
-    struct hash<StringWithLength> {
-        std::size_t operator()(const StringWithLength &k) const {
+    struct hash<lexer::StringWithLength> {
+        std::size_t operator()(const lexer::StringWithLength &k) const {
             size_t hash = std::hash<int>()(k.length);
             hash ^= (k.data[0] * (k.length > 0)) << 2;
             hash ^= (k.data[1] * (k.length > 1)) << 3;
@@ -197,8 +188,26 @@ namespace std {
     };
 }
 
+namespace lexer {
+
 class Lexer {
 public:
+    struct Input {
+        std::shared_ptr<char> data;
+        int length;
+    };
+
+    class Error {
+    public:
+        std::string message;
+        TextPosition start_pos, end_pos;
+        
+        Error(const std::string &message, TextPosition start_pos, TextPosition end_pos)
+        : message(message), start_pos(start_pos), end_pos(end_pos) {
+            
+        }
+    };
+
     Lexer(char *data, int length) {
         input.data = std::shared_ptr<char>(data);
         input.length = length;
@@ -234,10 +243,10 @@ private:
         return buffer;
     }
     
-    LexerInput input;
+    Input input;
     TextPosition pos;
     
-    TokenPunctuator last_punctuator;
+    Token::Punctuator last_punctuator;
     
     void replace_eol() {
         bool last_char_was_cr = false;
@@ -297,7 +306,7 @@ private:
         return pos.index + offset >= input.length;
     }
     
-    Token create_token(TokenType type, int length);
+    Token create_token(Token::Type type, int length);
     void error(const std::string &message, int offset);
     
     int read_whitespace();
@@ -312,5 +321,7 @@ private:
     
     int read_constant();
 };
+
+}
 
 #endif /* Lexer_hpp */

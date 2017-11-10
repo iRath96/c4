@@ -18,14 +18,14 @@
 bool debug_mode = false;
 bool enable_output = true;
 
-const char *token_type_name(TokenType type) {
+const char *token_type_name(Token::Type type) {
     switch (type) {
-        case TokenType::KEYWORD: return "keyword";
-        case TokenType::IDENTIFIER: return "identifier";
-        case TokenType::CONSTANT: return "constant";
-        case TokenType::STRING_LITERAL: return "string-literal";
-        case TokenType::PUNCTUATOR: return "punctuator";
-        case TokenType::END: return "end";
+        case Token::Type::KEYWORD: return "keyword";
+        case Token::Type::IDENTIFIER: return "identifier";
+        case Token::Type::CONSTANT: return "constant";
+        case Token::Type::STRING_LITERAL: return "string-literal";
+        case Token::Type::PUNCTUATOR: return "punctuator";
+        case Token::Type::END: return "end";
     }
     return "unknown";
 }
@@ -55,12 +55,12 @@ void tokenize(const char *filename) {
         while (true) {
             Token t = lexer.next_token();
         
-            if (t.type == TokenType::END)
+            if (t.type == Token::Type::END)
                 break;
         
             enable_output && printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
         }
-    } catch (LexerError e) {
+    } catch (Lexer::Error e) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
         exit(1);
     }
@@ -70,7 +70,7 @@ void parse(const char *filename) {
     Parser parser(create_lexer(filename));
     try {
         parser.parse();
-    } catch (LexerError e) {
+    } catch (Lexer::Error e) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
         exit(1);
     } catch (ParserError e) {

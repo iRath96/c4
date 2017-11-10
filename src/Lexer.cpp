@@ -11,6 +11,8 @@
 
 #define TEST_CHAR(lookup, chr) lookup[(int)(unsigned char)chr]
 
+namespace lexer {
+
 bool is_alpha[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -55,24 +57,24 @@ Token Lexer::next_token() {
             consume(length);
             continue;
         } else if (c == '"')
-            return create_token(TokenType::STRING_LITERAL, read_string());
+            return create_token(Token::Type::STRING_LITERAL, read_string());
         else if (c == '\'')
-            return create_token(TokenType::CONSTANT, read_char());
+            return create_token(Token::Type::CONSTANT, read_char());
         else if (TEST_CHAR(is_alpha, c) || c == '_')
-            return create_token(TokenType::IDENTIFIER, read_identifier());
+            return create_token(Token::Type::IDENTIFIER, read_identifier());
         else if (isdigit(c))
-            return create_token(TokenType::CONSTANT, read_constant());
+            return create_token(Token::Type::CONSTANT, read_constant());
         else if ((length = read_punctuator()))
-            return create_token(TokenType::PUNCTUATOR, length);
+            return create_token(Token::Type::PUNCTUATOR, length);
         
         // no token was found
         error("unrecognized character", 0);
     }
     
-    return create_token(TokenType::END, 0);
+    return create_token(Token::Type::END, 0);
 }
 
-Token Lexer::create_token(TokenType type, int length) {
+Token Lexer::create_token(Token::Type type, int length) {
     Token token;
     token.pos = pos;
     token.type = type;
@@ -80,11 +82,11 @@ Token Lexer::create_token(TokenType type, int length) {
     
     const char *raw_text = input.data.get() + pos.index;
     
-    if (token.type == TokenType::IDENTIFIER) {
+    if (token.type == Token::Type::IDENTIFIER) {
 #define K(x, y, z) if (length == z && !strncmp(raw_text, x, length)) {\
-    token.type = TokenType::KEYWORD; \
+    token.type = Token::Type::KEYWORD; \
     token.text = x; \
-    token.keyword = TokenKeyword::y; \
+    token.keyword = Token::Keyword::y; \
 } else
         switch (raw_text[0]) {
             case 'a': K("auto", AUTO, 4) {}; break;
@@ -112,7 +114,7 @@ Token Lexer::create_token(TokenType type, int length) {
                 {}; break;
         }
 #undef K
-    } else if (token.type == TokenType::PUNCTUATOR) {
+    } else if (token.type == Token::Type::PUNCTUATOR) {
         token.punctuator = last_punctuator;
     }
     
@@ -241,7 +243,7 @@ int Lexer::read_comment() {
 }
 
 int Lexer::read_punctuator() {
-#define RET(x, y) { last_punctuator = TokenPunctuator::x; return y; }
+#define RET(x, y) { last_punctuator = Token::Punctuator::x; return y; }
     
     char c = peek(0), d = peek(1);
     
@@ -338,5 +340,7 @@ int Lexer::read_constant() {
 void Lexer::error(const std::string &message, int offset) {
     TextPosition start_pos = pos;
     consume(offset);
-    throw LexerError(message, start_pos, pos);
+    throw Error(message, start_pos, pos);
+}
+
 }
