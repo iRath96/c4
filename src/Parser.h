@@ -786,8 +786,10 @@ protected:
             } else if (read_identifier_list(identifier_list)) {
             }
             
+            UNIQUE
             if (!read_punctuator(TokenPunctuator::RB_CLOSE))
                 break;
+            NON_UNIQUE
             
             last_good_i = i;
         }
@@ -1140,6 +1142,8 @@ protected:
             DENY
         
         NON_OPTIONAL(read_punctuator(TokenPunctuator::COLON))
+        
+        UNIQUE
         NON_OPTIONAL(read_statement(node))
         
         node->labels.push_back(label);
@@ -1399,7 +1403,7 @@ protected:
             } else {
                 // ordinary operator
                 
-                if (dynamic_cast<ExpressionBinary *>(root.get())) {
+                if (PRECEDENCE(peek().punctuator) == Precedence::ASSIGNMENT && dynamic_cast<ExpressionBinary *>(root.get())) {
                     UNIQUE
                     error("expression is not assignable");
                 }
