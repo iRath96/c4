@@ -16,6 +16,7 @@
 #include "Parser.h"
 
 #include "ASTInspector.h"
+#include "Beautifier.h"
 
 
 bool debug_mode = false;
@@ -90,6 +91,12 @@ void parse(const char *filename) {
         ASTInspector inspector;
         for (auto &decl : parser.declarations) {
             decl->accept(inspector);
+        }
+        
+        Beautifier beautifier;
+        for (auto &decl : parser.declarations) {
+            decl->accept(beautifier);
+            std::cout << std::endl;
         }
     }
 }

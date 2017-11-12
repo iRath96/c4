@@ -1,29 +1,24 @@
 //
-//  ASTInspector.h
+//  Beautifier.h
 //  c4
 //
 //  Created by Alexander Rath on 12.11.17.
 //  Copyright © 2017 Alexander Rath. All rights reserved.
 //
 
-#ifndef ASTINSPECTOR_h
-#define ASTINSPECTOR_h
+#ifndef Beautifier_h
+#define Beautifier_h
 
 #include "AST.h"
 
 using namespace ast;
 
-class ASTInspector : public Visitor {
+class Beautifier : public Visitor {
 protected:
     std::string indent = "";
     
     void inspect(Node &node) {
-        std::string prev_indent = indent;
-        
-        indent += "  ";
         node.accept(*this);
-        
-        indent = prev_indent;
     }
     
     template<typename T>
@@ -44,26 +39,59 @@ protected:
         indent = prev_indent;
     }
     
+    template<typename T>
+    void join(Vector<T> &vector, std::string delimiter, std::string suffix = "") {
+        bool first = true;
+        
+        for (auto &child : vector) {
+            if (first)
+                first = false;
+            else
+                std::cout << delimiter;
+            
+            inspect(child);
+        }
+        
+        if (!vector.empty())
+            std::cout << suffix;
+    }
+    
+    template<typename T>
+    void separate_lines(Vector<T> &vector) {
+        std::string prev_indent = indent;
+        indent += "  ";
+        
+        for (auto &child : vector) {
+            std::cout << std::endl << indent;
+            inspect(child);
+        }
+        
+        indent = prev_indent;
+        
+        std::cout << std::endl << indent;
+    }
+    
 public:
     virtual void visit(CaseLabel &node) {
-        std::cout << indent << "CaseLabel" << std::endl;
+        std::cout << "case ";
         inspect(*node.expression);
+        std::cout << ":";
     }
     
     virtual void visit(DefaultLabel &node) {
-        std::cout << indent << "DefaultLabel" << std::endl;
+        std::cout << "default:";
     }
     
     virtual void visit(IdentifierLabel &node) {
-        std::cout << indent << "IdentifierLabel" << std::endl;
+        std::cout << node.id << ":";
     }
 
     virtual void visit(Identifier &node) {
-        std::cout << indent << "Identifier[" << node.id << "]" << std::endl;
+        std::cout << node.id;
     }
 
     virtual void visit(NamedType &node) {
-        std::cout << indent << "NamedType[" << node.id << "]" << std::endl;
+        std::cout << node.id;
     }
 
     virtual void visit(Pointer &node) {
@@ -72,90 +100,89 @@ public:
     }
 
     virtual void visit(CompoundStatement &node) {
-        std::cout << indent << "CompoundStatement" << std::endl;
-        inspect_vector("items", node.items);
+        std::cout << "{";
+        separate_lines(node.items);
+        std::cout << "}";
     }
     
     virtual void visit(DeclaratorParameterList &node) {
-        std::cout << indent << "DeclaratorParameterList" << std::endl;
-        inspect_vector("parameters", node.parameters);
+        std::cout << "(";
+        join(node.parameters, ", ");
+        std::cout << ")";
     }
 
     virtual void visit(Declarator &node) {
-        std::cout << indent << "Declarator[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
-        if (node.initializer.get())
+        join(node.pointers, " ");
+        std::cout << (node.name ? node.name : "(unnamed)");
+        join(node.suffixes, "");
+        
+        if (node.initializer.get()) {
+            std::cout << " = ";
             inspect(node.initializer);
-        inspect_vector("pointers", node.pointers);
+        }
     }
 
     virtual void visit(Declaration &node) {
-        std::cout << indent << "Declaration" << std::endl;
-        inspect_vector("declarators", node.declarators);
-        inspect_vector("specifiers", node.specifiers);
+        join(node.specifiers, " ", " ");
+        join(node.declarators, " ");
+        std::cout << ";";
     }
 
-    virtual void visit(ExternalDeclarationVariable &node) { // @todo Isn't this equivalent to Declaration?
-        std::cout << indent << "ExternalDeclarationVariable" << std::endl;
-        inspect_vector("declarators", node.declarators);
-        inspect_vector("specifiers", node.specifiers);
+    virtual void visit(ExternalDeclarationVariable &node) {
+        join(node.specifiers, " ", " ");
+        join(node.declarators, ", ");
+        std::cout << ";" << std::endl;
     }
 
     virtual void visit(ExternalDeclarationFunction &node) {
-        std::cout << indent << "ExternalDeclarationFunction" << std::endl;
-        inspect_vector("declarators", node.declarators);
-        inspect_vector("specifiers", node.specifiers);
-        inspect_vector("declarations", node.declarations);
+        join(node.specifiers, " ", " ");
+        join(node.declarators, ", ", " ");
         inspect(node.body);
     }
 
     virtual void visit(ParameterDeclaration &node) {
-        std::cout << indent << "ParameterDeclaration" << std::endl;
-        inspect_vector("specifiers", node.specifiers);
+        join(node.specifiers, " ", " ");
         inspect(node.declarator);
     }
 
-    virtual void visit(ComposedType &node) {
-        std::cout << indent << "ComposedType[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
-        inspect_vector("declarations", node.declarations);
-    }
-
     virtual void visit(ConstantExpression &node) {
-        std::cout << indent << "ConstantExpression[" << node.text << "]" << std::endl;
+        std::cout << node.text;
     }
 
     virtual void visit(UnaryExpression &node) {
-        std::cout << indent << "UnaryExpression[" << operator_name(node.op) << "]" << std::endl;
+        std::cout << operator_name(node.op);
         inspect(node.operand);
     }
 
     virtual void visit(BinaryExpression &node) {
-        std::cout << indent << "BinaryExpression[" << operator_name(node.op) << "]" << std::endl;
         inspect(node.lhs);
+        std::cout << " " << operator_name(node.op) << " "; // @todo precedence!
         inspect(node.rhs);
     }
 
     virtual void visit(ConditionalExpression &node) {
-        std::cout << indent << "ConditionalExpression" << std::endl;
         inspect(node.condition);
+        std::cout << " ? ";
         inspect(node.when_true);
+        std::cout << " : ";
         inspect(node.when_false);
     }
 
     virtual void visit(ExpressionList &node) {
-        std::cout << indent << "ExpressionList" << std::endl;
-        inspect_vector("children", node.children);
+        join(node.children, ", ");
     }
 
     virtual void visit(CallExpression &node) {
-        std::cout << indent << "CallExpression" << std::endl;
         inspect(node.function);
-        inspect_vector("arguments", node.arguments);
+        std::cout << "(";
+        join(node.arguments, ", ");
+        std::cout << ")";
     }
 
     virtual void visit(ExpressionStatement &node) {
-        std::cout << indent << "ExpressionStatement" << std::endl;
-        inspect_vector("labels", node.labels);
+        join(node.labels, " ", " ");
         inspect(node.expressions);
+        std::cout << ";";
     }
 
     virtual void visit(SizeofExpressionUnary &node) {
@@ -164,8 +191,13 @@ public:
     }
 
     virtual void visit(TypeName &node) {
-        std::cout << indent << "TypeName" << std::endl;
-        inspect_vector("specifiers", node.specifiers);
+        join(node.specifiers, " ");
+    }
+    
+    virtual void visit(ComposedType &node) {
+        std::cout << "struct {";
+        separate_lines(node.declarations);
+        std::cout << "}";
     }
 
     virtual void visit(SizeofExpressionTypeName &node) {
@@ -200,25 +232,32 @@ public:
     }
 
     virtual void visit(IterationStatement &node) {
-        std::cout << indent << "IterationStatement" << std::endl;
-        inspect_vector("labels", node.labels);
+        join(node.labels, " ", " ");
+        
+        std::cout << "while (";
         inspect(node.condition);
+        std::cout << ") ";
         inspect(node.body);
     }
 
     virtual void visit(SelectionStatement &node) {
-        std::cout << indent << "SelectionStatement" << std::endl;
-        inspect_vector("labels", node.labels);
+        join(node.labels, " ", " ");
+        
+        std::cout << "if (";
         inspect(node.condition);
+        std::cout << ") ";
+        
         inspect(node.when_true);
         
-        if (node.when_false.get())
+        if (node.when_false.get()) {
+            std::cout << " else ";
             inspect(node.when_false);
+        }
     }
 
     virtual void visit(GotoStatement &node) {
-        std::cout << indent << "GotoStatement[" << node.target << "]" << std::endl;
-        inspect_vector("labels", node.labels);
+        join(node.labels, " ", " ");
+        std::cout << "goto " << node.target << ";";
     }
 
     virtual void visit(ContinueStatement &node) {
@@ -233,4 +272,4 @@ public:
     }
 };
 
-#endif /* ASTInspector_h */
+#endif /* Beautifier_h */

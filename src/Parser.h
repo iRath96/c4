@@ -395,13 +395,14 @@ protected:
         while (!eof()) {
             // try reading parameter-list / identifier-list
             
-            std::vector<ast::ParameterDeclaration> parameter_list;
+            auto p_suffix = std::make_shared<ast::DeclaratorParameterList>();
             std::vector<const char *> identifier_list;
             
             if (!read_punctuator(Token::Punctuator::RB_OPEN))
                 break;
             
-            if (read_parameter_type_list()) {
+            if (read_parameter_type_list(p_suffix->parameters)) {
+                node.suffixes.push_back(p_suffix);
             } else if (read_identifier_list(identifier_list)) {
             }
             
@@ -449,11 +450,13 @@ protected:
         }
         
         while (!eof()) {
+            ast::Vector<ast::ParameterDeclaration> plist;
+            
             if (read_punctuator(Token::Punctuator::SB_OPEN)) {
                 NON_EMPTY(read_punctuator(Token::Punctuator::ASTERISK), "* expected");
                 NON_EMPTY(read_punctuator(Token::Punctuator::SB_CLOSE), "] expected");
             } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
-                read_parameter_type_list();
+                read_parameter_type_list(plist);
                 NON_EMPTY(read_punctuator(Token::Punctuator::RB_CLOSE), ") expected");
             } else
                 break;
@@ -462,10 +465,9 @@ protected:
         DEBUG_RETURN(i != initial_i)
     }
     
-    bool read_parameter_type_list()
+    bool read_parameter_type_list(ast::Vector<ast::ParameterDeclaration> &node)
     OPTION
-        ast::Vector<ast::ParameterDeclaration> pd;
-        NON_OPTIONAL(read_parameter_list(pd))
+        NON_OPTIONAL(read_parameter_list(node))
     END_OPTION
     
     bool read_parameter_list(ast::Vector<ast::ParameterDeclaration> &node)
@@ -830,13 +832,13 @@ protected:
     
     bool read_jump_statement(ast::Ptr<ast::JumpStatement> &node)
     OPTION
-        const char *target;
+        auto g = std::make_shared<ast::GotoStatement>();
     
         BEGIN_UNIQUE(read_keyword(Token::Keyword::GOTO))
-        NON_OPTIONAL(read_identifier(target))
+        NON_OPTIONAL(read_identifier(g->target))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::SEMICOLON))
     
-        node = std::make_shared<ast::GotoStatement>();
+        node = g;
     ELSE_OPTION
         Token::Keyword keyword = peek().keyword;
         ast::Ptr<ast::ContinueStatement> c;

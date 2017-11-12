@@ -34,6 +34,7 @@ struct NamedType;
 struct ComposedType;
 struct Pointer;
 struct CompoundStatement;
+struct DeclaratorParameterList;
 struct Declarator;
 struct Declaration;
 struct ExternalDeclarationVariable;
@@ -69,6 +70,7 @@ struct Visitor {
     virtual void visit(ComposedType &) = 0;
     virtual void visit(Pointer &) = 0;
     virtual void visit(CompoundStatement &) = 0;
+    virtual void visit(DeclaratorParameterList &) = 0;
     virtual void visit(Declarator &) = 0;
     virtual void visit(Declaration &) = 0;
     virtual void visit(ExternalDeclarationVariable &) = 0;
@@ -154,12 +156,20 @@ struct CompoundStatement : Statement {
     ACCEPT
 };
 
+struct DeclaratorSuffix : Node {};
+
+struct DeclaratorParameterList : DeclaratorSuffix {
+    ast::Vector<ast::ParameterDeclaration> parameters;
+    ACCEPT
+};
+
 struct Declarator : Node {
     const char *name = NULL;
     bool is_function = false; // function pointer
     
     Vector<Pointer> pointers;
     Ptr<Expression> initializer;
+    PtrVector<DeclaratorSuffix> suffixes;
     
     ACCEPT
 };
@@ -309,6 +319,7 @@ struct SelectionStatement : Statement {
 struct JumpStatement : Statement {};
 
 struct GotoStatement : JumpStatement {
+    const char *target;
     ACCEPT
 };
 
