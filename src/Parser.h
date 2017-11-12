@@ -486,7 +486,7 @@ protected:
     bool read_pointer_single(ast::Pointer &node)
     OPTION
         NON_OPTIONAL(read_punctuator(Token::Punctuator::ASTERISK))
-        OPTIONAL(read_type_qualifier_list(node.specifiers))
+        OPTIONAL(read_type_qualifier_list())
     END_OPTION
     
     bool read_pointer(ast::Declarator &node)
@@ -494,9 +494,10 @@ protected:
         NON_OPTIONAL(read_list(&Parser::read_pointer_single, node.pointers))
     END_OPTION
     
-    bool read_type_qualifier_list(ast::PtrVector<ast::TypeSpecifier> &node)
+    bool read_type_qualifier_list()
     OPTION
-        NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
+        ast::Vector<int> node;
+        NON_OPTIONAL(read_list(&Parser::read_type_qualifier, node))
     END_OPTION
     
     bool read_specifier_qualifier_list(ast::PtrVector<ast::TypeSpecifier> &node)
@@ -534,6 +535,21 @@ protected:
         NON_OPTIONAL(read_struct_declaration_list(node.declarations))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
     OTHERWISE_FAIL("struct body expected")
+    
+    bool read_type_qualifier(int &node)
+    OPTION
+        switch (peek().keyword) {
+            case Token::Keyword::CONST:
+            case Token::Keyword::RESTRICT:
+            case Token::Keyword::VOLATILE:
+            case Token::Keyword::_ATOMIC:
+                shift();
+                break;
+            
+            default:
+                DENY
+        }
+    END_OPTION
     
     bool read_type_specifier(ast::Ptr<ast::TypeSpecifier> &node) {
         DEBUG_HOOK

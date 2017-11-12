@@ -129,7 +129,6 @@ struct NamedType : TypeSpecifier {
 };
 
 struct Pointer : Node {
-    PtrVector<TypeSpecifier> specifiers;
     ACCEPT
 };
 

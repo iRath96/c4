@@ -95,8 +95,7 @@ public:
     }
 
     virtual void visit(Pointer &node) {
-        std::cout << indent << "Pointer" << std::endl;
-        inspect_vector("specifiers", node.specifiers);
+        std::cout << "*";
     }
 
     virtual void visit(CompoundStatement &node) {
@@ -112,7 +111,7 @@ public:
     }
 
     virtual void visit(Declarator &node) {
-        join(node.pointers, " ");
+        join(node.pointers, "");
         std::cout << (node.name ? node.name : "(unnamed)");
         join(node.suffixes, "");
         
@@ -195,9 +194,15 @@ public:
     }
     
     virtual void visit(ComposedType &node) {
-        std::cout << "struct {";
-        separate_lines(node.declarations);
-        std::cout << "}";
+        std::cout << "struct";
+        if (node.name)
+            std::cout << " " << node.name;
+        
+        if (!node.declarations.empty()) {
+            std::cout << " {";
+            separate_lines(node.declarations);
+            std::cout << "}";
+        }
     }
 
     virtual void visit(SizeofExpressionTypeName &node) {

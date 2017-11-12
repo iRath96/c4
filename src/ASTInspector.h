@@ -68,7 +68,6 @@ public:
 
     virtual void visit(Pointer &node) {
         std::cout << indent << "Pointer" << std::endl;
-        inspect_vector("specifiers", node.specifiers);
     }
 
     virtual void visit(CompoundStatement &node) {
