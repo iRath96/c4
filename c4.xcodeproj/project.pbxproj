@@ -31,6 +31,8 @@
 		FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Lexer.cpp; sourceTree = "<group>"; };
 		FA74D4FE1FA257A000D7CA2E /* Lexer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Lexer.h; sourceTree = "<group>"; };
 		FA74D5001FA257CC00D7CA2E /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		FA87A23C1FB84DAD0023DB3F /* AST.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AST.h; sourceTree = "<group>"; };
+		FA87A23D1FB8D2930023DB3F /* ASTInspector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ASTInspector.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,6 +51,8 @@
 			children = (
 				FA6431861FAD924D00ABFB9D /* Parser.cpp */,
 				FA6431871FAD924D00ABFB9D /* Parser.h */,
+				FA87A23C1FB84DAD0023DB3F /* AST.h */,
+				FA87A23D1FB8D2930023DB3F /* ASTInspector.h */,
 			);
 			name = parser;
 			sourceTree = "<group>";

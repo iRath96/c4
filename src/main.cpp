@@ -15,6 +15,9 @@
 #include "Lexer.h"
 #include "Parser.h"
 
+#include "ASTInspector.h"
+
+
 bool debug_mode = false;
 bool enable_output = true;
 
@@ -84,8 +87,9 @@ void parse(const char *filename) {
     }
     
     if (debug_mode) {
+        ASTInspector inspector;
         for (auto &decl : parser.declarations) {
-            decl->describe(std::cout, "");
+            decl->accept(inspector);
         }
     }
 }
