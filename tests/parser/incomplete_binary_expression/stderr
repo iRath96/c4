@@ -1,1 +1,1 @@
-tests/parser/uncomplete_binary_expression/input.c:2:14: error: expression expected
+tests/parser/incomplete_binary_expression/input.c:2:14: error: expression expected
