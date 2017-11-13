@@ -27,19 +27,6 @@ protected:
     }
     
     template<typename T>
-    void inspect_vector(std::string title, Vector<T> &vector) {
-        std::string prev_indent = indent;
-        
-        std::cout << indent << "  " << title << std::endl;
-        indent += "  ";
-        
-        for (auto &child : vector)
-            inspect(child);
-        
-        indent = prev_indent;
-    }
-    
-    template<typename T>
     void join(Vector<T> &vector, std::string delimiter, std::string suffix = "") {
         bool first = true;
         
@@ -112,7 +99,8 @@ public:
 
     virtual void visit(Declarator &node) {
         join(node.pointers, "");
-        std::cout << (node.name ? node.name : "(unnamed)");
+        if (node.name)
+            std::cout << node.name;
         join(node.suffixes, "");
         
         if (node.initializer.get()) {
@@ -212,23 +200,25 @@ public:
     }
 
     virtual void visit(DesignatorWithIdentifier &node) {
-        std::cout << indent << "DesignatorWithIdentifier[" << node.id << "]" << std::endl;
+        std::cout << "." << node.id;
     }
 
     virtual void visit(DesignatorWithExpression &node) {
-        std::cout << indent << "DesignatorWithExpression" << std::endl;
+        std::cout << "[";
         inspect(node.expression);
+        std::cout << "]";
     }
 
     virtual void visit(Initializer &node) {
-        std::cout << indent << "Initializer" << std::endl;
+        join(node.designators, ", ");
         inspect(node.declarator);
-        inspect_vector("designators", node.designators);
+        std::cout << " = ";
     }
 
     virtual void visit(InitializerList &node) {
-        std::cout << indent << "InitializerList" << std::endl;
-        inspect_vector("initializers", node.initializers);
+        std::cout << "{ ";
+        join(node.initializers, ", ", " ");
+        std::cout << "}";
     }
 
     virtual void visit(InitializerExpression &node) {
@@ -267,14 +257,13 @@ public:
     }
 
     virtual void visit(ContinueStatement &node) {
-        std::cout << indent << "ContinueStatement" << std::endl;
-        inspect_vector("labels", node.labels);
+        std::cout << "continue;";
     }
 
     virtual void visit(ReturnStatement &node) {
-        std::cout << indent << "ReturnStatement" << std::endl;
-        inspect_vector("labels", node.labels);
+        std::cout << "return ";
         inspect(node.expressions);
+        std::cout << ";";
     }
 };
 
