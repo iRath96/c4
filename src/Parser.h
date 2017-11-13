@@ -1006,7 +1006,8 @@ protected:
     OPTION
         ast::TypeName type_name;
     
-        ALLOW_FAILURE(read_punctuator(Token::Punctuator::RB_OPEN))
+        NON_UNIQUE
+        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
         NON_OPTIONAL(read_type_name(type_name))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
     
