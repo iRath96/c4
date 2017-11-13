@@ -358,16 +358,14 @@ protected:
     
 #pragma mark - Declarations
     
-    bool read_declarator(ast::Declarator &node) {
-        DEBUG_HOOK
-        
-        if (read_pointer(node))
-            NON_EMPTY(read_direct_declarator(node), "direct declarator expected")
-        else
-            NON_EMPTY_RET(read_direct_declarator(node))
-        
-        ACCEPT
-    }
+    bool read_declarator(ast::Declarator &node)
+    OPTION
+        if (read_pointer(node)) {
+            NON_OPTIONAL(read_direct_declarator(node))
+        } else {
+            OPTIONAL(read_direct_declarator(node))
+        }
+    END_OPTION
     
     bool read_declaration_specifiers(ast::PtrVector<ast::TypeSpecifier> &node)
     OPTION
