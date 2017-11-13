@@ -138,6 +138,7 @@ extern DebugTree *dbg_tree_current;
     error_flag = false;
 
 #define BEGIN_UNIQUE(stmt) \
+    NON_UNIQUE \
     if (!(stmt)) goto deny; \
     else UNIQUE
 
@@ -603,8 +604,7 @@ protected:
     OPTION
         auto initializer_list = std::make_shared<ast::InitializerList>();
     
-        NON_UNIQUE
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_OPEN))
+        ALLOW_FAILURE(read_punctuator(Token::Punctuator::CB_OPEN))
         NON_OPTIONAL(read_initializer_list(*initializer_list))
         OPTIONAL(read_punctuator(Token::Punctuator::COMMA))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
@@ -613,8 +613,7 @@ protected:
     ELSE_OPTION
         ast::Ptr<ast::Expression> assignment_expr;
     
-        NON_UNIQUE
-        NON_OPTIONAL(read_assignment_expression(assignment_expr))
+        ALLOW_FAILURE(read_assignment_expression(assignment_expr))
     
         node.initializer = assignment_expr;
     OTHERWISE_FAIL("initializer expected")
