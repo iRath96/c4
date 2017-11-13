@@ -439,15 +439,19 @@ protected:
             NON_OPTIONAL(read_direct_abstract_declarator())
     END_OPTION
     
+    bool read_direct_abstract_declarator_prefix()
+    OPTION
+        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
+        NON_OPTIONAL(read_abstract_declarator())
+        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
+    END_OPTION
+    
     bool read_direct_abstract_declarator() {
         DEBUG_HOOK
         
         int initial_i = i;
         
-        if (read_punctuator(Token::Punctuator::RB_OPEN)) {
-            NON_EMPTY(read_abstract_declarator(), "abstract declarator expected");
-            NON_EMPTY(read_punctuator(Token::Punctuator::RB_CLOSE), ") expected");
-        }
+        read_direct_abstract_declarator_prefix();
         
         while (!eof()) {
             ast::Vector<ast::ParameterDeclaration> plist;
