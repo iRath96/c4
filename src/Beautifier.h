@@ -185,7 +185,7 @@ public:
     }
 
     virtual void visit(SizeofExpressionUnary &node) {
-        std::cout << indent << "SizeofExpressionUnary" << std::endl;
+        std::cout << "sizeof ";
         inspect(node.expression);
     }
 
@@ -206,8 +206,9 @@ public:
     }
 
     virtual void visit(SizeofExpressionTypeName &node) {
-        std::cout << indent << "SizeofExpressionTypeName" << std::endl;
+        std::cout << "sizeof(";
         inspect(node.type);
+        std::cout << ")";
     }
 
     virtual void visit(DesignatorWithIdentifier &node) {
