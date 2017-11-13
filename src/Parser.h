@@ -620,11 +620,10 @@ protected:
     
     bool read_designation_initializer_pair(ast::Initializer &node)
     OPTION
-        if (read_designation(node.designators)) {
-            NON_OPTIONAL(read_initializer(node.declarator))
-        } else if (read_initializer(node.declarator)) {
-        } else
-            DENY
+        ALLOW_FAILURE(read_designation(node.designators))
+        NON_OPTIONAL(read_initializer(node.declarator))
+    ELSE_OPTION
+        ALLOW_FAILURE(read_initializer(node.declarator))
     END_OPTION
     
     bool read_initializer_list(ast::InitializerList &node)
