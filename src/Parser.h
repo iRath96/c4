@@ -689,10 +689,10 @@ protected:
         ast::Declarator declarator;
         
         NON_EMPTY_RET(read_declaration_specifiers(specifiers));
-        NON_EMPTY(read_declarator(declarator), "declarator expected");
         
-        bool needs_declaration_list = peek().punctuator == Token::Punctuator::COMMA;
-        bool needs_initialization = peek().punctuator == Token::Punctuator::ASSIGN;
+        bool has_declarator = read_declarator(declarator);
+        bool needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
+        bool needs_initialization = has_declarator && peek().punctuator == Token::Punctuator::ASSIGN;
         bool is_declaration = needs_initialization || needs_declaration_list || peek().punctuator == Token::Punctuator::SEMICOLON;
         
         if (is_declaration) {
