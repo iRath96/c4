@@ -361,6 +361,7 @@ protected:
     bool read_declarator(ast::Declarator &node)
     OPTION
         if (read_pointer(node)) {
+            UNIQUE
             NON_OPTIONAL(read_direct_declarator(node))
         } else {
             OPTIONAL(read_direct_declarator(node))
@@ -383,14 +384,15 @@ protected:
         node.is_function = true;
     END_OPTION
     
-    bool read_direct_declarator(ast::Declarator &node) {
-        DEBUG_HOOK
-        
-        NON_EMPTY_RET(read_direct_declarator_prefix(node));
+    bool read_direct_declarator(ast::Declarator &node)
+    OPTION
+        OPTIONAL(read_direct_declarator_prefix(node))
         
         int last_good_i = i;
         
         while (!eof()) {
+            NON_UNIQUE
+            
             // try reading parameter-list / identifier-list
             
             auto p_suffix = std::make_shared<ast::DeclaratorParameterList>();
@@ -407,14 +409,12 @@ protected:
             UNIQUE
             if (!read_punctuator(Token::Punctuator::RB_CLOSE))
                 break;
-            NON_UNIQUE
             
             last_good_i = i;
         }
         
         i = last_good_i;
-        ACCEPT
-    }
+    END_OPTION
     
     bool read_identifier_list(std::vector<const char *> &node)
     OPTION
