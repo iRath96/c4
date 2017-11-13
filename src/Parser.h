@@ -360,7 +360,10 @@ protected:
     
     bool read_declarator(ast::Declarator &node)
     OPTION
-        if (read_pointer(node)) {
+        bool has_pointer;
+        OPTIONAL(has_pointer = read_pointer(node))
+    
+        if (has_pointer) {
             UNIQUE
             NON_OPTIONAL(read_direct_declarator(node))
         } else {
@@ -536,7 +539,7 @@ protected:
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_OPEN))
         NON_OPTIONAL(read_struct_declaration_list(node.declarations))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
-    OTHERWISE_FAIL("struct body expected")
+    END_OPTION
     
     bool read_type_qualifier(int &node)
     OPTION
@@ -600,6 +603,7 @@ protected:
     OPTION
         auto initializer_list = std::make_shared<ast::InitializerList>();
     
+        NON_UNIQUE
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_OPEN))
         NON_OPTIONAL(read_initializer_list(*initializer_list))
         OPTIONAL(read_punctuator(Token::Punctuator::COMMA))
@@ -609,10 +613,11 @@ protected:
     ELSE_OPTION
         ast::Ptr<ast::Expression> assignment_expr;
     
+        NON_UNIQUE
         NON_OPTIONAL(read_assignment_expression(assignment_expr))
     
         node.initializer = assignment_expr;
-    END_OPTION
+    OTHERWISE_FAIL("initializer expected")
     
     bool read_designation_initializer_pair(ast::Initializer &node)
     OPTION
@@ -660,8 +665,11 @@ protected:
     bool read_init_declarator(ast::Declarator &node)
     OPTION
         NON_OPTIONAL(read_declarator(node))
-        
+    
+        NON_UNIQUE
         if (read_punctuator(Token::Punctuator::ASSIGN)) {
+            UNIQUE
+            
             // also read initializer
             NON_OPTIONAL(read_initializer(node));
         }
@@ -709,7 +717,7 @@ protected:
                 shift(); // consume assign
                 read_initializer(declarator);
                 
-                needs_initialization = peek().punctuator == Token::Punctuator::COMMA;
+                needs_declaration_list = peek().punctuator == Token::Punctuator::COMMA;
             }
             
             node->declarators.push_back(std::move(declarator));

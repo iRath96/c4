@@ -1,4 +1,4 @@
-unsigned int x, **y;
+unsigned int x = 4, **y;
 
 int (*functionPtr)(int, int);
 int (*getFunc())(int, int) {}
