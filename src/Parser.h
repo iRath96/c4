@@ -368,7 +368,7 @@ protected:
             UNIQUE
             NON_OPTIONAL(read_direct_declarator(node))
         } else {
-            OPTIONAL(read_direct_declarator(node))
+            ALLOW_FAILURE(read_direct_declarator(node))
         }
     END_OPTION
     
@@ -379,9 +379,9 @@ protected:
     
     bool read_direct_declarator_prefix(ast::Declarator &node)
     OPTION
-        NON_OPTIONAL(read_identifier(node.name))
+        ALLOW_FAILURE(read_identifier(node.name))
     ELSE_OPTION
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
+        ALLOW_FAILURE(read_punctuator(Token::Punctuator::RB_OPEN))
         NON_OPTIONAL(read_declarator(node))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
     
@@ -390,10 +390,10 @@ protected:
     
     bool read_direct_declarator(ast::Declarator &node)
     OPTION
-        OPTIONAL(read_direct_declarator_prefix(node))
-        
-        int last_good_i = i;
-        
+        int last_good_i;
+        NON_OPTIONAL(read_direct_declarator_prefix(node))
+    
+        last_good_i = i;
         while (!eof()) {
             NON_UNIQUE
             
@@ -418,7 +418,7 @@ protected:
         }
         
         i = last_good_i;
-    END_OPTION
+    OTHERWISE_FAIL("direct declarator expected")
     
     bool read_identifier_list(std::vector<const char *> &node)
     OPTION
@@ -434,8 +434,10 @@ protected:
     bool read_abstract_declarator()
     OPTION
         ast::Declarator ptr;
+        bool has_pointer;
+        OPTIONAL(has_pointer = read_pointer(ptr))
     
-        if (read_pointer(ptr))
+        if (has_pointer)
             OPTIONAL(read_direct_abstract_declarator())
         else
             NON_OPTIONAL(read_direct_abstract_declarator())
@@ -728,6 +730,11 @@ protected:
             NON_EMPTY(read_punctuator(Token::Punctuator::SEMICOLON), "semicolon expected");
         } else {
             // function definition: ... declaration-list(opt) compound-statement
+            
+            if (!has_declarator) {
+                UNIQUE
+                error("declarator expected");
+            }
             
             auto n = new ast::ExternalDeclarationFunction();
             node.reset(n);

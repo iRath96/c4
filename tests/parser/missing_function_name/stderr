@@ -1,0 +1,1 @@
+tests/parser/missing_function_name/input.c:1:4: error: declarator expected
