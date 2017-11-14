@@ -65,25 +65,12 @@ public:
         std::cout << ":";
     }
     
-    virtual void visit(DefaultLabel &node) {
-        std::cout << "default:";
-    }
-    
-    virtual void visit(IdentifierLabel &node) {
-        std::cout << node.id << ":";
-    }
-
-    virtual void visit(Identifier &node) {
-        std::cout << node.id;
-    }
-
-    virtual void visit(NamedType &node) {
-        std::cout << node.id;
-    }
-
-    virtual void visit(Pointer &node) {
-        std::cout << "*";
-    }
+    virtual void visit(DefaultLabel &) { std::cout << "default:"; }
+    virtual void visit(IdentifierLabel &node) { std::cout << node.id << ":"; }
+    virtual void visit(Identifier &node) { std::cout << node.id; }
+    virtual void visit(NamedType &node) { std::cout << node.id; }
+    virtual void visit(Pointer &) { std::cout << "*"; }
+    virtual void visit(ContinueStatement &) { std::cout << "continue;"; }
 
     virtual void visit(CompoundStatement &node) {
         std::cout << "{";
@@ -254,10 +241,6 @@ public:
     virtual void visit(GotoStatement &node) {
         join(node.labels, " ", " ");
         std::cout << "goto " << node.target << ";";
-    }
-
-    virtual void visit(ContinueStatement &node) {
-        std::cout << "continue;";
     }
 
     virtual void visit(ReturnStatement &node) {

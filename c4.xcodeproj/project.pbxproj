@@ -33,6 +33,7 @@
 		FA74D5001FA257CC00D7CA2E /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		FA87A23C1FB84DAD0023DB3F /* AST.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AST.h; sourceTree = "<group>"; };
 		FA87A23D1FB8D2930023DB3F /* ASTInspector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ASTInspector.h; sourceTree = "<group>"; };
+		FA87A23E1FB8E3A00023DB3F /* Beautifier.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Beautifier.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +54,7 @@
 				FA6431871FAD924D00ABFB9D /* Parser.h */,
 				FA87A23C1FB84DAD0023DB3F /* AST.h */,
 				FA87A23D1FB8D2930023DB3F /* ASTInspector.h */,
+				FA87A23E1FB8E3A00023DB3F /* Beautifier.h */,
 			);
 			name = parser;
 			sourceTree = "<group>";

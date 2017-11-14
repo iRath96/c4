@@ -26,41 +26,57 @@ using PtrVector = Vector<Ptr<T>>;
 
 #pragma mark - Visitor
 
+// Nodes
+struct Identifier;
+struct Pointer;
+struct TypeName;
+
+// Labels
 struct CaseLabel;
 struct DefaultLabel;
 struct IdentifierLabel;
-struct Identifier;
-struct NamedType;
-struct ComposedType;
-struct Pointer;
-struct CompoundStatement;
-struct DeclaratorParameterList;
+
+// Declarators
 struct Declarator;
-struct Declaration;
-struct ExternalDeclarationVariable;
-struct ExternalDeclarationFunction;
-struct ParameterDeclaration;
+struct DeclaratorParameterList;
+
+// Designators
+struct DesignatorWithIdentifier;
+struct DesignatorWithExpression;
+struct Initializer;
+
+// Expressions
 struct ConstantExpression;
 struct UnaryExpression;
 struct BinaryExpression;
 struct ConditionalExpression;
 struct ExpressionList;
 struct CallExpression;
-struct ExpressionStatement;
-struct SizeofExpressionUnary;
-struct TypeName;
-struct SizeofExpressionTypeName;
-struct DesignatorWithIdentifier;
-struct DesignatorWithExpression;
-struct Initializer;
 struct InitializerList;
 struct InitializerExpression;
+struct SizeofExpressionUnary;
+struct SizeofExpressionTypeName;
+
+// Statements
+struct CompoundStatement;
 struct IterationStatement;
+struct ExpressionStatement;
 struct SelectionStatement;
 struct GotoStatement;
 struct ContinueStatement;
 struct ReturnStatement;
 
+// Declarations
+struct Declaration;
+struct ParameterDeclaration;
+struct ExternalDeclarationVariable;
+struct ExternalDeclarationFunction;
+
+// Types
+struct NamedType;
+struct ComposedType;
+
+// Visitor
 struct Visitor {
     virtual void visit(CaseLabel &) = 0;
     virtual void visit(DefaultLabel &) = 0;
@@ -123,12 +139,12 @@ struct Identifier : Node {
 
 struct TypeSpecifier : Node {};
 
-struct NamedType : TypeSpecifier {
-    const char *id;
+struct Pointer : Node {
     ACCEPT
 };
 
-struct Pointer : Node {
+struct TypeName : Node {
+    PtrVector<TypeSpecifier> specifiers;
     ACCEPT
 };
 
@@ -148,12 +164,7 @@ struct IdentifierLabel : Label {
     ACCEPT
 };
 
-#pragma mark - Statements
-
-struct CompoundStatement : Statement {
-    PtrVector<BlockItem> items;
-    ACCEPT
-};
+#pragma mark - Declarators
 
 struct DeclaratorSuffix : Node {};
 
@@ -173,39 +184,22 @@ struct Declarator : Node {
     ACCEPT
 };
 
-struct Declaration : BlockItem {
-    PtrVector<TypeSpecifier> specifiers;
-    Vector<Declarator> declarators;
-    
+#pragma mark - Designators
+
+struct Designator : Node {};
+struct DesignatorWithIdentifier : Designator {
+    const char *id;
     ACCEPT
 };
 
-struct ExternalDeclaration : Declaration {};
-
-struct ExternalDeclarationVariable : ExternalDeclaration {
+struct DesignatorWithExpression : Designator {
+    Ptr<Expression> expression;
     ACCEPT
 };
 
-struct ExternalDeclarationFunction : ExternalDeclaration {
-    Vector<Declaration> declarations;
-    CompoundStatement body;
-    
-    ACCEPT
-};
-
-struct ParameterDeclaration : Node {
-    PtrVector<TypeSpecifier> specifiers;
+struct Initializer : Node {
+    PtrVector<Designator> designators;
     Declarator declarator;
-    
-    ACCEPT
-};
-
-struct ComposedType : TypeSpecifier {
-    const char *name = NULL;
-    
-    lexer::Token::Keyword type; // STRUCT or UNION
-    Vector<Declaration> declarations;
-    
     ACCEPT
 };
 
@@ -248,8 +242,15 @@ struct CallExpression : Expression {
     ACCEPT
 };
 
-struct ExpressionStatement : Statement {
-    ExpressionList expressions;
+struct InitializerList : Expression { // @todo really inherit from Expression?
+    Vector<Initializer> initializers;
+    ACCEPT
+};
+
+struct InitializerExpression : Expression {
+    TypeName type;
+    InitializerList initializers;
+    
     ACCEPT
 };
 
@@ -260,44 +261,20 @@ struct SizeofExpressionUnary : SizeofExpression {
     ACCEPT
 };
 
-struct TypeName : Node {
-    PtrVector<TypeSpecifier> specifiers;
-    ACCEPT
-};
-
 struct SizeofExpressionTypeName : SizeofExpression { // @todo wtf?
     TypeName type;
     ACCEPT
 };
 
-#pragma mark - Designators
+#pragma mark - Statements
 
-struct Designator : Node {};
-struct DesignatorWithIdentifier : Designator {
-    const char *id;
+struct CompoundStatement : Statement {
+    PtrVector<BlockItem> items;
     ACCEPT
 };
 
-struct DesignatorWithExpression : Designator {
-    Ptr<Expression> expression;
-    ACCEPT
-};
-
-struct Initializer : Node {
-    PtrVector<Designator> designators;
-    Declarator declarator;
-    ACCEPT
-};
-
-struct InitializerList : Expression { // @todo really inherit from Expression?
-    Vector<Initializer> initializers;
-    ACCEPT
-};
-
-struct InitializerExpression : Expression {
-    TypeName type;
-    InitializerList initializers;
-    
+struct ExpressionStatement : Statement {
+    ExpressionList expressions;
     ACCEPT
 };
 
@@ -329,6 +306,51 @@ struct ContinueStatement : JumpStatement {
 
 struct ReturnStatement : JumpStatement {
     ExpressionList expressions;
+    ACCEPT
+};
+
+#pragma mark - Declarations
+
+struct Declaration : BlockItem {
+    PtrVector<TypeSpecifier> specifiers;
+    Vector<Declarator> declarators;
+    
+    ACCEPT
+};
+
+struct ParameterDeclaration : Node {
+    PtrVector<TypeSpecifier> specifiers;
+    Declarator declarator;
+    
+    ACCEPT
+};
+
+struct ExternalDeclaration : Declaration {};
+
+struct ExternalDeclarationVariable : ExternalDeclaration {
+    ACCEPT
+};
+
+struct ExternalDeclarationFunction : ExternalDeclaration {
+    Vector<Declaration> declarations;
+    CompoundStatement body;
+    
+    ACCEPT
+};
+
+#pragma mark - Types
+
+struct NamedType : TypeSpecifier {
+    const char *id;
+    ACCEPT
+};
+
+struct ComposedType : TypeSpecifier {
+    const char *name = NULL;
+    
+    lexer::Token::Keyword type; // STRUCT or UNION
+    Vector<Declaration> declarations;
+    
     ACCEPT
 };
 

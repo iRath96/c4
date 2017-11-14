@@ -50,11 +50,11 @@ public:
         inspect(*node.expression);
     }
     
-    virtual void visit(DefaultLabel &node) {
+    virtual void visit(DefaultLabel &) {
         std::cout << indent << "DefaultLabel" << std::endl;
     }
     
-    virtual void visit(IdentifierLabel &node) {
+    virtual void visit(IdentifierLabel &) {
         std::cout << indent << "IdentifierLabel" << std::endl;
     }
 
@@ -66,7 +66,7 @@ public:
         std::cout << indent << "NamedType[" << node.id << "]" << std::endl;
     }
 
-    virtual void visit(Pointer &node) {
+    virtual void visit(Pointer &) {
         std::cout << indent << "Pointer" << std::endl;
     }
 

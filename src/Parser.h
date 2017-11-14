@@ -477,7 +477,7 @@ protected:
         }
     END_OPTION
     
-    bool read_pointer_single(ast::Pointer &node)
+    bool read_pointer_single(ast::Pointer &)
     OPTION
         NON_OPTIONAL(read_punctuator(Token::Punctuator::ASTERISK))
         OPTIONAL(read_type_qualifier_list())
@@ -530,7 +530,7 @@ protected:
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
     END_OPTION
     
-    bool read_type_qualifier(int &node)
+    bool read_type_qualifier(int &)
     OPTION
         switch (peek().keyword) {
             case Token::Keyword::CONST:
@@ -960,21 +960,19 @@ protected:
     bool read_unary_expression(ast::Ptr<ast::Expression> &node)
     OPTION
         auto unary_node = std::make_shared<ast::UnaryExpression>();
-        ALLOW_FAILURE(read_punctuator(Token::Punctuator::PLUSPLUS) || read_punctuator(Token::Punctuator::MINUSMINUS))
-        UNIQUE
+        BEGIN_UNIQUE(read_punctuator(Token::Punctuator::PLUSPLUS) || read_punctuator(Token::Punctuator::MINUSMINUS))
         NON_OPTIONAL(read_unary_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
         auto unary_node = std::make_shared<ast::UnaryExpression>();
-        ALLOW_FAILURE(read_unary_operator(unary_node->op))
-        UNIQUE
+        BEGIN_UNIQUE(read_unary_operator(unary_node->op))
         NON_OPTIONAL(read_cast_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
         ast::Ptr<ast::Expression> u;
     
-        ALLOW_FAILURE(read_keyword(Token::Keyword::SIZEOF))
         NON_UNIQUE
+        NON_OPTIONAL(read_keyword(Token::Keyword::SIZEOF))
     
         if (read_unary_expression(u)) {
             auto s = std::make_shared<ast::SizeofExpressionUnary>();
@@ -992,8 +990,7 @@ protected:
     ELSE_OPTION
         ast::TypeName type_name;
     
-        ALLOW_FAILURE(read_keyword(Token::Keyword::_ALIGNOF))
-        UNIQUE
+        BEGIN_UNIQUE(read_keyword(Token::Keyword::_ALIGNOF))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
         NON_OPTIONAL(read_type_name(type_name))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
@@ -1081,8 +1078,22 @@ protected:
     END_OPTION
 };
 
-#undef NON_EMPTY
-#undef NON_EMPTY_RET
+#undef _DEBUG_RETURN
+#undef FAIL
+#undef FAIL_IF_EMPTY
+#undef _OPTION_PREFIX
+#undef _OPTION_SUFFIX
+#undef OPTION
+#undef ELSE_OPTION
+#undef END_OPTION
+#undef ERROR
+#undef OTHERWISE_FAIL
+#undef ALLOW_FAILURE
+#undef NON_OPTIONAL
+#undef UNIQUE
+#undef NON_UNIQUE
+#undef BEGIN_UNIQUE
+#undef OPTIONAL
 
 #endif /* Parser_hpp */
 
