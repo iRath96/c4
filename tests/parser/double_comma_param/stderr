@@ -1,0 +1,1 @@
+tests/parser/double_comma_param/input.c:1:16: error: type specifier expected
