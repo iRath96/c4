@@ -57,44 +57,33 @@ public:
 extern DebugTree dbg_tree_root;
 extern DebugTree *dbg_tree_current;
 
-#define DEBUG_HOOK { \
-    if (debug_mode) { \
-        /* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
-        dbg_tree_current = dbg_tree_current->create_child(__PRETTY_FUNCTION__, i); \
-    } \
-}
-
-#define DEBUG_RETURN(x) { \
+#define _DEBUG_RETURN(x) { \
     if (debug_mode) \
         dbg_tree_current = dbg_tree_current->perform_return(x, i); \
     return x; \
 }
 
 #define FAIL goto deny;
-
-#define NON_EMPTY(stmt, err) {\
-    if (!(stmt)) \
-        error(err); \
-}
-
-#define NON_EMPTY_RET(stmt) {\
-    if (!(stmt)) \
-        DEBUG_RETURN(false); \
-}
+#define FAIL_IF_EMPTY \
+    if (i == _initial_i) \
+        FAIL
 
 #define _OPTION_PREFIX \
     { \
         __label__ deny;
 
 #define _OPTION_SUFFIX \
-        DEBUG_RETURN(true) \
+        _DEBUG_RETURN(true) \
         deny: \
         i = _initial_i; \
         error_flag = _initial_ef; \
     }
 
 #define OPTION { \
-    DEBUG_HOOK \
+    if (debug_mode) { \
+        /* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
+        dbg_tree_current = dbg_tree_current->create_child(__PRETTY_FUNCTION__, i); \
+    } \
     int _initial_i = i; \
     bool _initial_ef = error_flag; \
     _OPTION_PREFIX;
@@ -105,7 +94,7 @@ extern DebugTree *dbg_tree_current;
 
 #define END_OPTION \
     _OPTION_SUFFIX \
-    DEBUG_RETURN(false) \
+    _DEBUG_RETURN(false) \
 }
 
 #define ERROR(error_message) if (error_flag) error(error_message);
@@ -114,7 +103,7 @@ extern DebugTree *dbg_tree_current;
     _OPTION_SUFFIX \
     ERROR(error_message) \
     error_flag = _initial_ef; \
-    DEBUG_RETURN(false) \
+    _DEBUG_RETURN(false) \
 }
 
 #define ALLOW_FAILURE(stmt) \
@@ -445,28 +434,28 @@ protected:
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
     END_OPTION
     
-    bool read_direct_abstract_declarator() {
-        DEBUG_HOOK
-        
-        int initial_i = i;
-        
-        read_direct_abstract_declarator_prefix();
+    bool read_direct_abstract_declarator()
+    OPTION
+        OPTIONAL(read_direct_abstract_declarator_prefix())
         
         while (!eof()) {
             ast::Vector<ast::ParameterDeclaration> plist;
             
+            NON_UNIQUE
             if (read_punctuator(Token::Punctuator::SB_OPEN)) {
-                NON_EMPTY(read_punctuator(Token::Punctuator::ASTERISK), "* expected");
-                NON_EMPTY(read_punctuator(Token::Punctuator::SB_CLOSE), "] expected");
+                UNIQUE
+                NON_OPTIONAL(read_punctuator(Token::Punctuator::ASTERISK))
+                NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
             } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
-                read_parameter_type_list(plist);
-                NON_EMPTY(read_punctuator(Token::Punctuator::RB_CLOSE), ") expected");
+                UNIQUE
+                OPTIONAL(read_parameter_type_list(plist))
+                NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
             } else
                 break;
         }
         
-        DEBUG_RETURN(i != initial_i)
-    }
+        FAIL_IF_EMPTY
+    END_OPTION
     
     bool read_parameter_type_list(ast::Vector<ast::ParameterDeclaration> &node)
     OPTION
@@ -583,7 +572,7 @@ protected:
                     
                     if (has_body) {
                         UNIQUE
-                        NON_EMPTY_RET(read_struct_body(*n))
+                        NON_OPTIONAL(read_struct_body(*n))
                     }
                     
                     break;
@@ -685,18 +674,18 @@ protected:
         NON_OPTIONAL(read_list(&Parser::read_declaration, node))
     END_OPTION
     
-    bool read_external_declaration(ast::Ptr<ast::ExternalDeclaration> &node) {
-        DEBUG_HOOK
-        
+    bool read_external_declaration(ast::Ptr<ast::ExternalDeclaration> &node)
+    OPTION
         ast::PtrVector<ast::TypeSpecifier> specifiers;
         ast::Declarator declarator;
+        bool has_declarator, needs_declaration_list, needs_initialization, is_declaration;
         
-        NON_EMPTY_RET(read_declaration_specifiers(specifiers));
+        ALLOW_FAILURE(read_declaration_specifiers(specifiers))
         
-        bool has_declarator = read_declarator(declarator);
-        bool needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
-        bool needs_initialization = has_declarator && peek().punctuator == Token::Punctuator::ASSIGN;
-        bool is_declaration = needs_initialization || needs_declaration_list || peek().punctuator == Token::Punctuator::SEMICOLON;
+        has_declarator = read_declarator(declarator);
+        needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
+        needs_initialization = has_declarator && peek().punctuator == Token::Punctuator::ASSIGN;
+        is_declaration = needs_initialization || needs_declaration_list || peek().punctuator == Token::Punctuator::SEMICOLON;
         
         if (is_declaration) {
             // declaration: ... (',' init-declarator-list(opt))(opt) ;
@@ -720,7 +709,8 @@ protected:
                 read_init_declarator_list(node->declarators);
             }
             
-            NON_EMPTY(read_punctuator(Token::Punctuator::SEMICOLON), "semicolon expected");
+            UNIQUE
+            NON_OPTIONAL(read_punctuator(Token::Punctuator::SEMICOLON))
         } else {
             // function definition: ... declaration-list(opt) compound-statement
             
@@ -737,11 +727,11 @@ protected:
             node->declarators.push_back(std::move(declarator));
             
             read_declaration_list(n->declarations);
-            NON_EMPTY(read_compound_statement(n->body), "compound statement expected");
+            
+            UNIQUE
+            NON_OPTIONAL(read_compound_statement(n->body))
         }
-        
-        DEBUG_RETURN(true)
-    }
+    END_OPTION
     
 #pragma mark - Statements
     
@@ -928,38 +918,44 @@ protected:
         node = initializer;
     END_OPTION
     
-    bool read_postfix_expression(ast::Ptr<ast::Expression> &node) {
-        DEBUG_HOOK
-        
-        NON_EMPTY_RET(read_postfix_expression_prefix(node))
+    bool read_postfix_expression(ast::Ptr<ast::Expression> &node)
+    OPTION
+        NON_OPTIONAL(read_postfix_expression_prefix(node))
         
         while (!eof()) {
+            NON_UNIQUE
             if (read_punctuator(Token::Punctuator::SB_OPEN)) {
+                UNIQUE
+                
                 ast::ExpressionList list;
-                NON_EMPTY(read_expression(list), "expression expected");
-                NON_EMPTY(read_punctuator(Token::Punctuator::SB_CLOSE), "] expected");
+                NON_OPTIONAL(read_expression(list))
+                NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
             } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
+                UNIQUE
+                
                 auto n = std::make_shared<ast::CallExpression>();
                 n->function = node;
                 
-                read_argument_expression_list(n->arguments);
-                NON_EMPTY(read_punctuator(Token::Punctuator::RB_CLOSE), ") expected");
+                OPTIONAL(read_argument_expression_list(n->arguments))
+                NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
                 
                 node = n;
-            } else if (read_punctuator(Token::Punctuator::PERIOD)) {
+            } else if (read_punctuator(Token::Punctuator::PERIOD)) { // @todo wrap NON_UNIQUE->if->UNIQUE stuff
+                UNIQUE
+                
                 const char *id;
-                NON_EMPTY(read_identifier(id), "subscript expected");
+                NON_OPTIONAL(read_identifier(id))
             } else if (read_punctuator(Token::Punctuator::ARROW)) {
+                UNIQUE
+                
                 const char *id;
-                NON_EMPTY(read_identifier(id), "subscript expected");
+                NON_OPTIONAL(read_identifier(id))
             } else if (read_punctuator(Token::Punctuator::PLUSPLUS)) {
             } else if (read_punctuator(Token::Punctuator::MINUSMINUS)) {
             } else
                 break;
         }
-        
-        DEBUG_RETURN(true)
-    }
+    END_OPTION
     
     bool read_unary_expression(ast::Ptr<ast::Expression> &node)
     OPTION
@@ -1044,9 +1040,10 @@ protected:
                 auto elist = std::make_shared<ast::ExpressionList>();
                 tree->when_true = elist;
                 
-                NON_EMPTY(read_expression(*elist), "expression expected");
-                NON_EMPTY(read_punctuator(Token::Punctuator::COLON), "colon expected");
-                NON_EMPTY(read_expression_with_precedence((Token::Precedence)((int)right_precedence - 1), tree->when_false), "expression expected");
+                UNIQUE
+                NON_OPTIONAL(read_expression(*elist))
+                NON_OPTIONAL(read_punctuator(Token::Punctuator::COLON))
+                NON_OPTIONAL(read_expression_with_precedence((Token::Precedence)((int)right_precedence - 1), tree->when_false))
             } else {
                 // ordinary operator
                 
@@ -1064,12 +1061,12 @@ protected:
                 
                 shift();
                 
-                NON_EMPTY(read_expression_with_precedence(right_precedence, tree->rhs), "expression expected");
+                NON_OPTIONAL(read_expression_with_precedence(right_precedence, tree->rhs))
             }
         }
         
         node = root;
-    END_OPTION
+    OTHERWISE_FAIL("expression expected")
     
     bool read_assignment_expression(ast::Ptr<ast::Expression> &node)
     OPTION
