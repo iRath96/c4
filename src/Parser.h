@@ -361,15 +361,8 @@ protected:
     
     bool read_declarator(ast::Declarator &node)
     OPTION
-        bool has_pointer;
-        OPTIONAL(has_pointer = read_pointer(node))
-    
-        if (has_pointer) {
-            UNIQUE
-            NON_OPTIONAL(read_direct_declarator(node))
-        } else {
-            ALLOW_FAILURE(read_direct_declarator(node))
-        }
+        OPTIONAL(read_pointer(node))
+        NON_OPTIONAL(read_direct_declarator(node))
     END_OPTION
     
     bool read_declaration_specifiers(ast::PtrVector<ast::TypeSpecifier> &node)
@@ -486,6 +479,8 @@ protected:
     bool read_parameter_declaration(ast::ParameterDeclaration &node)
     OPTION
         NON_OPTIONAL(read_declaration_specifiers(node.specifiers))
+        
+        NON_UNIQUE
         if (read_declarator(node.declarator)) {
         } else if (read_abstract_declarator()) {
         }
@@ -733,7 +728,8 @@ protected:
             
             if (!has_declarator) {
                 UNIQUE
-                error("declarator expected");
+                read_declarator(declarator);
+                //error("declarator expected");
             }
             
             auto n = new ast::ExternalDeclarationFunction();

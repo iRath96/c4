@@ -24,6 +24,12 @@ int b;
 {
     a ? b : c ? d : e; // a ? b : (c ? d : e)
     
+    /*
+        the following statement is valid,
+        but wtf does it mean?
+    */
+    int x = (int (int *(*), long x)) 2;
+
     !(int) { 4 };
 
     int c = 1 << 8;
