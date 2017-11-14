@@ -1,0 +1,1 @@
+tests/parser/param_no_type/input.c:1:16: error: type specifier expected

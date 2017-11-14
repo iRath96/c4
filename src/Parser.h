@@ -70,8 +70,7 @@ extern DebugTree *dbg_tree_current;
     return x; \
 }
 
-#define ACCEPT DEBUG_RETURN(true)
-#define DENY DEBUG_RETURN(false)
+#define FAIL goto deny;
 
 #define NON_EMPTY(stmt, err) {\
     if (!(stmt)) \
@@ -88,7 +87,7 @@ extern DebugTree *dbg_tree_current;
         __label__ deny;
 
 #define _OPTION_SUFFIX \
-        ACCEPT \
+        DEBUG_RETURN(true) \
         deny: \
         i = _initial_i; \
         error_flag = _initial_ef; \
@@ -106,7 +105,7 @@ extern DebugTree *dbg_tree_current;
 
 #define END_OPTION \
     _OPTION_SUFFIX \
-    DENY \
+    DEBUG_RETURN(false) \
 }
 
 #define ERROR(error_message) if (error_flag) error(error_message);
@@ -115,21 +114,21 @@ extern DebugTree *dbg_tree_current;
     _OPTION_SUFFIX \
     ERROR(error_message) \
     error_flag = _initial_ef; \
-    DENY \
+    DEBUG_RETURN(false) \
 }
 
 #define ALLOW_FAILURE(stmt) \
     { \
         bool _prev_ef = error_flag; \
         error_flag = false; \
-        if (!(stmt)) { \
-            goto deny; \
-        } \
+        if (!(stmt)) \
+            FAIL \
         error_flag = _prev_ef; \
     }
 
 #define NON_OPTIONAL(stmt) \
-    if (!(stmt)) goto deny;
+    if (!(stmt)) \
+        FAIL;
 
 #define UNIQUE \
     error_flag = true;
@@ -139,7 +138,8 @@ extern DebugTree *dbg_tree_current;
 
 #define BEGIN_UNIQUE(stmt) \
     NON_UNIQUE \
-    if (!(stmt)) goto deny; \
+    if (!(stmt)) \
+        FAIL \
     else UNIQUE
 
 #define OPTIONAL(stmt) \
@@ -263,7 +263,7 @@ protected:
                 break;
                 
             default:
-                NON_OPTIONAL(false)
+                FAIL
         }
     OTHERWISE_FAIL("unary operator expected")
     
@@ -552,52 +552,48 @@ protected:
                 break;
             
             default:
-                DENY
+                FAIL
         }
     END_OPTION
     
-    bool read_type_specifier(ast::Ptr<ast::TypeSpecifier> &node) {
-        DEBUG_HOOK
-        
+    bool read_type_specifier(ast::Ptr<ast::TypeSpecifier> &node)
+    OPTION
         ast::NamedType type_name;
         if (read_type_specifier_keyword(type_name)) {
             node = std::make_shared<ast::NamedType>(type_name);
-            ACCEPT
-        }
-        
-        Token &token = peek();
-        switch (token.keyword) {
-            case Token::Keyword::STRUCT:
-            case Token::Keyword::UNION: {
-                shift();
-                
-                auto n = new ast::ComposedType();
-                node.reset(n);
-                
-                n->type = token.keyword;
-                
-                NON_UNIQUE
-                
-                bool has_identifier = read_identifier(n->name);
-                bool has_body = peek().punctuator == Token::Punctuator::CB_OPEN;
-                
-                if (!has_body && !has_identifier)
-                    error("struct/union without identifier or body");
-                
-                if (has_body) {
-                    UNIQUE
-                    NON_EMPTY_RET(read_struct_body(*n))
+        } else {
+            Token &token = peek();
+            switch (token.keyword) {
+                case Token::Keyword::STRUCT:
+                case Token::Keyword::UNION: {
+                    shift();
+                    
+                    auto n = new ast::ComposedType();
+                    node.reset(n);
+                    
+                    n->type = token.keyword;
+                    
+                    NON_UNIQUE
+                    
+                    bool has_identifier = read_identifier(n->name);
+                    bool has_body = peek().punctuator == Token::Punctuator::CB_OPEN;
+                    
+                    if (!has_body && !has_identifier)
+                        error("struct/union without identifier or body");
+                    
+                    if (has_body) {
+                        UNIQUE
+                        NON_EMPTY_RET(read_struct_body(*n))
+                    }
+                    
+                    break;
                 }
-                
-                break;
+                    
+                default:
+                    NON_OPTIONAL(false)
             }
-                
-            default:
-                DENY
         }
-        
-        ACCEPT
-    }
+    OTHERWISE_FAIL("type specifier expected")
     
     bool read_initializer(ast::Declarator &node)
     OPTION
@@ -744,7 +740,7 @@ protected:
             NON_EMPTY(read_compound_statement(n->body), "compound statement expected");
         }
         
-        ACCEPT
+        DEBUG_RETURN(true)
     }
     
 #pragma mark - Statements
@@ -789,7 +785,7 @@ protected:
             read_identifier(n->id);
             label = n;
         } else
-            DENY
+            FAIL
         
         NON_OPTIONAL(read_punctuator(Token::Punctuator::COLON))
         
@@ -962,7 +958,7 @@ protected:
                 break;
         }
         
-        ACCEPT
+        DEBUG_RETURN(true)
     }
     
     bool read_unary_expression(ast::Ptr<ast::Expression> &node)
