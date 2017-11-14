@@ -567,12 +567,12 @@ protected:
                     bool has_identifier = read_identifier(n->name);
                     bool has_body = peek().punctuator == Token::Punctuator::CB_OPEN;
                     
-                    if (!has_body && !has_identifier)
-                        error("struct/union without identifier or body");
+                    UNIQUE
                     
                     if (has_body) {
-                        UNIQUE
                         NON_OPTIONAL(read_struct_body(*n))
+                    } else if (!has_identifier) {
+                        error("struct/union without identifier or body");
                     }
                     
                     break;
@@ -981,6 +981,8 @@ protected:
             s->expression = u;
             node = s;
         } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
+            UNIQUE
+            
             auto s = std::make_shared<ast::SizeofExpressionTypeName>();
             NON_OPTIONAL(read_type_name(s->type))
             NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
@@ -1017,7 +1019,7 @@ protected:
     OPTION
         ast::Ptr<ast::Expression> root; // @todo rename this to lhs
         BEGIN_UNIQUE(read_cast_expression(root))
-        
+    
         while (!eof()) {
             Token::Punctuator op = peek().punctuator;
             Token::Precedence right_precedence = Token::precedence(op);
