@@ -1,0 +1,1 @@
+tests/parser/double_comma/input.c:2:7: error: assignment expression expected

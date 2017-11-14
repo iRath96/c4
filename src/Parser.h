@@ -350,6 +350,8 @@ protected:
             
             if (!read_punctuator(separator))
                 break;
+            
+            error_flag = true;
         }
         
         error_flag = _initial_ef;
@@ -1076,7 +1078,7 @@ protected:
     bool read_assignment_expression(ast::Ptr<ast::Expression> &node)
     OPTION
         NON_OPTIONAL(read_expression_with_precedence(Token::Precedence::NONE, node))
-    END_OPTION
+    OTHERWISE_FAIL("assignment expression expected")
     
     bool read_constant_expression(ast::Ptr<ast::Expression> &node)
     OPTION
