@@ -52,7 +52,10 @@ Token Lexer::next_token() {
         int length = 0;
         char c = peek(0);
         
-        if ((length = read_whitespace()) || (length = read_comment())) {
+        if (isspace(c)) {
+            consume(read_whitespace());
+            continue;
+        } else if (c == '/' && (length = read_comment())) {
             // skip whitespace and comments
             consume(length);
             continue;
