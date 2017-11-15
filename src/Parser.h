@@ -217,10 +217,11 @@ protected:
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
-        TextPosition start_pos = i + offset > 0 ?
+        /*TextPosition start_pos = i + offset > 0 ?
             peek(offset - 1).end_pos :
             peek(offset).pos
-        ;
+        ;*/
+        TextPosition start_pos = peek(offset).pos;
         throw ParserError(message, start_pos);
     }
     
