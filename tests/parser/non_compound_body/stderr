@@ -1,0 +1,1 @@
+tests/parser/non_compound_body/input.c:1:9: error: compound statement expected

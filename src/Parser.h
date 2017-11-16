@@ -187,7 +187,7 @@ public:
     
 protected:
     int i = 0;
-    bool error_flag = false; // whtether errors will be thrown
+    bool error_flag = true; // whether errors will be thrown
     
     bool shift(bool condition = true) {
         i += condition ? 1 : 0;
@@ -307,16 +307,19 @@ protected:
     }
     
     template<typename T>
-    bool read_list(bool (Parser::*method)(T &node), std::vector<T> &result) {
+    bool read_list(bool (Parser::*method)(T &node), std::vector<T> &result, Token::Punctuator end_marker = Token::Punctuator::NEVER) {
         int initial_i = i;
         bool _initial_ef = error_flag;
         
         while (!eof()) {
+            if (peek().punctuator == end_marker)
+                break;
+            
             T temp;
             if (!(this->*method)(temp))
                 break;
             
-            error_flag = false;
+            //error_flag = false;
             
             result.push_back(temp);
         }
@@ -363,7 +366,7 @@ protected:
     bool read_declaration_specifiers(ast::PtrVector<ast::TypeSpecifier> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
-    END_OPTION
+    OTHERWISE_FAIL("type specifier expected")
     
     bool read_direct_declarator_prefix(ast::Declarator &node)
     OPTION
@@ -501,7 +504,7 @@ protected:
     bool read_specifier_qualifier_list(ast::PtrVector<ast::TypeSpecifier> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
-    END_OPTION
+    OTHERWISE_FAIL("specifier qualifier list expected") // END_OPTION
     
 #pragma mark - Structs
     
@@ -586,7 +589,7 @@ protected:
                     NON_OPTIONAL(false)
             }
         }
-    OTHERWISE_FAIL("type specifier expected")
+    END_OPTION // OTHERWISE_FAIL("type specifier expected")
     
     bool read_initializer(ast::Declarator &node)
     OPTION
@@ -634,7 +637,7 @@ protected:
     OPTION
         auto d = std::make_shared<ast::DesignatorWithExpression>();
     
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_OPEN))
+        ALLOW_FAILURE(read_punctuator(Token::Punctuator::SB_OPEN))
         NON_OPTIONAL(read_constant_expression(d->expression))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
     
@@ -642,7 +645,7 @@ protected:
     ELSE_OPTION
         auto d = std::make_shared<ast::DesignatorWithIdentifier>();
     
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::PERIOD))
+        ALLOW_FAILURE(read_punctuator(Token::Punctuator::PERIOD))
         NON_OPTIONAL(read_identifier(d->id))
     
         node = d;
@@ -684,13 +687,15 @@ protected:
         ast::Declarator declarator;
         bool has_declarator, needs_declaration_list, needs_initialization, is_declaration;
         
-        ALLOW_FAILURE(read_declaration_specifiers(specifiers))
-        
+        NON_OPTIONAL(read_declaration_specifiers(specifiers))
+    
+        NON_UNIQUE
         has_declarator = read_declarator(declarator);
         needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
         needs_initialization = has_declarator && peek().punctuator == Token::Punctuator::ASSIGN;
         is_declaration = needs_initialization || needs_declaration_list || peek().punctuator == Token::Punctuator::SEMICOLON;
-        
+    
+        UNIQUE
         if (is_declaration) {
             // declaration: ... (',' init-declarator-list(opt))(opt) ;
             
@@ -713,13 +718,11 @@ protected:
                 read_init_declarator_list(node->declarators);
             }
             
-            UNIQUE
             NON_OPTIONAL(read_punctuator(Token::Punctuator::SEMICOLON))
         } else {
             // function definition: ... declaration-list(opt) compound-statement
             
             if (!has_declarator) {
-                UNIQUE
                 read_declarator(declarator);
                 //error("declarator expected");
             }
@@ -730,9 +733,7 @@ protected:
             node->specifiers = std::move(specifiers);
             node->declarators.push_back(std::move(declarator));
             
-            read_declaration_list(n->declarations);
-            
-            UNIQUE
+            OPTIONAL(read_declaration_list(n->declarations))
             NON_OPTIONAL(read_compound_statement(n->body))
         }
     END_OPTION
@@ -802,7 +803,7 @@ protected:
     
     bool read_block_item_list(ast::PtrVector<ast::BlockItem> &node)
     OPTION
-        NON_OPTIONAL(read_list(&Parser::read_block_item, node))
+        NON_OPTIONAL(read_list(&Parser::read_block_item, node, Token::Punctuator::CB_CLOSE))
     END_OPTION
     
     bool read_compound_statement(ast::CompoundStatement &node)
@@ -810,7 +811,7 @@ protected:
         BEGIN_UNIQUE(read_punctuator(Token::Punctuator::CB_OPEN))
         OPTIONAL(read_block_item_list(node.items))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
-    END_OPTION
+    OTHERWISE_FAIL("compound statement expected")
     
     bool read_expression_statement(ast::ExpressionStatement &node)
     OPTION

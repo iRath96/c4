@@ -1,0 +1,1 @@
+tests/parser/ext_decl_eof/input.c:2:1: error: compound statement expected

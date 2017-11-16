@@ -37,7 +37,8 @@ void DebugTree::dump(Parser *parser, std::string indent) {
 
 const char *operator_name(Token::Punctuator punctuator) {
     switch (punctuator) {
-        case Token::Punctuator::NOT_A_PUNCTUATOR: return "+";
+        case Token::Punctuator::NOT_A_PUNCTUATOR: return "(nap)";
+        case Token::Punctuator::NEVER: return "(never)";
             
         case Token::Punctuator::CB_OPEN: return "{";
         case Token::Punctuator::CB_CLOSE: return "}";

@@ -50,7 +50,8 @@ struct Token {
 
 #define ID(name, id, precedence, token) name = (id << 8) | (int)precedence,
     enum class Punctuator : uint32_t {
-        ID(NOT_A_PUNCTUATOR, 0, Precedence::NONE, "+")
+        ID(NOT_A_PUNCTUATOR, 0, Precedence::NONE, "")
+        ID(NEVER, 120, Precedence::NONE, "")
         
         ID(CB_OPEN,  10, Precedence::NONE, "{")
         ID(CB_CLOSE, 11, Precedence::NONE, "}")
