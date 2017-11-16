@@ -1,1 +1,1 @@
-tests/parser/invalid_statement/input.c:1:13: error: } expected
+tests/parser/invalid_statement/input.c:2:5: error: } expected

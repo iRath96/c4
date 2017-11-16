@@ -1,1 +1,1 @@
-tests/parser/param_missing_comma/input.c:1:15: error: ) expected
+tests/parser/param_missing_comma/input.c:1:16: error: ) expected

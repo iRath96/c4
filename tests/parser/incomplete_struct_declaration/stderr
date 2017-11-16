@@ -1,1 +1,1 @@
-tests/parser/incomplete_struct_declaration/input.c:1:30: error: ; expected
+tests/parser/incomplete_struct_declaration/input.c:1:31: error: ; expected

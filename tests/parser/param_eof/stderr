@@ -1,1 +1,1 @@
-tests/parser/param_eof/input.c:1:13: error: ) expected
+tests/parser/param_eof/input.c:2:1: error: ) expected

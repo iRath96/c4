@@ -1,1 +1,1 @@
-tests/parser/unassignable_expression/input.c:2:11: error: expression is not assignable
+tests/parser/unassignable_expression/input.c:2:12: error: expression is not assignable
