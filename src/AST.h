@@ -39,6 +39,7 @@ struct IdentifierLabel;
 // Declarators
 struct Declarator;
 struct DeclaratorParameterList;
+struct DeclaratorIdentifierList;
 
 // Designators
 struct DesignatorWithIdentifier;
@@ -52,6 +53,9 @@ struct BinaryExpression;
 struct ConditionalExpression;
 struct ExpressionList;
 struct CallExpression;
+struct SubscriptExpression;
+struct MemberExpression;
+struct PostExpression;
 struct InitializerList;
 struct InitializerExpression;
 struct SizeofExpressionUnary;
@@ -78,40 +82,59 @@ struct ComposedType;
 
 // Visitor
 struct Visitor {
+    // Nodes
+    virtual void visit(Identifier &) = 0;
+    virtual void visit(Pointer &) = 0;
+    virtual void visit(TypeName &) = 0;
+
+    // Labels
     virtual void visit(CaseLabel &) = 0;
     virtual void visit(DefaultLabel &) = 0;
     virtual void visit(IdentifierLabel &) = 0;
-    virtual void visit(Identifier &) = 0;
-    virtual void visit(NamedType &) = 0;
-    virtual void visit(ComposedType &) = 0;
-    virtual void visit(Pointer &) = 0;
-    virtual void visit(CompoundStatement &) = 0;
-    virtual void visit(DeclaratorParameterList &) = 0;
+
+    // Declarators
     virtual void visit(Declarator &) = 0;
-    virtual void visit(Declaration &) = 0;
-    virtual void visit(ExternalDeclarationVariable &) = 0;
-    virtual void visit(ExternalDeclarationFunction &) = 0;
-    virtual void visit(ParameterDeclaration &) = 0;
+    virtual void visit(DeclaratorParameterList &) = 0;
+    virtual void visit(DeclaratorIdentifierList &) = 0;
+
+    // Designators
+    virtual void visit(DesignatorWithIdentifier &) = 0;
+    virtual void visit(DesignatorWithExpression &) = 0;
+    virtual void visit(Initializer &) = 0;
+
+    // Expressions
     virtual void visit(ConstantExpression &) = 0;
     virtual void visit(UnaryExpression &) = 0;
     virtual void visit(BinaryExpression &) = 0;
     virtual void visit(ConditionalExpression &) = 0;
     virtual void visit(ExpressionList &) = 0;
     virtual void visit(CallExpression &) = 0;
-    virtual void visit(ExpressionStatement &) = 0;
-    virtual void visit(SizeofExpressionUnary &) = 0;
-    virtual void visit(TypeName &) = 0;
-    virtual void visit(SizeofExpressionTypeName &) = 0;
-    virtual void visit(DesignatorWithIdentifier &) = 0;
-    virtual void visit(DesignatorWithExpression &) = 0;
-    virtual void visit(Initializer &) = 0;
+    virtual void visit(SubscriptExpression &) = 0;
+    virtual void visit(MemberExpression &) = 0;
+    virtual void visit(PostExpression &) = 0;
     virtual void visit(InitializerList &) = 0;
     virtual void visit(InitializerExpression &) = 0;
+    virtual void visit(SizeofExpressionUnary &) = 0;
+    virtual void visit(SizeofExpressionTypeName &) = 0;
+
+    // Statements
+    virtual void visit(CompoundStatement &) = 0;
     virtual void visit(IterationStatement &) = 0;
+    virtual void visit(ExpressionStatement &) = 0;
     virtual void visit(SelectionStatement &) = 0;
     virtual void visit(GotoStatement &) = 0;
     virtual void visit(ContinueStatement &) = 0;
     virtual void visit(ReturnStatement &) = 0;
+
+    // Declarations
+    virtual void visit(Declaration &) = 0;
+    virtual void visit(ParameterDeclaration &) = 0;
+    virtual void visit(ExternalDeclarationVariable &) = 0;
+    virtual void visit(ExternalDeclarationFunction &) = 0;
+
+    // Types
+    virtual void visit(NamedType &) = 0;
+    virtual void visit(ComposedType &) = 0;
 };
 
 #pragma mark - Base classes
@@ -170,6 +193,11 @@ struct DeclaratorSuffix : Node {};
 
 struct DeclaratorParameterList : DeclaratorSuffix {
     ast::Vector<ast::ParameterDeclaration> parameters;
+    ACCEPT
+};
+
+struct DeclaratorIdentifierList : DeclaratorSuffix {
+    ast::Vector<const char *> identifiers;
     ACCEPT
 };
 
@@ -238,6 +266,29 @@ struct ExpressionList : Expression {
 struct CallExpression : Expression {
     Ptr<Expression> function;
     PtrVector<Expression> arguments;
+    
+    ACCEPT
+};
+
+struct SubscriptExpression : Expression {
+    Ptr<Expression> base;
+    ast::ExpressionList subscript;
+    
+    ACCEPT
+};
+
+struct MemberExpression : Expression {
+    bool dereference; // false for '.', true for '->'
+    
+    Ptr<Expression> base;
+    const char *id;
+    
+    ACCEPT
+};
+
+struct PostExpression : Expression {
+    Ptr<Expression> base;
+    lexer::Token::Punctuator op;
     
     ACCEPT
 };

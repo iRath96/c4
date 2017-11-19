@@ -79,6 +79,12 @@ public:
         std::cout << indent << "DeclaratorParameterList" << std::endl;
         inspect_vector("parameters", node.parameters);
     }
+    
+    virtual void visit(DeclaratorIdentifierList &node) {
+        std::cout << indent << "DeclaratorIdentifierList" << std::endl;
+        for (const auto &id : node.identifiers)
+            std::cout << indent << "  " << id << std::endl;
+    }
 
     virtual void visit(Declarator &node) {
         std::cout << indent << "Declarator[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
@@ -149,6 +155,26 @@ public:
         std::cout << indent << "CallExpression" << std::endl;
         inspect(node.function);
         inspect_vector("arguments", node.arguments);
+    }
+    
+    virtual void visit(SubscriptExpression &node) {
+        std::cout << indent << "SubscriptExpression" << std::endl;
+        inspect(node.base);
+        inspect(node.subscript);
+    }
+    
+    virtual void visit(MemberExpression &node) {
+        std::cout
+            << indent
+            << "MemberExpression[" << node.id << ", " << (node.dereference ? "->" : ".") << "]"
+            << std::endl;
+        
+        inspect(node.base);
+    }
+    
+    virtual void visit(PostExpression &node) {
+        std::cout << indent << "PostExpression[" << operator_name(node.op) << "]" << std::endl;
+        inspect(node.base);
     }
 
     virtual void visit(ExpressionStatement &node) {

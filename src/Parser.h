@@ -391,14 +391,16 @@ protected:
             // try reading parameter-list / identifier-list
             
             auto p_suffix = std::make_shared<ast::DeclaratorParameterList>();
-            std::vector<const char *> identifier_list;
             
             if (!read_punctuator(Token::Punctuator::RB_OPEN))
                 break;
             
             if (read_parameter_type_list(p_suffix->parameters)) {
                 node.suffixes.push_back(p_suffix);
-            } else if (read_identifier_list(identifier_list)) {
+            } else {
+                auto i_suffix = std::make_shared<ast::DeclaratorIdentifierList>();
+                read_identifier_list(i_suffix->identifiers);
+                node.suffixes.push_back(i_suffix);
             }
             
             UNIQUE
@@ -932,9 +934,13 @@ protected:
             if (read_punctuator(Token::Punctuator::SB_OPEN)) {
                 UNIQUE
                 
-                ast::ExpressionList list;
-                NON_OPTIONAL(read_expression(list))
+                auto s = std::make_shared<ast::SubscriptExpression>();
+                s->base = node;
+                
+                NON_OPTIONAL(read_expression(s->subscript))
                 NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
+                
+                node = s;
             } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
                 UNIQUE
                 
@@ -948,15 +954,35 @@ protected:
             } else if (read_punctuator(Token::Punctuator::PERIOD)) { // @todo wrap NON_UNIQUE->if->UNIQUE stuff
                 UNIQUE
                 
-                const char *id;
-                NON_OPTIONAL(read_identifier(id))
+                auto m = std::make_shared<ast::MemberExpression>();
+                m->dereference = false;
+                m->base = node;
+                
+                NON_OPTIONAL(read_identifier(m->id))
+                
+                node = m;
             } else if (read_punctuator(Token::Punctuator::ARROW)) {
                 UNIQUE
                 
-                const char *id;
-                NON_OPTIONAL(read_identifier(id))
+                auto m = std::make_shared<ast::MemberExpression>();
+                m->dereference = true;
+                m->base = node;
+                
+                NON_OPTIONAL(read_identifier(m->id))
+                
+                node = m;
             } else if (read_punctuator(Token::Punctuator::PLUSPLUS)) {
+                auto p = std::make_shared<ast::PostExpression>();
+                p->op = Token::Punctuator::PLUSPLUS;
+                p->base = node;
+                
+                node = p;
             } else if (read_punctuator(Token::Punctuator::MINUSMINUS)) {
+                auto p = std::make_shared<ast::PostExpression>();
+                p->op = Token::Punctuator::MINUSMINUS;
+                p->base = node;
+                
+                node = p;
             } else
                 break;
         }
@@ -965,6 +991,7 @@ protected:
     bool read_unary_expression(ast::Ptr<ast::Expression> &node)
     OPTION
         auto unary_node = std::make_shared<ast::UnaryExpression>();
+        unary_node->op = peek().punctuator;
         BEGIN_UNIQUE(read_punctuator(Token::Punctuator::PLUSPLUS) || read_punctuator(Token::Punctuator::MINUSMINUS))
         NON_OPTIONAL(read_unary_expression(unary_node->operand))
         node = unary_node;

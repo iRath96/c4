@@ -21,6 +21,10 @@ protected:
         node.accept(*this);
     }
     
+    void inspect(const char *str) {
+        std::cout << str;
+    }
+    
     template<typename T>
     void inspect(Ptr<T> &ptr) {
         inspect(*ptr);
@@ -44,9 +48,10 @@ protected:
     }
     
     template<typename T>
-    void separate_lines(Vector<T> &vector) {
+    void separate_lines(Vector<T> &vector, bool do_indent = true) {
         std::string prev_indent = indent;
-        indent += "  ";
+        if (do_indent)
+            indent += "  ";
         
         for (auto &child : vector) {
             std::cout << std::endl << indent;
@@ -73,6 +78,8 @@ public:
     virtual void visit(ContinueStatement &) { std::cout << "continue;"; }
 
     virtual void visit(CompoundStatement &node) {
+        join(node.labels, " ", " ");
+        
         std::cout << "{";
         separate_lines(node.items);
         std::cout << "}";
@@ -81,6 +88,12 @@ public:
     virtual void visit(DeclaratorParameterList &node) {
         std::cout << "(";
         join(node.parameters, ", ");
+        std::cout << ")";
+    }
+    
+    virtual void visit(DeclaratorIdentifierList &node) {
+        std::cout << "(";
+        join(node.identifiers, ", ");
         std::cout << ")";
     }
 
@@ -111,6 +124,7 @@ public:
     virtual void visit(ExternalDeclarationFunction &node) {
         join(node.specifiers, " ", " ");
         join(node.declarators, ", ", " ");
+        separate_lines(node.declarations, false);
         inspect(node.body);
     }
 
@@ -125,7 +139,9 @@ public:
 
     virtual void visit(UnaryExpression &node) {
         std::cout << operator_name(node.op);
+        std::cout << "(";
         inspect(node.operand);
+        std::cout << ")";
     }
 
     virtual void visit(BinaryExpression &node) {
@@ -152,6 +168,23 @@ public:
         join(node.arguments, ", ");
         std::cout << ")";
     }
+    
+    virtual void visit(SubscriptExpression &node) {
+        inspect(node.base);
+        std::cout << "[";
+        inspect(node.subscript);
+        std::cout << "]";
+    }
+    
+    virtual void visit(MemberExpression &node) {
+        inspect(node.base);
+        std::cout << (node.dereference ? "->" : ".") << node.id;
+    }
+    
+    virtual void visit(PostExpression &node) {
+        inspect(node.base);
+        std::cout << operator_name(node.op);
+    }
 
     virtual void visit(ExpressionStatement &node) {
         join(node.labels, " ", " ");
@@ -160,7 +193,7 @@ public:
     }
 
     virtual void visit(SizeofExpressionUnary &node) {
-        std::cout << "sizeof ";
+        std::cout << "sizeof";
         inspect(node.expression);
     }
 
@@ -198,8 +231,10 @@ public:
 
     virtual void visit(Initializer &node) {
         join(node.designators, ", ");
-        inspect(node.declarator);
-        std::cout << " = ";
+        if (!node.designators.empty()) {
+            std::cout << " = ";
+        }
+        inspect(node.declarator.initializer);
     }
 
     virtual void visit(InitializerList &node) {
@@ -209,8 +244,9 @@ public:
     }
 
     virtual void visit(InitializerExpression &node) {
-        std::cout << indent << "InitializerExpression" << std::endl;
+        std::cout << "(";
         inspect(node.type);
+        std::cout << ") ";
         inspect(node.initializers);
     }
 
