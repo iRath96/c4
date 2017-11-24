@@ -37,9 +37,10 @@ struct DefaultLabel;
 struct IdentifierLabel;
 
 // Declarators
-struct Declarator;
 struct DeclaratorParameterList;
 struct DeclaratorIdentifierList;
+struct IdentifierDeclarator;
+struct ComposedDeclarator;
 
 // Designators
 struct DesignatorWithIdentifier;
@@ -93,9 +94,10 @@ struct Visitor {
     virtual void visit(IdentifierLabel &) = 0;
 
     // Declarators
-    virtual void visit(Declarator &) = 0;
     virtual void visit(DeclaratorParameterList &) = 0;
     virtual void visit(DeclaratorIdentifierList &) = 0;
+    virtual void visit(IdentifierDeclarator &) = 0;
+    virtual void visit(ComposedDeclarator &) = 0;
 
     // Designators
     virtual void visit(DesignatorWithIdentifier &) = 0;
@@ -202,13 +204,18 @@ struct DeclaratorIdentifierList : DeclaratorSuffix {
 };
 
 struct Declarator : Node {
-    const char *name = NULL;
-    bool is_function = false; // function pointer
-    
     Vector<Pointer> pointers;
     Ptr<Expression> initializer;
     PtrVector<DeclaratorSuffix> suffixes;
-    
+};
+
+struct IdentifierDeclarator : Declarator {
+    const char *name = NULL;
+    ACCEPT
+};
+
+struct ComposedDeclarator : Declarator {
+    Ptr<Declarator> base;
     ACCEPT
 };
 
@@ -227,7 +234,7 @@ struct DesignatorWithExpression : Designator {
 
 struct Initializer : Node {
     PtrVector<Designator> designators;
-    Declarator declarator;
+    Ptr<Declarator> declarator;
     ACCEPT
 };
 
@@ -364,14 +371,14 @@ struct ReturnStatement : JumpStatement {
 
 struct Declaration : BlockItem {
     PtrVector<TypeSpecifier> specifiers;
-    Vector<Declarator> declarators;
+    PtrVector<Declarator> declarators;
     
     ACCEPT
 };
 
 struct ParameterDeclaration : Node {
     PtrVector<TypeSpecifier> specifiers;
-    Declarator declarator;
+    Ptr<Declarator> declarator;
     
     ACCEPT
 };

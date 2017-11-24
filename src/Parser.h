@@ -357,10 +357,12 @@ protected:
     
 #pragma mark - Declarations
     
-    bool read_declarator(ast::Declarator &node)
+    bool read_declarator(ast::Ptr<ast::Declarator> &node)
     OPTION
-        OPTIONAL(read_pointer(node))
+        ast::Vector<ast::Pointer> pointers;
+        OPTIONAL(read_pointer(pointers))
         NON_OPTIONAL(read_direct_declarator(node))
+        node->pointers = pointers;
     END_OPTION
     
     bool read_declaration_specifiers(ast::PtrVector<ast::TypeSpecifier> &node)
@@ -368,18 +370,24 @@ protected:
         NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
     OTHERWISE_FAIL("type specifier expected")
     
-    bool read_direct_declarator_prefix(ast::Declarator &node)
+    bool read_direct_declarator_prefix(ast::Ptr<ast::Declarator> &node)
     OPTION
-        ALLOW_FAILURE(read_identifier(node.name))
+        auto idecl = std::make_shared<ast::IdentifierDeclarator>();
+    
+        ALLOW_FAILURE(read_identifier(idecl->name))
+    
+        node = idecl;
     ELSE_OPTION
+        auto c = std::make_shared<ast::ComposedDeclarator>();
+    
         ALLOW_FAILURE(read_punctuator(Token::Punctuator::RB_OPEN))
-        NON_OPTIONAL(read_declarator(node))
+        NON_OPTIONAL(read_declarator(c->base))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
     
-        node.is_function = true;
+        node = c;
     END_OPTION
     
-    bool read_direct_declarator(ast::Declarator &node)
+    bool read_direct_declarator(ast::Ptr<ast::Declarator> &node)
     OPTION
         int last_good_i;
         NON_OPTIONAL(read_direct_declarator_prefix(node))
@@ -396,11 +404,11 @@ protected:
                 break;
             
             if (read_parameter_type_list(p_suffix->parameters)) {
-                node.suffixes.push_back(p_suffix);
+                node->suffixes.push_back(p_suffix);
             } else {
                 auto i_suffix = std::make_shared<ast::DeclaratorIdentifierList>();
                 read_identifier_list(i_suffix->identifiers);
-                node.suffixes.push_back(i_suffix);
+                node->suffixes.push_back(i_suffix);
             }
             
             UNIQUE
@@ -426,9 +434,10 @@ protected:
     
     bool read_abstract_declarator()
     OPTION
-        ast::Declarator ptr;
+        ast::Vector<ast::Pointer> pointers;
+    
         bool has_pointer;
-        OPTIONAL(has_pointer = read_pointer(ptr))
+        OPTIONAL(has_pointer = read_pointer(pointers))
     
         if (has_pointer)
             OPTIONAL(read_direct_abstract_declarator())
@@ -492,9 +501,9 @@ protected:
         OPTIONAL(read_type_qualifier_list())
     END_OPTION
     
-    bool read_pointer(ast::Declarator &node)
+    bool read_pointer(ast::Vector<ast::Pointer> &node)
     OPTION
-        NON_OPTIONAL(read_list(&Parser::read_pointer_single, node.pointers))
+        NON_OPTIONAL(read_list(&Parser::read_pointer_single, node))
     END_OPTION
     
     bool read_type_qualifier_list()
@@ -510,12 +519,12 @@ protected:
     
 #pragma mark - Structs
     
-    bool read_struct_declarator(ast::Declarator &node)
+    bool read_struct_declarator(ast::Ptr<ast::Declarator> &node)
     OPTION
         NON_OPTIONAL(read_declarator(node))
     END_OPTION
     
-    bool read_struct_declarator_list(std::vector<ast::Declarator> &node)
+    bool read_struct_declarator_list(ast::PtrVector<ast::Declarator> &node)
     OPTION
         NON_OPTIONAL(read_separated_list(&Parser::read_struct_declarator, Token::Punctuator::COMMA, node))
     END_OPTION
@@ -593,7 +602,7 @@ protected:
         }
     END_OPTION // OTHERWISE_FAIL("type specifier expected")
     
-    bool read_initializer(ast::Declarator &node)
+    bool read_initializer(ast::Ptr<ast::Declarator> &node)
     OPTION
         auto initializer_list = std::make_shared<ast::InitializerList>();
     
@@ -602,13 +611,13 @@ protected:
         OPTIONAL(read_punctuator(Token::Punctuator::COMMA))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
     
-        node.initializer = initializer_list;
+        node->initializer = initializer_list;
     ELSE_OPTION
         ast::Ptr<ast::Expression> assignment_expr;
     
         ALLOW_FAILURE(read_assignment_expression(assignment_expr))
     
-        node.initializer = assignment_expr;
+        node->initializer = assignment_expr;
     OTHERWISE_FAIL("initializer expected")
     
     bool read_designation_initializer_pair(ast::Initializer &node)
@@ -653,7 +662,7 @@ protected:
         node = d;
     END_OPTION
     
-    bool read_init_declarator(ast::Declarator &node)
+    bool read_init_declarator(ast::Ptr<ast::Declarator> &node)
     OPTION
         NON_OPTIONAL(read_declarator(node))
     
@@ -666,7 +675,7 @@ protected:
         }
     END_OPTION
     
-    bool read_init_declarator_list(std::vector<ast::Declarator> &node)
+    bool read_init_declarator_list(ast::PtrVector<ast::Declarator> &node)
     OPTION
         NON_OPTIONAL(read_separated_list(&Parser::read_init_declarator, Token::Punctuator::COMMA, node))
     END_OPTION
@@ -686,7 +695,7 @@ protected:
     bool read_external_declaration(ast::Ptr<ast::ExternalDeclaration> &node)
     OPTION
         ast::PtrVector<ast::TypeSpecifier> specifiers;
-        ast::Declarator declarator;
+        ast::Ptr<ast::Declarator> declarator;
         bool has_declarator, needs_declaration_list, needs_initialization, is_declaration;
         
         NON_OPTIONAL(read_declaration_specifiers(specifiers))

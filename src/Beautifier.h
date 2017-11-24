@@ -117,14 +117,33 @@ public:
         std::cout << ")";
     }
 
-    virtual void visit(Declarator &node) {
+    virtual void visit(IdentifierDeclarator &node) {
         for (int i = 0; i < node.pointers.size(); ++i)
-            std::cout << "(*";
+            std::cout << (i ? "(*" : "*");
         
         if (node.name)
             std::cout << node.name;
         
+        for (int i = 1; i < node.pointers.size(); ++i)
+            std::cout << ")";
+        
+        join(node.suffixes, "");
+        
+        if (node.initializer.get()) {
+            std::cout << " = ";
+            inspect(node.initializer);
+        }
+    }
+    
+    virtual void visit(ComposedDeclarator &node) {
         for (int i = 0; i < node.pointers.size(); ++i)
+            std::cout << (i ? "(*" : "*");
+        
+        std::cout << "(";
+        inspect(node.base);
+        std::cout << ")";
+        
+        for (int i = 1; i < node.pointers.size(); ++i)
             std::cout << ")";
         
         join(node.suffixes, "");
@@ -156,8 +175,9 @@ public:
     }
 
     virtual void visit(ParameterDeclaration &node) {
-        join(node.specifiers, " ", node.declarator.name ? " " : "");
-        inspect(node.declarator);
+        join(node.specifiers, " ", node.declarator.get() ? " " : "");
+        if (node.declarator.get())
+            inspect(node.declarator);
     }
 
     virtual void visit(ConstantExpression &node) {
@@ -267,7 +287,7 @@ public:
         if (!node.designators.empty()) {
             std::cout << " = ";
         }
-        inspect(node.declarator.initializer);
+        inspect(node.declarator->initializer);
     }
 
     virtual void visit(InitializerList &node) {

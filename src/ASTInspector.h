@@ -86,8 +86,16 @@ public:
             std::cout << indent << "  " << id << std::endl;
     }
 
-    virtual void visit(Declarator &node) {
-        std::cout << indent << "Declarator[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
+    virtual void visit(IdentifierDeclarator &node) {
+        std::cout << indent << "IdentifierDeclarator[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
+        if (node.initializer.get())
+            inspect(node.initializer);
+        inspect_vector("pointers", node.pointers);
+    }
+    
+    virtual void visit(ComposedDeclarator &node) {
+        std::cout << indent << "ComposedDeclarator" << std::endl;
+        inspect(node.base);
         if (node.initializer.get())
             inspect(node.initializer);
         inspect_vector("pointers", node.pointers);
