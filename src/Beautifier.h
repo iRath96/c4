@@ -168,7 +168,7 @@ public:
 
     virtual void visit(ExternalDeclarationFunction &node) {
         join(node.specifiers, " ", " ");
-        join(node.declarators, ", ", " ");
+        join(node.declarators, ", ");
         separate_lines(node.declarations, false);
         inspect(node.body);
         std::cout << std::endl;
@@ -212,9 +212,11 @@ public:
     }
 
     virtual void visit(CallExpression &node) {
+        std::cout << "(";
         inspect(node.function);
         std::cout << "(";
         join(node.arguments, ", ");
+        std::cout << ")";
         std::cout << ")";
     }
     
@@ -267,9 +269,9 @@ public:
     }
 
     virtual void visit(SizeofExpressionTypeName &node) {
-        std::cout << "sizeof(";
+        std::cout << "(sizeof(";
         inspect(node.type);
-        std::cout << ")";
+        std::cout << "))";
     }
 
     virtual void visit(DesignatorWithIdentifier &node) {

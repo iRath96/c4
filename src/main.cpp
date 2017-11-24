@@ -102,9 +102,14 @@ void parse(const char *filename, bool printAST) {
     
     if (printAST) {
         Beautifier beautifier;
+        bool isFirst = true;
         for (auto &decl : parser.declarations) {
+            if (isFirst)
+                isFirst = false;
+            else
+                std::cout << std::endl;
+            
             decl->accept(beautifier);
-            std::cout << std::endl;
         }
     }
 }

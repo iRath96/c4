@@ -798,7 +798,7 @@ protected:
         UNIQUE
         NON_OPTIONAL(read_statement(node))
         
-        node->labels.push_back(label);
+        node->labels.insert(node->labels.begin(), label); // @todo not efficient!
     END_OPTION
     
     bool read_block_item(ast::Ptr<ast::BlockItem> &node)
