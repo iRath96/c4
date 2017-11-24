@@ -51,7 +51,7 @@ protected:
     void separate_lines(Vector<T> &vector, bool do_indent = true) {
         std::string prev_indent = indent;
         if (do_indent)
-            indent += "  ";
+            indent += "\t";
         
         for (auto &child : vector) {
             std::cout << std::endl << indent;
@@ -75,14 +75,34 @@ public:
     virtual void visit(Identifier &node) { std::cout << node.id; }
     virtual void visit(NamedType &node) { std::cout << node.id; }
     virtual void visit(Pointer &) { std::cout << "*"; }
-    virtual void visit(ContinueStatement &) { std::cout << "continue;"; }
+    virtual void visit(ContinueStatement &node) {
+        if (node.keyword == lexer::Token::Keyword::CONTINUE)
+            std::cout << "continue;";
+        else
+            std::cout << "break;";
+    }
 
     virtual void visit(CompoundStatement &node) {
-        join(node.labels, " ", " ");
-        
         std::cout << "{";
-        separate_lines(node.items);
-        std::cout << "}";
+        
+        std::string prev_indent = indent;
+        indent += "\t";
+        
+        for (auto &child : node.items) {
+            std::cout << std::endl;
+            
+            Statement *stmt;
+            if ((stmt = dynamic_cast<Statement *>(child.get()))) {
+                join(stmt->labels, "\n", "\n");
+            }
+            
+            std::cout << indent;
+            inspect(child);
+        }
+        
+        indent = prev_indent;
+        
+        std::cout << std::endl << indent << "}";
     }
     
     virtual void visit(DeclaratorParameterList &node) {
@@ -98,9 +118,15 @@ public:
     }
 
     virtual void visit(Declarator &node) {
-        join(node.pointers, "");
+        for (int i = 0; i < node.pointers.size(); ++i)
+            std::cout << "(*";
+        
         if (node.name)
             std::cout << node.name;
+        
+        for (int i = 0; i < node.pointers.size(); ++i)
+            std::cout << ")";
+        
         join(node.suffixes, "");
         
         if (node.initializer.get()) {
@@ -126,10 +152,11 @@ public:
         join(node.declarators, ", ", " ");
         separate_lines(node.declarations, false);
         inspect(node.body);
+        std::cout << std::endl;
     }
 
     virtual void visit(ParameterDeclaration &node) {
-        join(node.specifiers, " ", " ");
+        join(node.specifiers, " ", node.declarator.name ? " " : "");
         inspect(node.declarator);
     }
 
@@ -138,16 +165,18 @@ public:
     }
 
     virtual void visit(UnaryExpression &node) {
-        std::cout << operator_name(node.op);
         std::cout << "(";
+        std::cout << operator_name(node.op);
         inspect(node.operand);
         std::cout << ")";
     }
 
     virtual void visit(BinaryExpression &node) {
+        std::cout << "(";
         inspect(node.lhs);
-        std::cout << " " << operator_name(node.op) << " "; // @todo precedence!
+        std::cout << " " << operator_name(node.op) << " ";
         inspect(node.rhs);
+        std::cout << ")";
     }
 
     virtual void visit(ConditionalExpression &node) {
@@ -170,15 +199,19 @@ public:
     }
     
     virtual void visit(SubscriptExpression &node) {
+        std::cout << "(";
         inspect(node.base);
         std::cout << "[";
         inspect(node.subscript);
         std::cout << "]";
+        std::cout << ")";
     }
     
     virtual void visit(MemberExpression &node) {
+        std::cout << "(";
         inspect(node.base);
         std::cout << (node.dereference ? "->" : ".") << node.id;
+        std::cout << ")";
     }
     
     virtual void visit(PostExpression &node) {
@@ -187,14 +220,14 @@ public:
     }
 
     virtual void visit(ExpressionStatement &node) {
-        join(node.labels, " ", " ");
         inspect(node.expressions);
         std::cout << ";";
     }
 
     virtual void visit(SizeofExpressionUnary &node) {
-        std::cout << "sizeof";
+        std::cout << "(sizeof ";
         inspect(node.expression);
+        std::cout << ")";
     }
 
     virtual void visit(TypeName &node) {
@@ -207,7 +240,7 @@ public:
             std::cout << " " << node.name;
         
         if (!node.declarations.empty()) {
-            std::cout << " {";
+            std::cout << std::endl << indent << "{";
             separate_lines(node.declarations);
             std::cout << "}";
         }
@@ -251,31 +284,54 @@ public:
     }
 
     virtual void visit(IterationStatement &node) {
-        join(node.labels, " ", " ");
-        
         std::cout << "while (";
         inspect(node.condition);
-        std::cout << ") ";
-        inspect(node.body);
+        std::cout << ")";
+        
+        inline_inspect(node.body.get());
+    }
+    
+    static bool inline_if(Statement *node) {
+        return !(dynamic_cast<ExpressionStatement *>(node)
+            || dynamic_cast<ReturnStatement *>(node)
+            || dynamic_cast<JumpStatement *>(node)
+        );
+    }
+    
+    void inline_inspect(Statement *node, bool suffix = false) {
+        if (inline_if(node))
+            std::cout << " ";
+        else {
+            std::cout << std::endl;
+            join(node->labels, "\n", "\n");
+            std::cout << indent << "\t";
+        }
+        
+        inspect(*node);
+        
+        if (suffix) {
+            if (inline_if(node))
+                std::cout << " ";
+            else
+                std::cout << std::endl << indent;
+        }
     }
 
     virtual void visit(SelectionStatement &node) {
-        join(node.labels, " ", " ");
-        
         std::cout << "if (";
         inspect(node.condition);
-        std::cout << ") ";
+        std::cout << ")";
         
-        inspect(node.when_true);
+        inline_inspect(node.when_true.get(), " ");
         
         if (node.when_false.get()) {
-            std::cout << " else ";
-            inspect(node.when_false);
+            std::cout << "else";
+            
+            inline_inspect(node.when_false.get());
         }
     }
 
     virtual void visit(GotoStatement &node) {
-        join(node.labels, " ", " ");
         std::cout << "goto " << node.target << ";";
     }
 

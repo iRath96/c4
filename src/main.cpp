@@ -70,7 +70,7 @@ void tokenize(const char *filename) {
     }
 }
 
-void parse(const char *filename) {
+void parse(const char *filename, bool printAST) {
     Parser parser(create_lexer(filename));
     try {
         parser.parse();
@@ -99,6 +99,14 @@ void parse(const char *filename) {
             std::cout << std::endl;
         }
     }
+    
+    if (printAST) {
+        Beautifier beautifier;
+        for (auto &decl : parser.declarations) {
+            decl->accept(beautifier);
+            std::cout << std::endl;
+        }
+    }
 }
 
 int main(int argc, const char *argv[]) {
@@ -110,7 +118,9 @@ int main(int argc, const char *argv[]) {
         else if (!strcmp(argv[i], "--dry"))
             enable_output = false;
         else if (!strcmp(argv[i], "--parse"))
-            parse(argv[++i]);
+            parse(argv[++i], false);
+        else if (!strcmp(argv[i], "--print-ast"))
+            parse(argv[++i], true);
         else {
             printf("Unrecognized argument: %s\n", argv[i]);
             exit(1);
