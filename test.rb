@@ -34,6 +34,7 @@ $tests.each do |test|
   argument = case test.split("/")[1]
   when "lexer" then "--tokenize"
   when "parser" then "--parse"
+  when "ast" then "--print-ast"
   end
 
   test_start_time = Time.now
