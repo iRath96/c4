@@ -623,7 +623,7 @@ protected:
     bool read_designation_initializer_pair(ast::Initializer &node)
     OPTION
         ALLOW_FAILURE(read_designation(node.designators))
-        
+    
         node.declarator = std::make_shared<ast::IdentifierDeclarator>(); // @todo
         NON_OPTIONAL(read_initializer(node.declarator))
     ELSE_OPTION
