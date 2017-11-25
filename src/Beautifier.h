@@ -348,7 +348,7 @@ public:
         inspect(node.condition);
         std::cout << ")";
         
-        inline_inspect(node.when_true.get(), " ");
+        inline_inspect(node.when_true.get(), node.when_false.get() != NULL);
         
         if (node.when_false.get()) {
             std::cout << "else";
