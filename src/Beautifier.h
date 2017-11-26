@@ -319,26 +319,32 @@ public:
         inline_inspect(node.body.get());
     }
     
-    static bool inline_if(Statement *node) {
+    static bool inline_if(Statement *node, bool afterElse = false) {
         return !(dynamic_cast<ExpressionStatement *>(node)
             || dynamic_cast<ReturnStatement *>(node)
             || dynamic_cast<JumpStatement *>(node)
+            || (!afterElse && dynamic_cast<SelectionStatement *>(node))
         );
     }
     
-    void inline_inspect(Statement *node, bool suffix = false) {
-        if (inline_if(node))
+    void inline_inspect(Statement *node, bool suffix = false, bool afterElse = false) {
+        std::string pi = indent;
+        
+        if (inline_if(node, afterElse))
             std::cout << " ";
         else {
+            indent += "\t";
+            
             std::cout << std::endl;
             join(node->labels, "\n", "\n");
-            std::cout << indent << "\t";
+            std::cout << indent;
         }
         
         inspect(*node);
+        indent = pi;
         
         if (suffix) {
-            if (inline_if(node))
+            if (inline_if(node, afterElse))
                 std::cout << " ";
             else
                 std::cout << std::endl << indent;
@@ -355,7 +361,7 @@ public:
         if (node.when_false.get()) {
             std::cout << "else";
             
-            inline_inspect(node.when_false.get());
+            inline_inspect(node.when_false.get(), false, true);
         }
     }
 

@@ -10,4 +10,12 @@ int main() {
         // madness!
     } else
         while (1+1);
+    
+    if (1)
+        if (2)
+            hi;
+        else
+            bye;
+    else
+        wow;
 }
