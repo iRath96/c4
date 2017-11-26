@@ -206,11 +206,13 @@ public:
     }
 
     virtual void visit(ConditionalExpression &node) {
+        std::cout << "(";
         inspect(node.condition);
         std::cout << " ? ";
         inspect(node.when_true);
         std::cout << " : ";
         inspect(node.when_false);
+        std::cout << ")";
     }
 
     virtual void visit(ExpressionList &node) {
