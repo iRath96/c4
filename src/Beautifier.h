@@ -120,19 +120,19 @@ public:
     virtual void visit(IdentifierDeclarator &node) {
         // @todo not DRY with respect to ComposedDeclarator
         
-        for (size_t i = 0; i < node.suffixes.size(); ++i)
-            std::cout << "(";
-        
         for (size_t i = 0; i < node.pointers.size(); ++i)
             std::cout << "(*";
+        
+        for (size_t i = 0; i < node.suffixes.size(); ++i)
+            std::cout << "(";
         
         if (node.name)
             std::cout << node.name;
         
+        join(node.suffixes, ")", ")");
+        
         for (size_t i = 0; i < node.pointers.size(); ++i)
             std::cout << ")";
-        
-        join(node.suffixes, ")", ")");
         
         if (node.initializer.get()) {
             std::cout << " = ";
@@ -141,18 +141,18 @@ public:
     }
     
     virtual void visit(ComposedDeclarator &node) {
-        for (size_t i = 0; i < node.suffixes.size(); ++i)
-            std::cout << "(";
-        
         for (size_t i = 0; i < node.pointers.size(); ++i)
             std::cout << "(*";
         
+        for (size_t i = 0; i < node.suffixes.size(); ++i)
+            std::cout << "(";
+        
         inspect(node.base);
+        
+        join(node.suffixes, ")", ")");
         
         for (size_t i = 0; i < node.pointers.size(); ++i)
             std::cout << ")";
-        
-        join(node.suffixes, ")", ")");
         
         if (node.initializer.get()) {
             std::cout << " = ";
