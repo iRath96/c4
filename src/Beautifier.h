@@ -167,7 +167,7 @@ public:
     }
 
     virtual void visit(ExternalDeclarationVariable &node) {
-        join(node.specifiers, " ", " ");
+        join(node.specifiers, " ", node.declarators.empty() ? "" : " ");
         join(node.declarators, ", ");
         std::cout << ";" << std::endl;
     }

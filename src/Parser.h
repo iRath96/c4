@@ -725,7 +725,8 @@ protected:
                 needs_declaration_list = peek().punctuator == Token::Punctuator::COMMA;
             }
             
-            node->declarators.push_back(std::move(declarator));
+            if (has_declarator)
+                node->declarators.push_back(std::move(declarator));
             
             if (needs_declaration_list) {
                 shift(); // jump over comma
