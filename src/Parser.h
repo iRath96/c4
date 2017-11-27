@@ -1086,7 +1086,7 @@ protected:
                 UNIQUE
                 NON_OPTIONAL(read_expression(*elist))
                 NON_OPTIONAL(read_punctuator(Token::Punctuator::COLON))
-                NON_OPTIONAL(read_expression_with_precedence((Token::Precedence)((int)right_precedence - 1), tree->when_false))
+                NON_OPTIONAL(read_expression_with_precedence(Token::Precedence::CONDITIONAL, tree->when_false))
             } else {
                 // ordinary operator
                 
