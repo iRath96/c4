@@ -325,6 +325,7 @@ public:
         return !(dynamic_cast<ExpressionStatement *>(node)
             || dynamic_cast<ReturnStatement *>(node)
             || dynamic_cast<JumpStatement *>(node)
+            || dynamic_cast<IterationStatement *>(node)
             || (!afterElse && dynamic_cast<SelectionStatement *>(node))
         );
     }
