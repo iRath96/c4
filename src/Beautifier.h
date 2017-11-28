@@ -10,6 +10,7 @@
 #define Beautifier_h
 
 #include "AST.h"
+#include <functional>
 
 using namespace ast;
 
@@ -27,7 +28,8 @@ protected:
     
     template<typename T>
     void inspect(Ptr<T> &ptr) {
-        inspect(*ptr);
+        if (ptr.get())
+            inspect(*ptr);
     }
     
     template<typename T>
@@ -116,18 +118,15 @@ public:
         join(node.identifiers, ", ");
         std::cout << ")";
     }
-
-    virtual void visit(IdentifierDeclarator &node) {
-        // @todo not DRY with respect to ComposedDeclarator
-        
+    
+    virtual void visitDeclarator(Declarator &node, std::function<void ()> callback) {
         for (size_t i = 0; i < node.pointers.size(); ++i)
             std::cout << "(*";
         
         for (size_t i = 0; i < node.suffixes.size(); ++i)
             std::cout << "(";
         
-        if (node.name)
-            std::cout << node.name;
+        callback();
         
         join(node.suffixes, ")", ")");
         
@@ -140,24 +139,21 @@ public:
         }
     }
     
+    virtual void visit(AbstractDeclarator &node) {
+        visitDeclarator(node, [&]() {});
+    }
+
+    virtual void visit(IdentifierDeclarator &node) {
+        visitDeclarator(node, [&]() {
+            if (node.name)
+                std::cout << node.name;
+        });
+    }
+    
     virtual void visit(ComposedDeclarator &node) {
-        for (size_t i = 0; i < node.pointers.size(); ++i)
-            std::cout << "(*";
-        
-        for (size_t i = 0; i < node.suffixes.size(); ++i)
-            std::cout << "(";
-        
-        inspect(node.base);
-        
-        join(node.suffixes, ")", ")");
-        
-        for (size_t i = 0; i < node.pointers.size(); ++i)
-            std::cout << ")";
-        
-        if (node.initializer.get()) {
-            std::cout << " = ";
-            inspect(node.initializer);
-        }
+        visitDeclarator(node, [&]() {
+            inspect(node.base);
+        });
     }
 
     virtual void visit(Declaration &node) {
@@ -179,9 +175,20 @@ public:
         inspect(node.body);
         std::cout << std::endl;
     }
+    
+    bool isDeclaratorEmpty(ast::Ptr<ast::Declarator> &ptr) const {
+        if (!ptr.get())
+            return true;
+        
+        auto a = dynamic_cast<AbstractDeclarator *>(ptr.get());
+        if (a)
+            return a->pointers.empty() && a->suffixes.empty();
+        
+        return false;
+    }
 
     virtual void visit(ParameterDeclaration &node) {
-        join(node.specifiers, " ", node.declarator.get() ? " " : "");
+        join(node.specifiers, " ", isDeclaratorEmpty(node.declarator) ? "" : " ");
         if (node.declarator.get())
             inspect(node.declarator);
     }
@@ -261,7 +268,8 @@ public:
     }
 
     virtual void visit(TypeName &node) {
-        join(node.specifiers, " ");
+        join(node.specifiers, " ", isDeclaratorEmpty(node.declarator) ? "" : " ");
+        inspect(node.declarator);
     }
     
     virtual void visit(ComposedType &node) {

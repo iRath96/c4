@@ -85,12 +85,21 @@ public:
         for (const auto &id : node.identifiers)
             std::cout << indent << "  " << id << std::endl;
     }
+    
+    virtual void visit(AbstractDeclarator &node) {
+        std::cout << indent << "AbstractDeclarator" << std::endl;
+        if (node.initializer.get())
+            inspect(node.initializer);
+        inspect_vector("pointers", node.pointers);
+        inspect_vector("suffixes", node.suffixes);
+    }
 
     virtual void visit(IdentifierDeclarator &node) {
         std::cout << indent << "IdentifierDeclarator[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
         if (node.initializer.get())
             inspect(node.initializer);
         inspect_vector("pointers", node.pointers);
+        inspect_vector("suffixes", node.suffixes);
     }
     
     virtual void visit(ComposedDeclarator &node) {
@@ -99,6 +108,7 @@ public:
         if (node.initializer.get())
             inspect(node.initializer);
         inspect_vector("pointers", node.pointers);
+        inspect_vector("suffixes", node.suffixes);
     }
 
     virtual void visit(Declaration &node) {
@@ -199,6 +209,7 @@ public:
     virtual void visit(TypeName &node) {
         std::cout << indent << "TypeName" << std::endl;
         inspect_vector("specifiers", node.specifiers);
+        inspect(node.declarator);
     }
 
     virtual void visit(SizeofExpressionTypeName &node) {

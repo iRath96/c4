@@ -39,6 +39,7 @@ struct IdentifierLabel;
 // Declarators
 struct DeclaratorParameterList;
 struct DeclaratorIdentifierList;
+struct AbstractDeclarator;
 struct IdentifierDeclarator;
 struct ComposedDeclarator;
 
@@ -96,6 +97,7 @@ struct Visitor {
     // Declarators
     virtual void visit(DeclaratorParameterList &) = 0;
     virtual void visit(DeclaratorIdentifierList &) = 0;
+    virtual void visit(AbstractDeclarator &) = 0;
     virtual void visit(IdentifierDeclarator &) = 0;
     virtual void visit(ComposedDeclarator &) = 0;
 
@@ -168,11 +170,6 @@ struct Pointer : Node {
     ACCEPT
 };
 
-struct TypeName : Node {
-    PtrVector<TypeSpecifier> specifiers;
-    ACCEPT
-};
-
 #pragma mark - Labels
 
 struct CaseLabel : Label {
@@ -209,6 +206,10 @@ struct Declarator : Node {
     PtrVector<DeclaratorSuffix> suffixes;
 };
 
+struct AbstractDeclarator : Declarator {
+    ACCEPT
+};
+
 struct IdentifierDeclarator : Declarator {
     const char *name = NULL;
     ACCEPT
@@ -216,6 +217,13 @@ struct IdentifierDeclarator : Declarator {
 
 struct ComposedDeclarator : Declarator {
     Ptr<Declarator> base;
+    ACCEPT
+};
+
+struct TypeName : Node {
+    PtrVector<TypeSpecifier> specifiers;
+    Ptr<Declarator> declarator;
+    
     ACCEPT
 };
 

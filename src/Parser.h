@@ -424,45 +424,53 @@ protected:
     bool read_type_name(ast::TypeName &node)
     OPTION
         NON_OPTIONAL(read_specifier_qualifier_list(node.specifiers))
-        OPTIONAL(read_abstract_declarator())
+        OPTIONAL(read_abstract_declarator(node.declarator))
     END_OPTION
     
-    bool read_abstract_declarator()
+    bool read_abstract_declarator(ast::Ptr<ast::Declarator> &node)
     OPTION
-        ast::Vector<ast::Pointer> pointers;
+        auto c = std::make_shared<ast::AbstractDeclarator>();
+        node = c;
     
         bool has_pointer;
-        OPTIONAL(has_pointer = read_pointer(pointers))
+        OPTIONAL(has_pointer = read_pointer(c->pointers))
     
         if (has_pointer)
-            OPTIONAL(read_direct_abstract_declarator())
+            OPTIONAL(read_direct_abstract_declarator(node))
         else
-            NON_OPTIONAL(read_direct_abstract_declarator())
+            NON_OPTIONAL(read_direct_abstract_declarator(node))
     END_OPTION
     
-    bool read_direct_abstract_declarator_prefix()
+    bool read_direct_abstract_declarator_prefix(ast::Ptr<ast::Declarator> &node)
     OPTION
+        auto c = std::make_shared<ast::ComposedDeclarator>();
+        c->pointers = node->pointers;
+    
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
-        NON_OPTIONAL(read_abstract_declarator())
+        NON_OPTIONAL(read_abstract_declarator(c->base))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
+    
+        node = c;
     END_OPTION
     
-    bool read_direct_abstract_declarator()
+    bool read_direct_abstract_declarator(ast::Ptr<ast::Declarator> &node)
     OPTION
-        OPTIONAL(read_direct_abstract_declarator_prefix())
+        OPTIONAL(read_direct_abstract_declarator_prefix(node))
         
         while (!eof()) {
-            ast::Vector<ast::ParameterDeclaration> plist;
-            
             NON_UNIQUE
             if (read_punctuator(Token::Punctuator::SB_OPEN)) {
                 UNIQUE
                 NON_OPTIONAL(read_punctuator(Token::Punctuator::ASTERISK))
                 NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
             } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
+                auto d = std::make_shared<ast::DeclaratorParameterList>();
+                
                 UNIQUE
-                OPTIONAL(read_parameter_type_list(plist))
+                OPTIONAL(read_parameter_type_list(d->parameters))
                 NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
+                
+                node->suffixes.push_back(d);
             } else
                 break;
         }
@@ -481,7 +489,7 @@ protected:
         
         NON_UNIQUE
         if (read_declarator(node.declarator)) {
-        } else if (read_abstract_declarator()) {
+        } else if (read_abstract_declarator(node.declarator)) {
         }
     END_OPTION
     
