@@ -1043,14 +1043,16 @@ protected:
     
     bool read_cast_expression(ast::Ptr<ast::Expression> &node)
     OPTION
-        ast::TypeName type_name;
+        auto c = std::make_shared<ast::CastExpression>();
     
         NON_UNIQUE
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
-        NON_OPTIONAL(read_type_name(type_name))
+        NON_OPTIONAL(read_type_name(c->type))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
     
-        NON_OPTIONAL(read_cast_expression(node))
+        NON_OPTIONAL(read_cast_expression(c->expression))
+    
+        node = c;
     ELSE_OPTION
         ALLOW_FAILURE(read_unary_expression(node))
     OTHERWISE_FAIL("cast expression expected")

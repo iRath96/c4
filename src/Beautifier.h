@@ -196,6 +196,14 @@ public:
     virtual void visit(ConstantExpression &node) {
         std::cout << node.text;
     }
+    
+    virtual void visit(CastExpression &node) {
+        std::cout << "((";
+        inspect(node.type);
+        std::cout << ")";
+        inspect(node.expression);
+        std::cout << ")";
+    }
 
     virtual void visit(UnaryExpression &node) {
         std::cout << "(";

@@ -50,6 +50,7 @@ struct Initializer;
 
 // Expressions
 struct ConstantExpression;
+struct CastExpression;
 struct UnaryExpression;
 struct BinaryExpression;
 struct ConditionalExpression;
@@ -108,6 +109,7 @@ struct Visitor {
 
     // Expressions
     virtual void visit(ConstantExpression &) = 0;
+    virtual void visit(CastExpression &) = 0;
     virtual void visit(UnaryExpression &) = 0;
     virtual void visit(BinaryExpression &) = 0;
     virtual void visit(ConditionalExpression &) = 0;
@@ -250,6 +252,13 @@ struct Initializer : Node {
 
 struct ConstantExpression : Expression {
     const char *text;
+    ACCEPT
+};
+
+struct CastExpression : Expression {
+    TypeName type;
+    Ptr<Expression> expression;
+    
     ACCEPT
 };
 

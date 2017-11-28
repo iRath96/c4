@@ -145,6 +145,12 @@ public:
     virtual void visit(ConstantExpression &node) {
         std::cout << indent << "ConstantExpression[" << node.text << "]" << std::endl;
     }
+    
+    virtual void visit(CastExpression &node) {
+        std::cout << indent << "CastExpression" << std::endl;
+        inspect(node.type);
+        inspect(node.expression);
+    }
 
     virtual void visit(UnaryExpression &node) {
         std::cout << indent << "UnaryExpression[" << operator_name(node.op) << "]" << std::endl;
