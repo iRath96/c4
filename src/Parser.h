@@ -407,7 +407,7 @@ protected:
                 node->suffixes.push_back(p_suffix);
             } else {
                 auto i_suffix = std::make_shared<ast::DeclaratorIdentifierList>();
-                read_identifier_list(i_suffix->identifiers);
+                read_separated_list(&Parser::read_identifier, Token::Punctuator::COMMA, i_suffix->identifiers);
                 node->suffixes.push_back(i_suffix);
             }
             
@@ -420,11 +420,6 @@ protected:
         
         i = last_good_i;
     OTHERWISE_FAIL("direct declarator expected")
-    
-    bool read_identifier_list(std::vector<const char *> &node)
-    OPTION
-        NON_OPTIONAL(read_separated_list(&Parser::read_identifier, Token::Punctuator::COMMA, node))
-    END_OPTION
     
     bool read_type_name(ast::TypeName &node)
     OPTION
@@ -477,11 +472,6 @@ protected:
     
     bool read_parameter_type_list(ast::Vector<ast::ParameterDeclaration> &node)
     OPTION
-        NON_OPTIONAL(read_parameter_list(node))
-    END_OPTION
-    
-    bool read_parameter_list(ast::Vector<ast::ParameterDeclaration> &node)
-    OPTION
         NON_OPTIONAL(read_separated_list(&Parser::read_parameter_declaration, Token::Punctuator::COMMA, node))
     END_OPTION
     
@@ -515,7 +505,7 @@ protected:
     bool read_specifier_qualifier_list(ast::PtrVector<ast::TypeSpecifier> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
-    OTHERWISE_FAIL("specifier qualifier list expected") // END_OPTION
+    OTHERWISE_FAIL("specifier qualifier list expected")
     
 #pragma mark - Structs
     
@@ -600,7 +590,7 @@ protected:
                     NON_OPTIONAL(false)
             }
         }
-    END_OPTION // OTHERWISE_FAIL("type specifier expected")
+    END_OPTION
     
     bool read_initializer(ast::Ptr<ast::Declarator> &node)
     OPTION
@@ -1141,4 +1131,3 @@ protected:
 #undef OPTIONAL
 
 #endif /* Parser_hpp */
-
