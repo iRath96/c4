@@ -158,7 +158,7 @@ public:
 
     virtual void visit(Declaration &node) {
         join(node.specifiers, " ", " ");
-        join(node.declarators, " ");
+        join(node.declarators, ", ");
         std::cout << ";";
     }
 
