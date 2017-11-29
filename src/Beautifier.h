@@ -349,9 +349,15 @@ public:
     void inline_inspect(Statement *node, bool suffix = false, bool afterElse = false) {
         std::string pi = indent;
         
-        if (inline_if(node, afterElse))
-            std::cout << " ";
-        else {
+        if (inline_if(node, afterElse)) {
+            if (node->labels.empty())
+                std::cout << " ";
+            else { // has labels, can't inline this easily.
+                std::cout << std::endl;
+                join(node->labels, "\n", "\n"); // @todo not DRY
+                std::cout << indent;
+            }
+        } else {
             indent += "\t";
             
             std::cout << std::endl;
