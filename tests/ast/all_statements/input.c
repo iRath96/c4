@@ -1,17 +1,69 @@
-int main() {
+int main()
+int x;
+{
+example:
+case 4:
+default:
+default:
+kitten:
+    statement;
+    
+woof:
+    {
+        int compound;
+        {
+            statement;
+        }
+    }
+    
+    int declarations, are, great;
+    struct z {
+        int x;
+    } y;
+    
+meow:
+    h += 2 * 3 - 1 * 4;
+    
+    if (selection)
+woah:
+        nice;
+    else
+        boo;
+    
+    if (a);
+    else
 label:
-    labeled_statement;
+        if (b) {
+            hi;
+        }
     
-    { compound_statement; }
+    if (a)
+        if (b)
+hi:
+            if (c)
+x:
+                {
+                    nice;
+                } else {
+                    not_nice;
+                }
+            else;
+        else while(1) {
+            woof;
+        }
     
-    expression_statement;
-    if (selection_statement) hooray;
+    if (no_else);
     
-    while (iteration_statement) madness;
+    while (true)
+        while (false)
+do_something:
+            useful;
     
-    goto label;
-    break;
+    while (true) if(false) meow;
+    
+meow:
+    goto meow;
     continue;
-    
-    return 4 * 4;
+    break;
+    return nope;
 }
