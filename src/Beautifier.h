@@ -156,8 +156,8 @@ public:
         });
     }
 
-    virtual void visit(Declaration &node) {
-        join(node.specifiers, " ", " ");
+    virtual void visit(Declaration &node) { // @todo not DRY with ExternalDeclarationVariable
+        join(node.specifiers, " ", node.declarators.empty() ? "" : " ");
         join(node.declarators, ", ");
         std::cout << ";";
     }
@@ -171,7 +171,9 @@ public:
     virtual void visit(ExternalDeclarationFunction &node) {
         join(node.specifiers, " ", " ");
         join(node.declarators, ", ");
-        separate_lines(node.declarations, false);
+        
+        separate_lines(node.declarations, true);
+        
         inspect(node.body);
         std::cout << std::endl;
     }
@@ -260,8 +262,10 @@ public:
     }
     
     virtual void visit(PostExpression &node) {
+        std::cout << "(";
         inspect(node.base);
         std::cout << operator_name(node.op);
+        std::cout << ")";
     }
 
     virtual void visit(ExpressionStatement &node) {
