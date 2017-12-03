@@ -17,6 +17,7 @@
 
 #include "ASTInspector.h"
 #include "Beautifier.h"
+#include "Compiler.h"
 
 
 bool debug_mode = false;
@@ -88,6 +89,10 @@ void parse(const char *filename, bool printAST) {
     }
     
     if (debug_mode) {
+        Compiler comp; // @todo rename this to Analyzer or something
+        for (auto &decl : parser.declarations)
+            decl->accept(comp);
+        
         ASTInspector inspector;
         for (auto &decl : parser.declarations) {
             decl->accept(inspector);

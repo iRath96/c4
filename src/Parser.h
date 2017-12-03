@@ -902,7 +902,8 @@ protected:
     bool read_primary_expression(ast::Ptr<ast::Expression> &node)
     OPTION
         auto constant = std::make_shared<ast::ConstantExpression>();
-        NON_OPTIONAL(read_identifier(constant->text) || read_constant(constant->text) || read_string_literal(constant->text))
+        constant->isIdentifier = read_identifier(constant->text);
+        NON_OPTIONAL(constant->isIdentifier || read_constant(constant->text) || read_string_literal(constant->text))
         node = constant;
     ELSE_OPTION
         auto list = std::make_shared<ast::ExpressionList>();

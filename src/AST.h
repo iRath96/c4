@@ -252,6 +252,8 @@ struct Initializer : Node {
 
 struct ConstantExpression : Expression {
     const char *text;
+    bool isIdentifier;
+    
     ACCEPT
 };
 
