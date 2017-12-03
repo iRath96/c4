@@ -87,7 +87,8 @@ public:
     
     template<typename T>
     void execute(std::function<void ()> callback) {
-        callback(push<T>());
+        push<T>()
+        callback();
         pop();
     }
     
