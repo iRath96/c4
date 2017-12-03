@@ -43,6 +43,8 @@ public:
 
 class FileScope : public BlockScope {
 public:
+    std::map<const char *, ast::Ptr<ComposedType>> composedTypes;
+    
 };
 
 class FunctionScope : public BlockScope {
@@ -84,7 +86,7 @@ public:
     }
     
     template<typename T>
-    void execute(std::function<void (ast::Ptr<T> &)> callback) {
+    void execute(std::function<void ()> callback) {
         callback(push<T>());
         pop();
     }
@@ -235,7 +237,7 @@ protected:
             node->accept(*this);
     }
     
-    void error(std::string message, Node &node) {
+    [[noreturn]] void error(std::string message, Node &node) {
         std::cerr << message << std::endl;
     }
     
@@ -284,7 +286,7 @@ public:
     virtual void visit(Pointer &) {}
 
     virtual void visit(CompoundStatement &node) {
-        scopes.execute<BlockScope>([&](auto &) {
+        scopes.execute<BlockScope>([&]() {
             for (auto &item : node.items)
                 inspect(item);
         });
@@ -335,7 +337,7 @@ public:
 
     virtual void visit(ExternalDeclarationFunction &node) {
         visit((Declaration &)node);
-        scopes.execute<FunctionScope>([&](auto &) {
+        scopes.execute<FunctionScope>([&]() {
             inspect(node.body);
         });
     }
@@ -446,7 +448,7 @@ public:
     virtual void visit(InitializerExpression &) {}
 
     virtual void visit(IterationStatement &node) {
-        scopes.execute<IterationScope>([&](auto &) {
+        scopes.execute<IterationScope>([&]() {
             inspect(node.body);
         });
     }
