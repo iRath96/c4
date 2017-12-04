@@ -359,6 +359,7 @@ protected:
     
     bool read_declarator(ast::Declarator &node)
     OPTION
+        node.pos = peek().pos;
         OPTIONAL(read_pointer(node.modifiers))
         NON_OPTIONAL(read_direct_declarator(node))
     END_OPTION
@@ -421,6 +422,8 @@ protected:
     
     bool read_abstract_declarator(ast::Declarator &node)
     OPTION
+        node.pos = peek().pos;
+    
         bool has_pointer;
         OPTIONAL(has_pointer = read_pointer(node.modifiers))
     
@@ -772,6 +775,7 @@ protected:
     bool read_labeled_statement(ast::Ptr<ast::Statement> &node)
     OPTION
         ast::Ptr<ast::Label> label;
+        auto pos = peek().pos;
     
         if (read_keyword(Token::Keyword::CASE)) {
             auto n = std::make_shared<ast::CaseLabel>();
@@ -785,6 +789,8 @@ protected:
             label = n;
         } else
             FAIL
+        
+        label->pos = pos;
         
         NON_OPTIONAL(read_punctuator(Token::Punctuator::COLON))
         
@@ -801,7 +807,9 @@ protected:
         node = n;
     ELSE_OPTION
         ast::Ptr<ast::Statement> stmt;
+        auto pos = peek().pos;
         NON_OPTIONAL(read_statement(stmt))
+        stmt->pos = pos;
         node = stmt;
     END_OPTION
     

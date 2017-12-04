@@ -188,6 +188,19 @@ public:
         return t;
     }
     
+    bool canCall() {
+        auto &m = typeName.declarator.modifiers;
+        return !m.empty() && dynamic_cast<DeclaratorParameterList *>(m.back().get()); // @todo @important only parameter list!!!
+    }
+    
+    Type call() {
+        Type t;
+        t.lvalue = false;
+        t.typeName = typeName;
+        t.typeName.declarator.modifiers.pop_back();
+        return t;
+    }
+    
     bool isScalar() {
         bool result = true;
         for (auto &ts : typeName.specifiers)
@@ -390,13 +403,14 @@ public:
 
     virtual void visit(Declaration &node) {
         auto scope = scopes.find<BlockScope>();
-        resolveTypeSpecifiers(node.specifiers);
+        auto specifiers = node.specifiers;
+        resolveTypeSpecifiers(specifiers);
         
         for (auto &decl : node.declarators) {
             inspect(decl);
             
             TypeName type;
-            type.specifiers = node.specifiers;
+            type.specifiers = specifiers;
             type.declarator = decl;
             
             if (!Type::validateTypeName(type))
@@ -418,13 +432,16 @@ public:
         visit((Declaration &)node);
         
         auto &decl = node.declarators.front();
-        auto plist = decl.modifiers.empty() ? NULL : dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get());
-        if (!plist)
-            error("not a function", node);
+        if (decl.modifiers.empty())
+            error("no parameter list given", node);
         
         scopes.execute<FunctionScope>([&]() {
-            for (auto &param : plist->parameters)
-                inspect(param);
+            if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
+                for (auto &param : plist->parameters)
+                    inspect(param);
+            } else if (auto ilist = dynamic_cast<DeclaratorIdentifierList *>(decl.modifiers.back().get())) {
+            } else
+                error("no parameter list given", node);
             
             for (auto &declaration : node.declarations)
                 inspect(declaration);
@@ -452,7 +469,7 @@ public:
         if (node.isIdentifier) {
             TypeName tn;
             if (!scopes.resolve(node.text, tn))
-                error("identifier could not be resolved", node);
+                error(std::string(node.text) + " was not declared in this scope", node);
             
             exprStack.push(tn, true);
             return;
@@ -515,6 +532,13 @@ public:
         auto cond = exprType(*node.condition);
         if (!cond.isScalar())
             error("condition not scalar", *node.condition);
+        
+        auto lhs = exprType(*node.when_true);
+        auto rhs = exprType(*node.when_false);
+        
+        // @todo compare lhs and rhs type
+        
+        exprStack.push(lhs);
     }
 
     virtual void visit(ExpressionList &node) {
@@ -525,11 +549,25 @@ public:
     }
 
     virtual void visit(CallExpression &node) {
-        error("call expressions not yet supported", node);
+        auto t = exprType(*node.function);
+        if (!t.canCall())
+            error("calling a non-function", node);
+        
+        // @todo check parameters
+        
+        exprStack.push(t.call());
     }
     
     virtual void visit(SubscriptExpression &node) {
-        error("subscript expressions not yet supported", node);
+        auto base = exprType(*node.base);
+        if (!base.canDereference())
+            error("invalid base", node);
+        
+        auto subscript = exprType(node.subscript);
+        if (!subscript.isScalar())
+            error("invalid subscript", node);
+        
+        exprStack.push(base.dereference());
     }
     
     virtual void visit(MemberExpression &node) {
@@ -548,7 +586,10 @@ public:
     }
     
     virtual void visit(PostExpression &node) {
-        error("post expressions not yet supported", node);
+        auto t = exprType(*node.base);
+        // @todo test if this makes sense
+        t.lvalue = false;
+        exprStack.push(t);
     }
 
     virtual void visit(ExpressionStatement &node) {
@@ -571,7 +612,12 @@ public:
     virtual void visit(DesignatorWithExpression &) {}
     virtual void visit(Initializer &) {}
     virtual void visit(InitializerList &) {}
-    virtual void visit(InitializerExpression &) {}
+    virtual void visit(InitializerExpression &node) {
+        Type t;
+        t.typeName = node.type;
+        t.lvalue = false;
+        exprStack.push(t);
+    }
 
     virtual void visit(IterationStatement &node) {
         scopes.execute<IterationScope>([&]() {
