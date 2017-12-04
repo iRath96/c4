@@ -1,3 +1,3 @@
-int hello() {}
+int hello(void) {}
 
 unsigned int *

@@ -1,4 +1,4 @@
-int main() {
+int main(void) {
     int x, y;
 
     1 + 1 * 1 / (1 / 1) - 1;

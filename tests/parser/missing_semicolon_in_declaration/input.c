@@ -1,4 +1,4 @@
-int hello()
+int hello(void)
 int x
 {
     

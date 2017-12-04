@@ -1,7 +1,7 @@
 int true = 1;
 int false = 0;
 
-int main()
+int main(void)
 int statement;
 {
     int h, selection, nice, not_nice, boo, woof, meow, nope;
