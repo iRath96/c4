@@ -904,6 +904,7 @@ protected:
     
     bool read_expression(ast::ExpressionList &node)
     OPTION
+        node.pos = peek().pos;
         NON_OPTIONAL(read_separated_list(&Parser::read_assignment_expression, Token::Punctuator::COMMA, node.children))
     END_OPTION
     

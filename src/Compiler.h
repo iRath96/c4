@@ -526,6 +526,9 @@ public:
             if (!lhs.lvalue)
                 error("lhs is not an lvalue", *node.lhs);
         
+        // @todo check compatibility
+        
+        lhs.lvalue = false;
         exprStack.push(lhs);
     }
 
