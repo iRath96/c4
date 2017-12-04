@@ -68,7 +68,7 @@ protected:
             return;
         
         if (composedTypes.find(type->name) != composedTypes.end())
-            throw CompilerError("composed type already defined", type->pos);
+            throw CompilerError("type " + std::string(type->name) + " redefined", type->pos);
         
         composedTypes.insert(std::make_pair(type->name, ptr));
     }
@@ -237,12 +237,20 @@ public:
     virtual bool isCompatible(const Type &other) const { return false; }
     
     virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
-        for (auto &member : members) {
+        for (auto &member : members) { // @todo not efficient
             if (member.first == name)
                 return member.second;
         }
         
         throw CompilerError("unknown member " + name, pos);
+    }
+    
+    void addMember(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
+        for (auto &member : members)
+            if (member.first == name)
+                throw CompilerError("member " + name + " redefined", pos);
+        
+        members.push_back(std::make_pair(std::string(name), type));
     }
 };
 

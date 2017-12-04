@@ -75,7 +75,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         for (auto &declaration : comp->declarations) {
             Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos);
             for (auto &decl : declaration.declarators)
-                c->members.push_back(std::make_pair(std::string(decl.name), type->applyDeclarator(decl)));
+                c->addMember(std::string(decl.name), type->applyDeclarator(decl), decl.pos);
         }
         return c;
     }

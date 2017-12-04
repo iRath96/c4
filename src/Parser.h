@@ -581,6 +581,7 @@ protected:
                     auto n = new ast::ComposedType();
                     node.reset(n);
                     
+                    n->pos = peek().pos;
                     n->type = token.keyword;
                     
                     NON_UNIQUE
