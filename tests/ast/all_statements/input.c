@@ -7,9 +7,6 @@ int statement;
     int h, selection, nice, not_nice, boo, woof, meow, nope;
     
 example:
-case 4:
-default:
-default:
 kitten:
     statement;
     
@@ -66,7 +63,7 @@ do_something:
     
     while (true) if(false) meow;
     
-meow:
+meow2:
     while (true) {
         goto meow;
         continue;

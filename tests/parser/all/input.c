@@ -49,7 +49,6 @@ int **assignments;
     sizeof(int) { [2] = 2 };
     
     label: {
-        default:
         42;
     }
     

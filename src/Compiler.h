@@ -94,7 +94,10 @@ public:
     std::set<std::string> resolvedLabels;
     std::map<std::string, lexer::TextPosition> unresolvedLabels;
     
-    void resolveLabel(std::string id) {
+    void resolveLabel(std::string id, lexer::TextPosition pos) {
+        if (resolvedLabels.find(id) != resolvedLabels.end())
+            throw CompilerError("label " + id + " redefined", pos);
+        
         resolvedLabels.insert(id);
         unresolvedLabels.erase(id);
     }
@@ -342,7 +345,7 @@ public:
     virtual void visit(IdentifierLabel &node) {
         auto scope = scopes.find<FunctionScope>();
         if (scope.get())
-            scope->resolveLabel(node.id);
+            scope->resolveLabel(node.id, node.pos);
         else
             error("label outside of function?!", node);
     }
@@ -571,6 +574,7 @@ public:
     }
 
     virtual void visit(ExpressionStatement &node) {
+        visit((Statement &)node);
         exprType(node.expressions);
     }
 
