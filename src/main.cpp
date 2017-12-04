@@ -88,11 +88,16 @@ void parse(const char *filename, bool printAST) {
         exit(1);
     }
     
-    if (debug_mode) {
+    try {
         Compiler comp; // @todo rename this to Analyzer or something
         for (auto &decl : parser.declarations)
             decl->accept(comp);
-        
+    } catch (CompilerError e) {
+        fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
+        exit(1);
+    }
+    
+    if (debug_mode) {
         ASTInspector inspector;
         for (auto &decl : parser.declarations) {
             decl->accept(inspector);

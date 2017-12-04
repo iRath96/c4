@@ -893,7 +893,9 @@ protected:
     bool read_primary_expression(ast::Ptr<ast::Expression> &node)
     OPTION
         auto constant = std::make_shared<ast::ConstantExpression>();
+        constant->pos = peek().pos;
         constant->isIdentifier = read_identifier(constant->text);
+    
         NON_OPTIONAL(constant->isIdentifier || read_constant(constant->text) || read_string_literal(constant->text))
         node = constant;
     ELSE_OPTION
@@ -933,6 +935,8 @@ protected:
         NON_OPTIONAL(read_postfix_expression_prefix(node))
         
         while (!eof()) {
+            TextPosition pos = peek().pos;
+            
             NON_UNIQUE
             if (read_punctuator(Token::Punctuator::SB_OPEN)) {
                 UNIQUE
@@ -988,6 +992,8 @@ protected:
                 node = p;
             } else
                 break;
+            
+            node->pos = pos;
         }
     END_OPTION
     
@@ -995,16 +1001,21 @@ protected:
     OPTION
         auto unary_node = std::make_shared<ast::UnaryExpression>();
         unary_node->op = peek().punctuator;
+        unary_node->pos = peek().pos;
+    
         BEGIN_UNIQUE(read_punctuator(Token::Punctuator::PLUSPLUS) || read_punctuator(Token::Punctuator::MINUSMINUS))
         NON_OPTIONAL(read_unary_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
         auto unary_node = std::make_shared<ast::UnaryExpression>();
+        unary_node->pos = peek().pos;
+    
         BEGIN_UNIQUE(read_unary_operator(unary_node->op))
         NON_OPTIONAL(read_cast_expression(unary_node->operand))
         node = unary_node;
     ELSE_OPTION
         ast::Ptr<ast::Expression> u;
+        TextPosition pos = peek().pos;
     
         NON_UNIQUE
         NON_OPTIONAL(read_keyword(Token::Keyword::SIZEOF))
@@ -1022,6 +1033,8 @@ protected:
             node = s;
         } else
             error("sizeof operand expected");
+        
+        node->pos = pos;
     ELSE_OPTION
         ast::TypeName type_name;
     
@@ -1036,7 +1049,8 @@ protected:
     bool read_cast_expression(ast::Ptr<ast::Expression> &node)
     OPTION
         auto c = std::make_shared<ast::CastExpression>();
-    
+        c->pos = peek().pos;
+        
         NON_UNIQUE
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
         NON_OPTIONAL(read_type_name(c->type))
@@ -1069,6 +1083,7 @@ protected:
                 
                 auto tree = std::make_shared<ast::ConditionalExpression>();
                 tree->condition = root;
+                tree->pos = peek().pos;
                 root = tree;
                 
                 shift();
@@ -1092,6 +1107,7 @@ protected:
                 
                 auto tree = std::make_shared<ast::BinaryExpression>();
                 tree->op = peek().punctuator;
+                tree->pos = peek().pos;
                 tree->lhs = root;
                 root = tree;
                 

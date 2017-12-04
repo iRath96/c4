@@ -144,6 +144,7 @@ struct Visitor {
 #define ACCEPT virtual void accept(Visitor &v) { v.visit(*this); }
 
 struct Node {
+    lexer::TextPosition pos;
     virtual void accept(Visitor &) = 0;
 };
 

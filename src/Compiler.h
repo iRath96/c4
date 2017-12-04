@@ -153,7 +153,7 @@ public:
     bool lvalue;
     
     bool canCast(TypeName &target) {
-        return false;
+        return true; // everything is possible in the wonderful lands of C!
     }
     
     Type cast(TypeName &target) {
@@ -164,11 +164,16 @@ public:
     }
     
     bool canDereference() { // @todo make declarators more like expressions
-        return false;
+        auto &m = typeName.declarator.modifiers;
+        return !m.empty() && dynamic_cast<DeclaratorPointer *>(m.back().get());
     }
     
     Type dereference() {
-        return *this; // @todo
+        Type t;
+        t.lvalue = true;
+        t.typeName = typeName;
+        t.typeName.declarator.modifiers.pop_back();
+        return t;
     }
     
     bool isScalar() {
@@ -276,6 +281,17 @@ public:
     }
 };
 
+class CompilerError {
+public:
+    std::string message;
+    TextPosition pos;
+    
+    CompilerError(const std::string &message, TextPosition pos)
+    : message(message), pos(pos) {
+        
+    }
+};
+
 class Compiler : public Visitor {
 protected:
     ScopeStack scopes;
@@ -291,8 +307,8 @@ protected:
             node->accept(*this);
     }
     
-    void error(std::string message, Node &node) {
-        std::cerr << message << std::endl;
+    [[noreturn]] void error(std::string message, Node &node) {
+        throw CompilerError(message, node.pos);
     }
     
     Type exprType(Expression &expr) { // @todo assert stack size
@@ -427,8 +443,16 @@ public:
         auto type = exprType(*node.operand);
         
         switch (node.op) {
-        case Token::Punctuator::ASTERISK: error("dereferencing is not supported", node);
-        default: error("unary operation is not supported", node);
+        case Token::Punctuator::ASTERISK:
+            if (!type.canDereference())
+                error("cannot dereference non-pointer", node);
+            exprStack.push(type.dereference());
+            break;
+            
+        default:
+            error("unary operation is not supported", node);
+            exprStack.push(type);
+            break;
         }
     }
 
@@ -439,7 +463,9 @@ public:
         if (!lhs.isScalar()) error("lhs is not scalar", *node.lhs);
         if (!rhs.isScalar()) error("rhs is not scalar", *node.rhs);
         
-        error("unable to check for type equality", node);
+        if (Token::precedence(node.op) == Token::Precedence::ASSIGNMENT)
+            if (!lhs.lvalue)
+                error("lhs is not an lvalue", *node.lhs);
         
         exprStack.push(lhs);
     }
