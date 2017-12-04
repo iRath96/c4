@@ -95,6 +95,8 @@ public:
 
 class FunctionScope : public BlockScope {
 public:
+    Ptr<Type> returnType;
+    
     std::set<std::string> resolvedLabels;
     std::map<std::string, lexer::TextPosition> unresolvedLabels;
     
@@ -225,16 +227,28 @@ public:
     ArithmeticType(Sign sign, Size size) : sign(sign), size(size) {}
     
     virtual bool isScalar() { return true; }
-    virtual bool isCompatible(const Type &other) const { return false; }
+    virtual bool isCompatible(const Type &other) const {
+        return dynamic_cast<const ArithmeticType *>(&other);
+    }
 };
 
 class ComposedType : public Type {
 public:
-    lexer::Token::Keyword type;
+    lexer::Token::Keyword type; // @todo
     std::vector<std::pair<std::string, Ptr<Type>>> members;
     
     virtual bool isScalar() { return false; }
-    virtual bool isCompatible(const Type &other) const { return false; }
+    virtual bool isCompatible(const Type &other) const {
+        auto c = dynamic_cast<const ComposedType *>(&other);
+        if (!c || c->members.size() != members.size())
+            return false;
+        
+        for (int i = 0; i < members.size(); ++i)
+            if (!members[i].second->isCompatible(*c->members[i].second))
+                return false;
+        
+        return true;
+    }
     
     virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
         for (auto &member : members) { // @todo not efficient
@@ -281,7 +295,10 @@ public:
     PointerType(Ptr<Type> base) : base(base) {}
     
     virtual bool isScalar() { return true; }
-    virtual bool isCompatible(const Type &other) const { return false; }
+    virtual bool isCompatible(const Type &other) const {
+        auto p = dynamic_cast<const PointerType *>(&other);
+        return p && base->isCompatible(*p->base);
+    }
     
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
         return base;
@@ -291,7 +308,9 @@ public:
 class VoidType : public Type {
 public:
     virtual bool isScalar() { return false; }
-    virtual bool isCompatible(const Type &other) const { return false; }
+    virtual bool isCompatible(const Type &other) const {
+        return dynamic_cast<const VoidType *>(&other);
+    }
 };
 
 class ExpressionStack {
@@ -338,7 +357,7 @@ protected:
         return exprStack.pop();
     }
     
-    TypePair intType, charType, stringType;
+    TypePair intType, charType, stringType, voidType;
     
 public:
     Compiler() {
@@ -347,6 +366,7 @@ public:
         intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT));
         charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::CHAR));
         stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
+        voidType = TypePair(false, std::make_shared<VoidType>());
     }
     
     virtual void visit(CaseLabel &node) {
@@ -447,6 +467,12 @@ public:
             error("no parameter list given", node);
         
         scopes.execute<FunctionScope>([&]() {
+            auto scope = scopes.find<FunctionScope>(); // @todo as param?
+            
+            auto t = Type::create(node.specifiers, decl, node.pos);
+            auto fn = dynamic_cast<FunctionType *>(t.get());
+            scope->returnType = fn->returnType;
+            
             if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
                 for (auto &param : plist->parameters) {
                     if (param.declarator.isAbstract())
@@ -462,7 +488,6 @@ public:
             
             inspect(node.body);
             
-            auto scope = scopes.find<FunctionScope>();
             if (!scope->unresolvedLabels.empty()) {
                 auto lab = *scope->unresolvedLabels.begin();
                 throw CompilerError("could not resolve label " + lab.first, lab.second);
@@ -558,7 +583,7 @@ public:
     }
 
     virtual void visit(ExpressionList &node) {
-        TypePair lastType;
+        TypePair lastType = voidType;
         for (auto &child : node.children)
             lastType = exprType(*child);
         exprStack.push(lastType);
@@ -651,8 +676,12 @@ public:
     virtual void visit(ReturnStatement &node) {
         visit((Statement &)node);
         
-        auto type = exprType(node.expressions);
-        //error("unable to verify return type", node); // @todo
+        auto scope = scopes.find<FunctionScope>();
+        auto expectedType = scope->returnType;
+        auto givenType = exprType(node.expressions);
+        
+        if (!expectedType->isCompatible(*givenType.type))
+            throw CompilerError("illegal return", node.pos);
     }
 };
 

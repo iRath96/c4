@@ -381,7 +381,9 @@ public:
     }
 
     virtual void visit(ReturnStatement &node) {
-        std::cout << "return ";
+        std::cout << "return";
+        if (!node.expressions.children.empty())
+            std::cout << " ";
         inspect(node.expressions);
         std::cout << ";";
     }
