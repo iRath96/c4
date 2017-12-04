@@ -176,7 +176,7 @@ public:
         throw CompilerError("cannot dereference non-pointer", pos);
     }
     
-    virtual Ptr<Type> call(lexer::TextPosition pos) const {
+    virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
         throw CompilerError("cannot call non-function", pos);
     }
     
@@ -262,7 +262,12 @@ public:
     virtual bool isScalar() { return false; }
     virtual bool isCompatible(const Type &other) const { return false; }
     
-    virtual Ptr<Type> call(lexer::TextPosition pos) const {
+    virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
+        if (argTypes.size() != parameters.size())
+            throw CompilerError(
+                std::to_string(argTypes.size()) + " arguments given, " +
+                std::to_string(parameters.size()) + " expected"
+            , pos);
         return returnType;
     }
 };
@@ -562,8 +567,13 @@ public:
     virtual void visit(CallExpression &node) {
         auto tp = exprType(*node.function);
         
-        // @todo check parameters
-        exprStack.push(TypePair(false, tp.type->call(node.pos)));
+        PtrVector<Type> argumentTypes;
+        for (auto &arg : node.arguments) {
+            auto tp = exprType(*arg);
+            argumentTypes.push_back(tp.type);
+        }
+        
+        exprStack.push(TypePair(false, tp.type->call(argumentTypes, node.pos)));
     }
     
     virtual void visit(SubscriptExpression &node) {

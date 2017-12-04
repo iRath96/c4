@@ -483,7 +483,7 @@ protected:
     bool read_parameter_declaration(ast::ParameterDeclaration &node)
     OPTION
         node.pos = peek().pos;
-        
+    
         NON_OPTIONAL(read_declaration_specifiers(node.specifiers))
         
         NON_UNIQUE
