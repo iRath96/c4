@@ -1,0 +1,1 @@
+tests/sema/same_name_param_var/input.c:1:21: error: variable x redefined

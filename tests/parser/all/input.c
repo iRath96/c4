@@ -21,7 +21,7 @@ int c = sizeof(int) { 0 };
 int fn(int)(void);
 int say(char *);
 
-int kitten(char *hi)
+char *kitten(char *hi)
 int a;
 int b;
 int c, d, e;
