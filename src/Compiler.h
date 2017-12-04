@@ -30,13 +30,13 @@ public:
 
 class BlockScope : public Scope {
 public:
-    std::map<const char *, TypeName> variables; // @todo ast::Id instead of const char *
+    std::map<std::string, TypeName> variables;
     
-    void declare(const char *name, TypeName type) {
+    void declare(std::string name, TypeName type) {
         variables.insert(std::make_pair(name, type));
     }
     
-    bool resolve(const char *name, TypeName &result) {
+    bool resolve(std::string name, TypeName &result) {
         auto it = variables.find(name);
         if (it == variables.end())
             return false;
@@ -47,7 +47,7 @@ public:
 
 class FileScope : public BlockScope {
 public:
-    std::map<const char *, ast::Ptr<TypeSpecifier>> composedTypes;
+    std::map<std::string, ast::Ptr<TypeSpecifier>> composedTypes;
     
 protected:
     void declareComposedType(ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
@@ -82,15 +82,15 @@ public:
 
 class FunctionScope : public BlockScope {
 public:
-    std::set<const char *> resolvedLabels;
-    std::set<const char *> unresolvedLabels;
+    std::set<std::string> resolvedLabels;
+    std::set<std::string> unresolvedLabels;
     
-    void resolveLabel(const char *id) {
+    void resolveLabel(std::string id) {
         resolvedLabels.insert(id);
         unresolvedLabels.erase(id);
     }
     
-    void referenceLabel(const char *id) {
+    void referenceLabel(std::string id) {
         if (resolvedLabels.find(id) == resolvedLabels.end())
             unresolvedLabels.insert(id);
     }
@@ -138,7 +138,7 @@ public:
         return nullptr;
     }
     
-    bool resolve(const char *name, TypeName &result) {
+    bool resolve(std::string name, TypeName &result) {
         for (auto it = stack.rbegin(); it != stack.rend(); ++it)
             if (auto bs = dynamic_cast<BlockScope *>(it->get()))
                 if (bs->resolve(name, result))
@@ -163,7 +163,7 @@ public:
         return t;
     }
     
-    bool canDereference() { // @todo make declarators more like expressions
+    bool canDereference() {
         auto &m = typeName.declarator.modifiers;
         return !m.empty() && dynamic_cast<DeclaratorPointer *>(m.back().get());
     }
@@ -173,6 +173,18 @@ public:
         t.lvalue = true;
         t.typeName = typeName;
         t.typeName.declarator.modifiers.pop_back();
+        return t;
+    }
+    
+    bool canReference() {
+        return lvalue;
+    }
+    
+    Type reference() {
+        Type t;
+        t.lvalue = false;
+        t.typeName = typeName;
+        t.typeName.declarator.modifiers.push_back(std::make_shared<ast::DeclaratorPointer>());
         return t;
     }
     
@@ -404,12 +416,35 @@ public:
 
     virtual void visit(ExternalDeclarationFunction &node) {
         visit((Declaration &)node);
+        
+        auto &decl = node.declarators.front();
+        auto plist = decl.modifiers.empty() ? NULL : dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get());
+        if (!plist)
+            error("not a function", node);
+        
         scopes.execute<FunctionScope>([&]() {
+            for (auto &param : plist->parameters)
+                inspect(param);
+            
+            for (auto &declaration : node.declarations)
+                inspect(declaration);
+            
             inspect(node.body);
         });
     }
     
-    virtual void visit(ParameterDeclaration &) {}
+    virtual void visit(ParameterDeclaration &node) {
+        if (node.declarator.isAbstract())
+            return;
+        
+        auto scope = scopes.find<FunctionScope>();
+        
+        TypeName t;
+        t.specifiers = node.specifiers;
+        t.declarator = node.declarator;
+        
+        scope->declare(node.declarator.name, t);
+    }
 
 #pragma mark - Expressions
 
@@ -448,7 +483,13 @@ public:
                 error("cannot dereference non-pointer", node);
             exprStack.push(type.dereference());
             break;
-            
+        
+        case Token::Punctuator::BIT_AND:
+            if (!type.canReference())
+                error("cannot reference non lvalue", node);
+            exprStack.push(type.reference());
+            break;
+        
         default:
             error("unary operation is not supported", node);
             exprStack.push(type);
