@@ -415,6 +415,9 @@ public:
         auto specifiers = node.specifiers;
         resolveTypeSpecifiers(specifiers);
         
+        if (node.declarators.empty())
+            error("declaration without declarators", node);
+        
         Ptr<Type> type = Type::create(specifiers, node.pos);
         for (auto &decl : node.declarators) {
             inspect(decl);

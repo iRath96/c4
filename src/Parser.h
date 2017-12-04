@@ -686,6 +686,8 @@ protected:
     
     bool read_declaration(ast::Declaration &node)
     OPTION
+        node.pos = peek().pos;
+        
         BEGIN_UNIQUE(read_declaration_specifiers(node.specifiers))
         OPTIONAL(read_init_declarator_list(node.declarators))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::SEMICOLON))
