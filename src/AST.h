@@ -28,7 +28,6 @@ using PtrVector = Vector<Ptr<T>>;
 
 // Nodes
 struct Identifier;
-struct Pointer;
 struct TypeName;
 
 // Labels
@@ -39,9 +38,8 @@ struct IdentifierLabel;
 // Declarators
 struct DeclaratorParameterList;
 struct DeclaratorIdentifierList;
-struct AbstractDeclarator;
-struct IdentifierDeclarator;
-struct ComposedDeclarator;
+struct DeclaratorPointer;
+struct Declarator;
 
 // Designators
 struct DesignatorWithIdentifier;
@@ -87,7 +85,6 @@ struct ComposedType;
 struct Visitor {
     // Nodes
     virtual void visit(Identifier &) = 0;
-    virtual void visit(Pointer &) = 0;
     virtual void visit(TypeName &) = 0;
 
     // Labels
@@ -98,9 +95,8 @@ struct Visitor {
     // Declarators
     virtual void visit(DeclaratorParameterList &) = 0;
     virtual void visit(DeclaratorIdentifierList &) = 0;
-    virtual void visit(AbstractDeclarator &) = 0;
-    virtual void visit(IdentifierDeclarator &) = 0;
-    virtual void visit(ComposedDeclarator &) = 0;
+    virtual void visit(DeclaratorPointer &) = 0;
+    virtual void visit(Declarator &) = 0;
 
     // Designators
     virtual void visit(DesignatorWithIdentifier &) = 0;
@@ -168,10 +164,6 @@ struct Identifier : Node {
 
 struct TypeSpecifier : Node {};
 
-struct Pointer : Node {
-    ACCEPT
-};
-
 #pragma mark - Labels
 
 struct CaseLabel : Label {
@@ -190,41 +182,38 @@ struct IdentifierLabel : Label {
 
 #pragma mark - Declarators
 
-struct DeclaratorSuffix : Node {};
+struct DeclaratorModifier : Node {};
 
-struct DeclaratorParameterList : DeclaratorSuffix {
+struct DeclaratorParameterList : DeclaratorModifier {
     ast::Vector<ast::ParameterDeclaration> parameters;
     ACCEPT
 };
 
-struct DeclaratorIdentifierList : DeclaratorSuffix {
+struct DeclaratorIdentifierList : DeclaratorModifier {
     ast::Vector<const char *> identifiers;
     ACCEPT
 };
 
+struct DeclaratorPointer : DeclaratorModifier {
+    Vector<const char *> qualifiers;
+    ACCEPT
+};
+
 struct Declarator : Node {
-    Vector<Pointer> pointers;
+    PtrVector<DeclaratorModifier> modifiers;
     Ptr<Expression> initializer;
-    PtrVector<DeclaratorSuffix> suffixes;
-};
-
-struct AbstractDeclarator : Declarator {
-    ACCEPT
-};
-
-struct IdentifierDeclarator : Declarator {
+    
     const char *name = NULL;
-    ACCEPT
-};
-
-struct ComposedDeclarator : Declarator {
-    Ptr<Declarator> base;
+    bool isAbstract() {
+        return !name;
+    }
+    
     ACCEPT
 };
 
 struct TypeName : Node {
     PtrVector<TypeSpecifier> specifiers;
-    Ptr<Declarator> declarator;
+    Declarator declarator;
     
     ACCEPT
 };
@@ -244,7 +233,8 @@ struct DesignatorWithExpression : Designator {
 
 struct Initializer : Node {
     PtrVector<Designator> designators;
-    Ptr<Declarator> declarator;
+    Declarator declarator;
+    
     ACCEPT
 };
 
@@ -390,14 +380,14 @@ struct ReturnStatement : JumpStatement {
 
 struct Declaration : BlockItem {
     PtrVector<TypeSpecifier> specifiers;
-    PtrVector<Declarator> declarators;
+    Vector<Declarator> declarators;
     
     ACCEPT
 };
 
 struct ParameterDeclaration : Node {
     PtrVector<TypeSpecifier> specifiers;
-    Ptr<Declarator> declarator;
+    Declarator declarator;
     
     ACCEPT
 };

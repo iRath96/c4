@@ -146,18 +146,11 @@ public:
             else
                 result = false; // must be composed
         
-        Declarator *decl = typeName.declarator.get();
-        while (decl) {
-            if (!decl->pointers.empty())
+        for (auto &mod : typeName.declarator.modifiers) {
+            if (auto ptr = dynamic_cast<DeclaratorPointer *>(mod.get()))
                 result = true;
-            
-            if (!decl->suffixes.empty())
-                result = false;
-            
-            if (auto cd = dynamic_cast<ComposedDeclarator *>(decl))
-                decl = cd->base.get();
             else
-                break;
+                result = false;
         }
         
         return result;
@@ -184,9 +177,8 @@ public:
         typeName.specifiers.push_back(n);
         
         if (ptr) {
-            Pointer p;
-            typeName.declarator = std::make_shared<AbstractDeclarator>();
-            typeName.declarator->pointers.push_back(p);
+            auto p = std::make_shared<DeclaratorPointer>();
+            typeName.declarator.modifiers.push_back(p);
         }
         
         Type type;
@@ -284,7 +276,6 @@ public:
     }
     
     virtual void visit(Identifier &) {}
-    virtual void visit(Pointer &) {}
 
     virtual void visit(CompoundStatement &node) {
         scopes.execute<BlockScope>([&]() {
@@ -293,11 +284,11 @@ public:
         });
     }
     
+    virtual void visit(DeclaratorPointer &) {}
     virtual void visit(DeclaratorParameterList &) {}
     virtual void visit(DeclaratorIdentifierList &) {}
-    virtual void visit(AbstractDeclarator &) {}
-    virtual void visit(IdentifierDeclarator &) {}
-    virtual void visit(ComposedDeclarator &) {}
+    virtual void visit(Declarator &) {}
+    
     virtual void visit(TypeName &) {}
 
     virtual void visit(Declaration &node) {
@@ -316,19 +307,10 @@ public:
                 error("invalid type", node);
             
             // find identifier
-            ast::Declarator *d = decl.get();
-            while (d) {
-                if (auto dd = dynamic_cast<ast::IdentifierDeclarator *>(d)) {
-                    scope->declare(dd->name, type);
-                    break;
-                } else if (auto dd = dynamic_cast<ast::AbstractDeclarator *>(d)) {
-                    error("abstract declarator in declaration", *d);
-                } else if (auto dd = dynamic_cast<ast::ComposedDeclarator *>(d)) {
-                    d = dd->base.get();
-                } else {
-                    error("unknown declarator type", *d);
-                }
-            }
+            if (decl.isAbstract())
+                error("abstract declarator in declaration", node);
+            else
+                scope->declare(decl.name, type);
         }
     }
 

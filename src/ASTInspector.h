@@ -66,13 +66,13 @@ public:
         std::cout << indent << "NamedType[" << node.id << "]" << std::endl;
     }
 
-    virtual void visit(Pointer &) {
-        std::cout << indent << "Pointer" << std::endl;
-    }
-
     virtual void visit(CompoundStatement &node) {
         std::cout << indent << "CompoundStatement" << std::endl;
         inspect_vector("items", node.items);
+    }
+    
+    virtual void visit(DeclaratorPointer &) {
+        std::cout << indent << "DeclaratorPointer" << std::endl;
     }
     
     virtual void visit(DeclaratorParameterList &node) {
@@ -85,30 +85,12 @@ public:
         for (const auto &id : node.identifiers)
             std::cout << indent << "  " << id << std::endl;
     }
-    
-    virtual void visit(AbstractDeclarator &node) {
-        std::cout << indent << "AbstractDeclarator" << std::endl;
-        if (node.initializer.get())
-            inspect(node.initializer);
-        inspect_vector("pointers", node.pointers);
-        inspect_vector("suffixes", node.suffixes);
-    }
 
-    virtual void visit(IdentifierDeclarator &node) {
-        std::cout << indent << "IdentifierDeclarator[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
+    virtual void visit(Declarator &node) {
+        std::cout << indent << "Declarator[" << (node.name ? node.name : "(abstract)") << "]" << std::endl;
         if (node.initializer.get())
             inspect(node.initializer);
-        inspect_vector("pointers", node.pointers);
-        inspect_vector("suffixes", node.suffixes);
-    }
-    
-    virtual void visit(ComposedDeclarator &node) {
-        std::cout << indent << "ComposedDeclarator" << std::endl;
-        inspect(node.base);
-        if (node.initializer.get())
-            inspect(node.initializer);
-        inspect_vector("pointers", node.pointers);
-        inspect_vector("suffixes", node.suffixes);
+        inspect_vector("modifiers", node.modifiers);
     }
 
     virtual void visit(Declaration &node) {

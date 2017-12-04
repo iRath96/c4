@@ -76,7 +76,6 @@ public:
     virtual void visit(IdentifierLabel &node) { std::cout << node.id << ":"; }
     virtual void visit(Identifier &node) { std::cout << node.id; }
     virtual void visit(NamedType &node) { std::cout << node.id; }
-    virtual void visit(Pointer &) { std::cout << "*"; }
     virtual void visit(ContinueStatement &node) {
         if (node.keyword == lexer::Token::Keyword::CONTINUE)
             std::cout << "continue;";
@@ -107,6 +106,15 @@ public:
         std::cout << std::endl << indent << "}";
     }
     
+    virtual void visit(DeclaratorPointer &node) {
+        std::cout << "*";
+        
+        if (!node.qualifiers.empty())
+            std::cout << " ";
+        
+        join(node.qualifiers, " ", " ");
+    }
+    
     virtual void visit(DeclaratorParameterList &node) {
         std::cout << "(";
         join(node.parameters, ", ");
@@ -119,19 +127,21 @@ public:
         std::cout << ")";
     }
     
-    virtual void visitDeclarator(Declarator &node, std::function<void ()> callback) {
-        for (size_t i = 0; i < node.pointers.size(); ++i)
-            std::cout << "(*";
-        
-        for (size_t i = 0; i < node.suffixes.size(); ++i)
+    virtual void visit(Declarator &node) {
+        for (auto &mod : node.modifiers) {
             std::cout << "(";
+            if (dynamic_cast<DeclaratorPointer *>(mod.get())) // @todo DeclaratorPrefix class?
+                inspect(mod);
+        }
         
-        callback();
+        if (!node.isAbstract())
+            std::cout << node.name;
         
-        join(node.suffixes, ")", ")");
-        
-        for (size_t i = 0; i < node.pointers.size(); ++i)
+        for (auto it = node.modifiers.rbegin(); it != node.modifiers.rend(); ++it) {
+            if (!dynamic_cast<DeclaratorPointer *>(it->get()))
+                inspect(*it);
             std::cout << ")";
+        }
         
         if (node.initializer.get()) {
             std::cout << " = ";
@@ -139,23 +149,6 @@ public:
         }
     }
     
-    virtual void visit(AbstractDeclarator &node) {
-        visitDeclarator(node, [&]() {});
-    }
-
-    virtual void visit(IdentifierDeclarator &node) {
-        visitDeclarator(node, [&]() {
-            if (node.name)
-                std::cout << node.name;
-        });
-    }
-    
-    virtual void visit(ComposedDeclarator &node) {
-        visitDeclarator(node, [&]() {
-            inspect(node.base);
-        });
-    }
-
     virtual void visit(Declaration &node) { // @todo not DRY with ExternalDeclarationVariable
         join(node.specifiers, " ", node.declarators.empty() ? "" : " ");
         join(node.declarators, ", ");
@@ -178,21 +171,13 @@ public:
         std::cout << std::endl;
     }
     
-    bool isDeclaratorEmpty(ast::Ptr<ast::Declarator> &ptr) const {
-        if (!ptr.get())
-            return true;
-        
-        auto a = dynamic_cast<AbstractDeclarator *>(ptr.get());
-        if (a)
-            return a->pointers.empty() && a->suffixes.empty();
-        
-        return false;
+    bool isDeclaratorEmpty(ast::Declarator &decl) const {
+        return decl.modifiers.empty() && decl.isAbstract();
     }
 
     virtual void visit(ParameterDeclaration &node) {
         join(node.specifiers, " ", isDeclaratorEmpty(node.declarator) ? "" : " ");
-        if (node.declarator.get())
-            inspect(node.declarator);
+        inspect(node.declarator);
     }
 
     virtual void visit(ConstantExpression &node) {
@@ -317,7 +302,7 @@ public:
         if (!node.designators.empty()) {
             std::cout << " = ";
         }
-        inspect(node.declarator->initializer);
+        inspect(node.declarator.initializer);
     }
 
     virtual void visit(InitializerList &node) {
