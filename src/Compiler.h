@@ -491,7 +491,7 @@ public:
             break;
         
         default:
-            error("unary operation is not supported", node);
+            //error("unary operation is not supported", node);
             exprStack.push(type);
             break;
         }
@@ -590,7 +590,7 @@ public:
 
     virtual void visit(ReturnStatement &node) {
         auto type = exprType(node.expressions);
-        error("unable to verify return type", node);
+        //error("unable to verify return type", node); // @todo
     }
 };
 
