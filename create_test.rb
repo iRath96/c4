@@ -16,6 +16,7 @@ puts "Copying file into #{test_folder}"
 argument = case name.split("/").first
 when "lexer" then "--tokenize"
 when "parser" then "--parse"
+when "sema" then "--parse"
 when "ast" then "--print-ast"
 end
 

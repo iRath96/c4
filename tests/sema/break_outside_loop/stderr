@@ -1,0 +1,1 @@
+tests/sema/break_outside_loop/input.c:2:5: error: break/continue outside of iteration stmt
