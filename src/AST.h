@@ -418,6 +418,14 @@ struct ComposedType : TypeSpecifier {
     lexer::Token::Keyword type; // STRUCT or UNION
     Vector<Declaration> declarations;
     
+    bool isQualified() {
+        return !declarations.empty();
+    }
+    
+    bool isNamed() {
+        return name;
+    }
+    
     ACCEPT
 };
 

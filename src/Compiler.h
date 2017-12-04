@@ -22,6 +22,10 @@ using namespace ast;
 class Scope {
 public:
     virtual ~Scope() {}
+    
+    void error(std::string message) {
+        std::cerr << message << std::endl;
+    }
 };
 
 class BlockScope : public Scope {
@@ -43,8 +47,37 @@ public:
 
 class FileScope : public BlockScope {
 public:
-    std::map<const char *, ast::Ptr<ComposedType>> composedTypes;
+    std::map<const char *, ast::Ptr<TypeSpecifier>> composedTypes;
     
+protected:
+    void declareComposedType(ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
+        if (!type->isNamed())
+            return;
+        
+        if (composedTypes.find(type->name) != composedTypes.end())
+            error("composed type already defined");
+        
+        composedTypes.insert(std::make_pair(type->name, ptr));
+    }
+    
+    void resolveComposedType(ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
+        if (type->isQualified()) {
+            declareComposedType(type, ptr);
+            return;
+        }
+        
+        auto it = composedTypes.find(type->name);
+        if (it == composedTypes.end())
+            error(std::string(type->name) + " has not been declared before");
+        else
+            ptr = it->second;
+    }
+    
+public:
+    void resolveType(ast::Ptr<TypeSpecifier> &type) {
+        if (auto ct = dynamic_cast<ComposedType *>(type.get()))
+            resolveComposedType(ct, type);
+    }
 };
 
 class FunctionScope : public BlockScope {
@@ -156,6 +189,34 @@ public:
         return result;
     }
     
+    bool isComposed() {
+        if (!typeName.declarator.modifiers.empty())
+            return false;
+        return getComposedType();
+    }
+    
+    bool getMember(const char *name, Type &type) {
+        auto ct = getComposedType();
+        for (auto &declaration : ct->declarations) {
+            for (auto &decl : declaration.declarators)
+                if (!strcmp(decl.name, name)) {
+                    type.lvalue = lvalue;
+                    type.typeName.specifiers = declaration.specifiers;
+                    type.typeName.declarator = decl;
+                    return true;
+                }
+        }
+        
+        return false;
+    }
+    
+    ComposedType *getComposedType() {
+        for (auto &ts : typeName.specifiers)
+            if (auto ct = dynamic_cast<ComposedType *>(ts.get()))
+                return ct;
+        return NULL;
+    }
+    
     static bool validateTypeName(TypeName &typeName) {
         bool hasComposed = false, hasScalar = false;
         for (auto &ts : typeName.specifiers)
@@ -230,7 +291,7 @@ protected:
             node->accept(*this);
     }
     
-    [[noreturn]] void error(std::string message, Node &node) {
+    void error(std::string message, Node &node) {
         std::cerr << message << std::endl;
     }
     
@@ -289,16 +350,23 @@ public:
     virtual void visit(DeclaratorIdentifierList &) {}
     virtual void visit(Declarator &) {}
     
-    virtual void visit(TypeName &) {}
+    void resolveTypeSpecifiers(ast::PtrVector<ast::TypeSpecifier> &specifiers) {
+        auto scope = scopes.find<FileScope>();
+        for (auto &spec : specifiers)
+            scope->resolveType(spec);
+    }
+    
+    virtual void visit(TypeName &node) {
+        resolveTypeSpecifiers(node.specifiers);
+    }
 
     virtual void visit(Declaration &node) {
         auto scope = scopes.find<BlockScope>();
-        
-        for (auto &spec : node.specifiers)
-            // might have some struct declarations
-            inspect(spec);
+        resolveTypeSpecifiers(node.specifiers);
         
         for (auto &decl : node.declarators) {
+            inspect(decl);
+            
             TypeName type;
             type.specifiers = node.specifiers;
             type.declarator = decl;
@@ -398,7 +466,18 @@ public:
     }
     
     virtual void visit(MemberExpression &node) {
-        error("member expressions not yet supported", node);
+        Type base = exprType(*node.base);
+        if (node.dereference) {
+            if (!base.canDereference()) error("cannot dereference base", node);
+            base = base.dereference();
+        }
+        
+        Type memberType;
+        
+        if (!base.isComposed()) error("member access into non-composed type", node);
+        if (!base.getMember(node.id, memberType)) error("unknown member " + std::string(node.id), node);
+        
+        exprStack.push(memberType);
     }
     
     virtual void visit(PostExpression &node) {
@@ -418,10 +497,7 @@ public:
         exprStack.push(Type::named("int"));
     }
 
-    virtual void visit(ComposedType &) {
-        // @todo
-    }
-    
+    virtual void visit(ComposedType &) {}
     virtual void visit(NamedType &) {}
 
     virtual void visit(DesignatorWithIdentifier &) {}
