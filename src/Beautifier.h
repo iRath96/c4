@@ -117,13 +117,10 @@ public:
     
     virtual void visit(DeclaratorParameterList &node) {
         std::cout << "(";
-        join(node.parameters, ", ");
-        std::cout << ")";
-    }
-    
-    virtual void visit(DeclaratorIdentifierList &node) {
-        std::cout << "(";
-        join(node.identifiers, ", ");
+        if (node.parameters.empty())
+            std::cout << "void";
+        else
+            join(node.parameters, ", ");
         std::cout << ")";
     }
     

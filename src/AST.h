@@ -37,7 +37,6 @@ struct IdentifierLabel;
 
 // Declarators
 struct DeclaratorParameterList;
-struct DeclaratorIdentifierList;
 struct DeclaratorPointer;
 struct Declarator;
 
@@ -94,7 +93,6 @@ struct Visitor {
 
     // Declarators
     virtual void visit(DeclaratorParameterList &) = 0;
-    virtual void visit(DeclaratorIdentifierList &) = 0;
     virtual void visit(DeclaratorPointer &) = 0;
     virtual void visit(Declarator &) = 0;
 
@@ -187,11 +185,6 @@ struct DeclaratorModifier : Node {};
 
 struct DeclaratorParameterList : DeclaratorModifier {
     ast::Vector<ast::ParameterDeclaration> parameters;
-    ACCEPT
-};
-
-struct DeclaratorIdentifierList : DeclaratorModifier {
-    ast::Vector<const char *> identifiers;
     ACCEPT
 };
 

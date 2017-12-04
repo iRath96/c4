@@ -80,12 +80,6 @@ public:
         inspect_vector("parameters", node.parameters);
     }
     
-    virtual void visit(DeclaratorIdentifierList &node) {
-        std::cout << indent << "DeclaratorIdentifierList" << std::endl;
-        for (const auto &id : node.identifiers)
-            std::cout << indent << "  " << id << std::endl;
-    }
-
     virtual void visit(Declarator &node) {
         std::cout << indent << "Declarator[" << (node.name ? node.name : "(abstract)") << "]" << std::endl;
         if (node.initializer.get())

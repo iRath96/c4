@@ -190,7 +190,7 @@ public:
     
     bool canCall() {
         auto &m = typeName.declarator.modifiers;
-        return !m.empty() && dynamic_cast<DeclaratorParameterList *>(m.back().get()); // @todo @important only parameter list!!!
+        return !m.empty() && dynamic_cast<DeclaratorParameterList *>(m.back().get());
     }
     
     Type call() {
@@ -388,7 +388,6 @@ public:
     
     virtual void visit(DeclaratorPointer &) {}
     virtual void visit(DeclaratorParameterList &) {}
-    virtual void visit(DeclaratorIdentifierList &) {}
     virtual void visit(Declarator &) {}
     
     void resolveTypeSpecifiers(ast::PtrVector<ast::TypeSpecifier> &specifiers) {
@@ -439,7 +438,6 @@ public:
             if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
                 for (auto &param : plist->parameters)
                     inspect(param);
-            } else if (auto ilist = dynamic_cast<DeclaratorIdentifierList *>(decl.modifiers.back().get())) {
             } else
                 error("no parameter list given", node);
             

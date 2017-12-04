@@ -396,15 +396,21 @@ protected:
             if (!read_punctuator(Token::Punctuator::RB_OPEN))
                 break;
             
-            if (read_parameter_type_list(p_suffix->parameters)) {
-                node.modifiers.insert(node.modifiers.begin() + insertionIndex, p_suffix);
-            } else {
-                auto i_suffix = std::make_shared<ast::DeclaratorIdentifierList>();
-                read_separated_list(&Parser::read_identifier, Token::Punctuator::COMMA, i_suffix->identifiers);
-                node.modifiers.insert(node.modifiers.begin() + insertionIndex, i_suffix);
+            UNIQUE
+            NON_OPTIONAL(read_parameter_type_list(p_suffix->parameters));
+            
+            if (p_suffix->parameters.size() == 1) {
+                auto p = p_suffix->parameters.front();
+                if (p.declarator.isAbstract() && p.declarator.modifiers.empty() && p.specifiers.size() == 1) {
+                    auto s = p.specifiers.front();
+                    if (auto nt = dynamic_cast<ast::NamedType *>(s.get()))
+                        if (!strcmp(nt->id, "void"))
+                            p_suffix->parameters.clear(); // no parameters taken
+                }
             }
             
-            UNIQUE
+            node.modifiers.insert(node.modifiers.begin() + insertionIndex, p_suffix);
+            
             if (!read_punctuator(Token::Punctuator::RB_CLOSE))
                 break;
             
