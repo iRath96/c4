@@ -41,7 +41,11 @@ class BlockScope : public Scope {
 public:
     std::map<std::string, Ptr<Type>> variables;
     
-    void declare(std::string name, Ptr<Type> type) {
+    void declare(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
+        for (auto &v : variables)
+            if (v.first == name)
+                throw CompilerError("variable " + name + " redefined", pos);
+        
         variables.insert(std::make_pair(name, type));
     }
     
@@ -411,7 +415,7 @@ public:
             if (decl.isAbstract())
                 error("abstract declarator in declaration", node);
             else
-                scope->declare(decl.name, type->applyDeclarator(decl));
+                scope->declare(decl.name, type->applyDeclarator(decl), decl.pos);
         }
     }
 
@@ -451,7 +455,7 @@ public:
             return;
         
         auto scope = scopes.find<FunctionScope>();
-        scope->declare(node.declarator.name, Type::create(node.specifiers, node.declarator, node.pos));
+        scope->declare(node.declarator.name, Type::create(node.specifiers, node.declarator, node.pos), node.declarator.pos);
     }
 
 #pragma mark - Expressions

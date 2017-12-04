@@ -1,4 +1,4 @@
-int main(int);
-int (main)(int);
-int (((main(int))));
-int main;
+int main1(int);
+int (main2)(int);
+int (((main3(int))));
+int main4;

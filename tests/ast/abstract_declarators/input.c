@@ -1,5 +1,5 @@
-int main(int, int *, struct {
+int main1(int, int *, struct {
     int x;
 });
 
-int main(int (*)(void));
+int main2(int (*)(void));
