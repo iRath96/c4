@@ -443,8 +443,12 @@ public:
         
         scopes.execute<FunctionScope>([&]() {
             if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
-                for (auto &param : plist->parameters)
+                for (auto &param : plist->parameters) {
+                    if (param.declarator.isAbstract())
+                        error("parameter without name", param);
+                    
                     inspect(param);
+                }
             } else
                 error("no parameter list given", node);
             
