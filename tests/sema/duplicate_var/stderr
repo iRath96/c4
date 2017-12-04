@@ -1,0 +1,1 @@
+tests/sema/duplicate_var/input.c:2:12: error: variable a redefined
