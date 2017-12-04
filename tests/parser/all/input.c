@@ -18,14 +18,14 @@ struct hello {
 int b = sizeof(int);
 int c = sizeof(int) { 0 };
 
-int fn(int)(int);
+int fn(int)(void);
 int say(char *);
 
 int kitten(char *hi)
 int a;
 int b;
 int c, d, e;
-int *(*array)(int);
+int *(*array)(int, int, int);
 int do_something, hammertime;
 struct { int right(int); } *are_nice;
 int **assignments;
@@ -65,8 +65,8 @@ int **assignments;
     }
     
     while (nobody_is_watching) {
-        say("I'm", "Groot");
-        *assignments[1] = are_nice->right();
+        say("I'm Groot");
+        *assignments[1] = are_nice->right(1);
     }
     
     return ((("nope")));
