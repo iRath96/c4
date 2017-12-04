@@ -92,16 +92,16 @@ public:
 class FunctionScope : public BlockScope {
 public:
     std::set<std::string> resolvedLabels;
-    std::set<std::string> unresolvedLabels;
+    std::map<std::string, lexer::TextPosition> unresolvedLabels;
     
     void resolveLabel(std::string id) {
         resolvedLabels.insert(id);
         unresolvedLabels.erase(id);
     }
     
-    void referenceLabel(std::string id) {
+    void referenceLabel(std::string id, lexer::TextPosition pos) {
         if (resolvedLabels.find(id) == resolvedLabels.end())
-            unresolvedLabels.insert(id);
+            unresolvedLabels.insert(std::make_pair(id, pos));
     }
 };
 
@@ -347,15 +347,24 @@ public:
             error("label outside of function?!", node);
     }
     
+    void visit(Statement &node) {
+        for (auto &lab : node.labels)
+            inspect(lab);
+    }
+    
     virtual void visit(GotoStatement &node) {
+        visit((Statement &)node);
+        
         auto scope = scopes.find<FunctionScope>();
         if (scope.get())
-            scope->referenceLabel(node.target);
+            scope->referenceLabel(node.target, node.pos);
         else
             error("goto outside of function?!", node);
     }
     
     virtual void visit(ContinueStatement &node) {
+        visit((Statement &)node);
+        
         if (!scopes.find<IterationScope>().get())
             error("break/continue outside of iteration stmt", node);
     }
@@ -363,6 +372,8 @@ public:
     virtual void visit(Identifier &) {}
 
     virtual void visit(CompoundStatement &node) {
+        visit((Statement &)node);
+        
         scopes.execute<BlockScope>([&]() {
             for (auto &item : node.items)
                 inspect(item);
@@ -423,6 +434,12 @@ public:
                 inspect(declaration);
             
             inspect(node.body);
+            
+            auto scope = scopes.find<FunctionScope>();
+            if (!scope->unresolvedLabels.empty()) {
+                auto lab = *scope->unresolvedLabels.begin();
+                throw CompilerError("could not resolve label " + lab.first, lab.second);
+            }
         });
     }
     
@@ -578,12 +595,15 @@ public:
     }
 
     virtual void visit(IterationStatement &node) {
+        visit((Statement &)node);
         scopes.execute<IterationScope>([&]() {
             inspect(node.body);
         });
     }
     
     virtual void visit(SelectionStatement &node) {
+        visit((Statement &)node);
+        
         auto cond = exprType(node.condition);
         if (!cond.type->isScalar())
             error("condition not scalar", node.condition);
@@ -593,6 +613,8 @@ public:
     }
 
     virtual void visit(ReturnStatement &node) {
+        visit((Statement &)node);
+        
         auto type = exprType(node.expressions);
         //error("unable to verify return type", node); // @todo
     }

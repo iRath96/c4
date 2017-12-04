@@ -1,4 +1,5 @@
 int main(int hi, int bye, int wow) {
+begin:
     if ((4)) {
         if ((4))
             if (2)
@@ -11,6 +12,7 @@ int main(int hi, int bye, int wow) {
     } else
         while (1+1);
     
+end:
     if (1)
         if (2)
             hi;
