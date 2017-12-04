@@ -198,7 +198,7 @@ struct Declarator : Node {
     Ptr<Expression> initializer;
     
     const char *name = NULL;
-    bool isAbstract() {
+    bool isAbstract() const {
         return !name;
     }
     
@@ -403,6 +403,8 @@ struct ExternalDeclarationFunction : ExternalDeclaration {
 
 struct NamedType : TypeSpecifier {
     const char *id;
+    lexer::Token::Keyword keyword;
+    
     ACCEPT
 };
 
@@ -412,11 +414,11 @@ struct ComposedType : TypeSpecifier {
     lexer::Token::Keyword type; // STRUCT or UNION
     Vector<Declaration> declarations;
     
-    bool isQualified() {
+    bool isQualified() const {
         return !declarations.empty();
     }
     
-    bool isNamed() {
+    bool isNamed() const {
         return name;
     }
     

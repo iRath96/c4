@@ -10,6 +10,8 @@
 #define Compiler_h
 
 #include "AST.h"
+
+#include <iostream>
 #include <functional>
 #include <set>
 #include <vector>
@@ -17,26 +19,33 @@
 #include <stack>
 
 using namespace ast;
-//using namespace std;
+
+class CompilerError {
+public:
+    std::string message;
+    lexer::TextPosition pos;
+    
+    CompilerError(const std::string &message, lexer::TextPosition pos)
+    : message(message), pos(pos) {
+        
+    }
+};
 
 class Scope {
 public:
     virtual ~Scope() {}
-    
-    void error(std::string message) {
-        std::cerr << message << std::endl;
-    }
 };
 
+class Type;
 class BlockScope : public Scope {
 public:
-    std::map<std::string, TypeName> variables;
+    std::map<std::string, Ptr<Type>> variables;
     
-    void declare(std::string name, TypeName type) {
+    void declare(std::string name, Ptr<Type> type) {
         variables.insert(std::make_pair(name, type));
     }
     
-    bool resolve(std::string name, TypeName &result) {
+    bool resolve(std::string name, Ptr<Type> &result) {
         auto it = variables.find(name);
         if (it == variables.end())
             return false;
@@ -50,17 +59,17 @@ public:
     std::map<std::string, ast::Ptr<TypeSpecifier>> composedTypes;
     
 protected:
-    void declareComposedType(ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
+    void declareComposedType(ast::ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
         if (!type->isNamed())
             return;
         
         if (composedTypes.find(type->name) != composedTypes.end())
-            error("composed type already defined");
+            throw CompilerError("composed type already defined", type->pos);
         
         composedTypes.insert(std::make_pair(type->name, ptr));
     }
     
-    void resolveComposedType(ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
+    void resolveComposedType(ast::ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
         if (type->isQualified()) {
             declareComposedType(type, ptr);
             return;
@@ -68,14 +77,14 @@ protected:
         
         auto it = composedTypes.find(type->name);
         if (it == composedTypes.end())
-            error(std::string(type->name) + " has not been declared before");
+            throw CompilerError(std::string(type->name) + " has not been declared before", type->pos);
         else
             ptr = it->second;
     }
     
 public:
     void resolveType(ast::Ptr<TypeSpecifier> &type) {
-        if (auto ct = dynamic_cast<ComposedType *>(type.get()))
+        if (auto ct = dynamic_cast<ast::ComposedType *>(type.get()))
             resolveComposedType(ct, type);
     }
 };
@@ -138,7 +147,7 @@ public:
         return nullptr;
     }
     
-    bool resolve(std::string name, TypeName &result) {
+    bool resolve(std::string name, Ptr<Type> &result) {
         for (auto it = stack.rbegin(); it != stack.rend(); ++it)
             if (auto bs = dynamic_cast<BlockScope *>(it->get()))
                 if (bs->resolve(name, result))
@@ -147,173 +156,141 @@ public:
     }
 };
 
-class Type {
+class Type : public std::enable_shared_from_this<Type> {
 public:
-    TypeName typeName;
-    bool lvalue;
-    
-    bool canCast(TypeName &target) {
-        return true; // everything is possible in the wonderful lands of C!
-    }
-    
-    Type cast(TypeName &target) {
-        Type t;
-        t.typeName = target;
-        t.lvalue = lvalue;
-        return t;
-    }
-    
-    bool canDereference() {
-        auto &m = typeName.declarator.modifiers;
-        return !m.empty() && dynamic_cast<DeclaratorPointer *>(m.back().get());
-    }
-    
-    Type dereference() {
-        Type t;
-        t.lvalue = true;
-        t.typeName = typeName;
-        t.typeName.declarator.modifiers.pop_back();
-        return t;
-    }
-    
-    bool canReference() {
-        return lvalue;
-    }
-    
-    Type reference() {
-        Type t;
-        t.lvalue = false;
-        t.typeName = typeName;
-        t.typeName.declarator.modifiers.push_back(std::make_shared<ast::DeclaratorPointer>());
-        return t;
-    }
-    
-    bool canCall() {
-        auto &m = typeName.declarator.modifiers;
-        return !m.empty() && dynamic_cast<DeclaratorParameterList *>(m.back().get());
-    }
-    
-    Type call() {
-        Type t;
-        t.lvalue = false;
-        t.typeName = typeName;
-        t.typeName.declarator.modifiers.pop_back();
-        return t;
-    }
-    
-    bool isScalar() {
-        bool result = true;
-        for (auto &ts : typeName.specifiers)
-            if (auto nt = dynamic_cast<NamedType *>(ts.get()))
-                result = true; // @todo
-            else
-                result = false; // must be composed
-        
-        for (auto &mod : typeName.declarator.modifiers) {
-            if (auto ptr = dynamic_cast<DeclaratorPointer *>(mod.get()))
-                result = true;
-            else
-                result = false;
-        }
-        
-        return result;
-    }
-    
-    bool isComposed() {
-        if (!typeName.declarator.modifiers.empty())
-            return false;
-        return getComposedType();
-    }
-    
-    bool getMember(const char *name, Type &type) {
-        auto ct = getComposedType();
-        for (auto &declaration : ct->declarations) {
-            for (auto &decl : declaration.declarators)
-                if (!strcmp(decl.name, name)) {
-                    type.lvalue = lvalue;
-                    type.typeName.specifiers = declaration.specifiers;
-                    type.typeName.declarator = decl;
-                    return true;
-                }
-        }
-        
-        return false;
-    }
-    
-    ComposedType *getComposedType() {
-        for (auto &ts : typeName.specifiers)
-            if (auto ct = dynamic_cast<ComposedType *>(ts.get()))
-                return ct;
-        return NULL;
-    }
-    
-    static bool validateTypeName(TypeName &typeName) {
-        bool hasComposed = false, hasScalar = false;
-        for (auto &ts : typeName.specifiers)
-            if (auto nt = dynamic_cast<NamedType *>(ts.get()))
-                hasScalar = true;
-            else
-                hasComposed = true;
-        
-        return hasComposed ^ hasScalar;
-    }
-    
-    static Type named(const char *name, bool ptr = false) {
-        // @idea use parser here for flexibility
-        
-        auto n = std::make_shared<NamedType>();
-        n->id = name;
-        
-        TypeName typeName;
-        typeName.specifiers.push_back(n);
-        
-        if (ptr) {
-            auto p = std::make_shared<DeclaratorPointer>();
-            typeName.declarator.modifiers.push_back(p);
-        }
-        
-        Type type;
-        type.typeName = typeName;
-        type.lvalue = false;
+    Ptr<Type> cast(const TypeName &target, lexer::TextPosition pos) const {
+        Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos);
+        if (!isCompatible(*type))
+            throw CompilerError("casting incompatible types", pos);
         return type;
     }
+    
+    virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+        throw CompilerError("cannot dereference non-pointer", pos);
+    }
+    
+    virtual Ptr<Type> call(lexer::TextPosition pos) const {
+        throw CompilerError("cannot call non-function", pos);
+    }
+    
+    virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
+        throw CompilerError("cannot access member in non-composed type", pos);
+    }
+    
+    Ptr<Type> reference();
+    
+    static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos);
+    static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos);
+    
+    Ptr<Type> applyDeclarator(Declarator decl);
+    
+    virtual bool isScalar() = 0;
+    virtual bool isCompatible(const Type &other) const = 0;
+};
+
+class TypePair {
+public:
+    bool lvalue;
+    Ptr<Type> type;
+    
+    TypePair() {}
+    TypePair(bool lvalue, Ptr<Type> type) : lvalue(lvalue), type(type) {}
+};
+
+class ArithmeticType : public Type {
+public:
+    enum Sign {
+        SIGNED,
+        UNSIGNED
+    };
+    
+    enum Size {
+        LONG,
+        INT,
+        SHORT,
+        CHAR
+    };
+    
+    Sign sign;
+    Size size;
+    
+    ArithmeticType() : sign(UNSIGNED), size(INT) {}
+    ArithmeticType(Sign sign, Size size) : sign(sign), size(size) {}
+    
+    virtual bool isScalar() { return true; }
+    virtual bool isCompatible(const Type &other) const { return false; }
+};
+
+class ComposedType : public Type {
+public:
+    lexer::Token::Keyword type;
+    std::vector<std::pair<std::string, Ptr<Type>>> members;
+    
+    virtual bool isScalar() { return false; }
+    virtual bool isCompatible(const Type &other) const { return false; }
+    
+    virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
+        for (auto &member : members) {
+            if (member.first == name)
+                return member.second;
+        }
+        
+        throw CompilerError("unknown member " + name, pos);
+    }
+};
+
+class FunctionType : public Type {
+public:
+    Ptr<Type> returnType;
+    std::vector<Ptr<Type>> parameters;
+    
+    virtual bool isScalar() { return false; }
+    virtual bool isCompatible(const Type &other) const { return false; }
+    
+    virtual Ptr<Type> call(lexer::TextPosition pos) const {
+        return returnType;
+    }
+};
+
+class PointerType : public Type {
+public:
+    Ptr<Type> base;
+    Vector<const char *> qualifiers;
+    
+    PointerType() {}
+    PointerType(Ptr<Type> base) : base(base) {}
+    
+    virtual bool isScalar() { return true; }
+    virtual bool isCompatible(const Type &other) const { return false; }
+    
+    virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+        return base;
+    }
+};
+
+class VoidType : public Type {
+public:
+    virtual bool isScalar() { return false; }
+    virtual bool isCompatible(const Type &other) const { return false; }
 };
 
 class ExpressionStack {
 public:
-    std::stack<Type> stack;
+    std::stack<TypePair> stack;
     
-    Type pop() {
-        Type t = stack.top();
+    TypePair pop() {
+        TypePair t = stack.top();
         stack.pop();
         return t;
     }
     
-    Type &push(Type t) {
+    TypePair &push(TypePair t) {
         stack.push(t);
         return top();
     }
     
-    Type &push(TypeName typeName, bool lvalue = false) {
-        Type t;
-        t.typeName = typeName;
-        t.lvalue = lvalue;
-        return push(t);
-    }
-    
-    Type &top() {
+    TypePair &top() {
         return stack.top();
-    }
-};
-
-class CompilerError {
-public:
-    std::string message;
-    TextPosition pos;
-    
-    CompilerError(const std::string &message, TextPosition pos)
-    : message(message), pos(pos) {
-        
     }
 };
 
@@ -336,14 +313,20 @@ protected:
         throw CompilerError(message, node.pos);
     }
     
-    Type exprType(Expression &expr) { // @todo assert stack size
+    TypePair exprType(Expression &expr) { // @todo assert stack size
         inspect(expr);
         return exprStack.pop();
     }
     
+    TypePair intType, charType, stringType;
+    
 public:
     Compiler() {
         scopes.push<FileScope>();
+        
+        intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT));
+        charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::CHAR));
+        stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
     }
     
     virtual void visit(CaseLabel &node) {
@@ -391,6 +374,7 @@ public:
     virtual void visit(Declarator &) {}
     
     void resolveTypeSpecifiers(ast::PtrVector<ast::TypeSpecifier> &specifiers) {
+         // @todo be more efficient and reuse ::ComposedTypes
         auto scope = scopes.find<FileScope>();
         for (auto &spec : specifiers)
             scope->resolveType(spec);
@@ -405,21 +389,15 @@ public:
         auto specifiers = node.specifiers;
         resolveTypeSpecifiers(specifiers);
         
+        Ptr<Type> type = Type::create(specifiers, node.pos);
         for (auto &decl : node.declarators) {
             inspect(decl);
-            
-            TypeName type;
-            type.specifiers = specifiers;
-            type.declarator = decl;
-            
-            if (!Type::validateTypeName(type))
-                error("invalid type", node);
             
             // find identifier
             if (decl.isAbstract())
                 error("abstract declarator in declaration", node);
             else
-                scope->declare(decl.name, type);
+                scope->declare(decl.name, type->applyDeclarator(decl));
         }
     }
 
@@ -453,71 +431,64 @@ public:
             return;
         
         auto scope = scopes.find<FunctionScope>();
-        
-        TypeName t;
-        t.specifiers = node.specifiers;
-        t.declarator = node.declarator;
-        
-        scope->declare(node.declarator.name, t);
+        scope->declare(node.declarator.name, Type::create(node.specifiers, node.declarator, node.pos));
     }
 
 #pragma mark - Expressions
 
     virtual void visit(ConstantExpression &node) {
         if (node.isIdentifier) {
-            TypeName tn;
-            if (!scopes.resolve(node.text, tn))
+            Ptr<Type> type;
+            if (!scopes.resolve(node.text, type))
                 error(std::string(node.text) + " was not declared in this scope", node);
             
-            exprStack.push(tn, true);
+            exprStack.push(TypePair(true, type));
             return;
         }
         
         switch (node.text[0]) {
-        case '\'': exprStack.push(Type::named("char")); break;
-        case '\"': exprStack.push(Type::named("char", true)); break;
-        default: exprStack.push(Type::named("int")); break;
+        case '\'': exprStack.push(charType); break;
+        case '\"': exprStack.push(stringType); break;
+        default: exprStack.push(intType); break;
         }
     }
     
     virtual void visit(CastExpression &node) {
-        auto type = exprType(*node.expression);
-        
-        if (!type.canCast(node.type))
-            error("invalid cast", node);
-        
-        exprStack.push(type.cast(node.type));
+        auto tp = exprType(*node.expression);
+        exprStack.push(TypePair(tp.lvalue, tp.type->cast(node.type, node.pos)));
     }
 
     virtual void visit(UnaryExpression &node) {
-        auto type = exprType(*node.operand);
+        using Punctuator = lexer::Token::Punctuator;
+        
+        auto tp = exprType(*node.operand);
         
         switch (node.op) {
-        case Token::Punctuator::ASTERISK:
-            if (!type.canDereference())
-                error("cannot dereference non-pointer", node);
-            exprStack.push(type.dereference());
+        case Punctuator::ASTERISK:
+            exprStack.push(TypePair(true, tp.type->dereference(node.pos)));
             break;
         
-        case Token::Punctuator::BIT_AND:
-            if (!type.canReference())
+        case Punctuator::BIT_AND:
+            if (!tp.lvalue)
                 error("cannot reference non lvalue", node);
-            exprStack.push(type.reference());
+            exprStack.push(TypePair(false, tp.type->reference()));
             break;
         
         default:
             //error("unary operation is not supported", node);
-            exprStack.push(type);
+            exprStack.push(tp);
             break;
         }
     }
 
     virtual void visit(BinaryExpression &node) {
+        using namespace lexer;
+        
         auto lhs = exprType(*node.lhs);
         auto rhs = exprType(*node.rhs);
         
-        if (!lhs.isScalar()) error("lhs is not scalar", *node.lhs);
-        if (!rhs.isScalar()) error("rhs is not scalar", *node.rhs);
+        if (!lhs.type->isScalar()) error("lhs is not scalar", *node.lhs);
+        if (!rhs.type->isScalar()) error("rhs is not scalar", *node.rhs);
         
         if (Token::precedence(node.op) == Token::Precedence::ASSIGNMENT)
             if (!lhs.lvalue)
@@ -528,7 +499,7 @@ public:
 
     virtual void visit(ConditionalExpression &node) {
         auto cond = exprType(*node.condition);
-        if (!cond.isScalar())
+        if (!cond.type->isScalar())
             error("condition not scalar", *node.condition);
         
         auto lhs = exprType(*node.when_true);
@@ -540,47 +511,39 @@ public:
     }
 
     virtual void visit(ExpressionList &node) {
-        Type lastType;
+        TypePair lastType;
         for (auto &child : node.children)
             lastType = exprType(*child);
         exprStack.push(lastType);
     }
 
     virtual void visit(CallExpression &node) {
-        auto t = exprType(*node.function);
-        if (!t.canCall())
-            error("calling a non-function", node);
+        auto tp = exprType(*node.function);
         
         // @todo check parameters
-        
-        exprStack.push(t.call());
+        exprStack.push(TypePair(false, tp.type->call(node.pos)));
     }
     
     virtual void visit(SubscriptExpression &node) {
         auto base = exprType(*node.base);
-        if (!base.canDereference())
-            error("invalid base", node);
+        // @todo this is actually incorrect, need to add first
         
         auto subscript = exprType(node.subscript);
-        if (!subscript.isScalar())
+        if (!subscript.type->isScalar())
             error("invalid subscript", node);
         
-        exprStack.push(base.dereference());
+        exprStack.push(TypePair(true, base.type->dereference(node.pos)));
     }
     
     virtual void visit(MemberExpression &node) {
-        Type base = exprType(*node.base);
+        auto base = exprType(*node.base);
+        
         if (node.dereference) {
-            if (!base.canDereference()) error("cannot dereference base", node);
-            base = base.dereference();
+            base.lvalue = true;
+            base.type = base.type->dereference(node.pos);
         }
         
-        Type memberType;
-        
-        if (!base.isComposed()) error("member access into non-composed type", node);
-        if (!base.getMember(node.id, memberType)) error("unknown member " + std::string(node.id), node);
-        
-        exprStack.push(memberType);
+        exprStack.push(TypePair(base.lvalue, base.type->getMember(node.id, node.pos)));
     }
     
     virtual void visit(PostExpression &node) {
@@ -595,15 +558,15 @@ public:
     }
 
     virtual void visit(SizeofExpressionTypeName &node) {
-        exprStack.push(Type::named("int"));
+        exprStack.push(intType);
     }
 
     virtual void visit(SizeofExpressionUnary &node) {
         exprType(*node.expression);
-        exprStack.push(Type::named("int"));
+        exprStack.push(intType);
     }
 
-    virtual void visit(ComposedType &) {}
+    virtual void visit(ast::ComposedType &) {}
     virtual void visit(NamedType &) {}
 
     virtual void visit(DesignatorWithIdentifier &) {}
@@ -611,10 +574,7 @@ public:
     virtual void visit(Initializer &) {}
     virtual void visit(InitializerList &) {}
     virtual void visit(InitializerExpression &node) {
-        Type t;
-        t.typeName = node.type;
-        t.lvalue = false;
-        exprStack.push(t);
+        exprStack.push(TypePair(false, Type::create(node.type.specifiers, node.type.declarator, node.pos)));
     }
 
     virtual void visit(IterationStatement &node) {
@@ -625,7 +585,7 @@ public:
     
     virtual void visit(SelectionStatement &node) {
         auto cond = exprType(node.condition);
-        if (!cond.isScalar())
+        if (!cond.type->isScalar())
             error("condition not scalar", node.condition);
         
         inspect(node.when_true);

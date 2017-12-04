@@ -5,7 +5,7 @@ int (*getFunc(void))(int, int) {}
 int (*test(int, int))(int, int) {
 }
 
-int (*(*wtf)(double))(float) = &x;
+int (*(*wtf)(int))(int) = &x;
 
 struct hello {
     struct { int inception; } rules;

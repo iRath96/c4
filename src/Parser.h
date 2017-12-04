@@ -299,6 +299,8 @@ protected:
             case Token::Keyword::_BOOL:
             case Token::Keyword::_COMPLEX:
                 node.id = peek().text;
+                node.keyword = peek().keyword;
+                
                 return shift();
                 
             default:

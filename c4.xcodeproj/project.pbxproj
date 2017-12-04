@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FA2C09C71FD5A6BA00C891A5 /* Compiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA2C09C61FD5A6BA00C891A5 /* Compiler.cpp */; };
 		FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA6431861FAD924D00ABFB9D /* Parser.cpp */; };
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
@@ -25,6 +26,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		FA2C09C61FD5A6BA00C891A5 /* Compiler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Compiler.cpp; sourceTree = "<group>"; };
 		FA6431861FAD924D00ABFB9D /* Parser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Parser.cpp; sourceTree = "<group>"; };
 		FA6431871FAD924D00ABFB9D /* Parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parser.h; sourceTree = "<group>"; };
 		FA74D4F01FA2576600D7CA2E /* c4 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = c4; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -57,6 +59,7 @@
 				FA87A23D1FB8D2930023DB3F /* ASTInspector.h */,
 				FA87A23E1FB8E3A00023DB3F /* Beautifier.h */,
 				FAED64FE1FD479C6001AC5D5 /* Compiler.h */,
+				FA2C09C61FD5A6BA00C891A5 /* Compiler.cpp */,
 			);
 			name = parser;
 			sourceTree = "<group>";
@@ -153,6 +156,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA2C09C71FD5A6BA00C891A5 /* Compiler.cpp in Sources */,
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
 				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
