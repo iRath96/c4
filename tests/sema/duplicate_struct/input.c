@@ -1,2 +1,2 @@
-struct x { int a; };
-struct x { int a; };
+struct x { int a; } x;
+struct x { int a; } y;

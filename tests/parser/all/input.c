@@ -2,7 +2,7 @@ unsigned int x = 4, **y;
 
 int (*functionPtr)(int, int);
 int (*getFunc(void))(int, int) {}
-int (*test(int, int))(int, int) {
+int (*test(int x, int y))(int, int) {
 }
 
 int (*(*wtf)(int))(int) = &x;
