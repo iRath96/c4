@@ -18,9 +18,17 @@ struct hello {
 int b = sizeof(int);
 int c = sizeof(int) { 0 };
 
+int fn(int)(int);
+int say(char *);
+
 int kitten(char *hi)
 int a;
 int b;
+int c, d, e;
+int *(*array)(int);
+int do_something, hammertime;
+struct { int right(int); } *are_nice;
+int **assignments;
 {
     a ? b : c ? d : e; // a ? b : (c ? d : e)
     
@@ -35,23 +43,25 @@ int b;
     int c = 1 << 8;
     4 + 2 * 3;
     4 + 4 << 8;
-    *(a[1](1,2,3) << 8 || 1 + ++a) = b;
+    *(array[1](1,2,3) << 8 || 1 + ++a) = b;
     fn(&c + 1)();
     
     sizeof(int) { [2] = 2 };
     
     label: {
         default:
-        hello;
+        42;
     }
     
-    goto label;
-    break;
-    continue;
+    while (1) {
+        goto label;
+        break;
+        continue;
+    }
     
     ;;;
     
-    if (true) if (true) do_something; else if ("hi") {
+    if (1) if (1) do_something; else if ("hi") {
         stop: hammertime;
     }
     

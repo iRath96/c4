@@ -70,11 +70,11 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--parse"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--print-ast"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--tokenize"

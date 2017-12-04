@@ -1,4 +1,4 @@
-int (main())
+int (main(int hi, int bye, int wow))
 {
 	if (4) {
 		if (4)

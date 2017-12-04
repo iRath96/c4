@@ -1,6 +1,11 @@
+int true = 1;
+int false = 0;
+
 int main()
-int x;
+int statement;
 {
+    int h, selection, nice, not_nice, boo, woof, meow, nope;
+    
 example:
 case 4:
 default:
@@ -30,17 +35,17 @@ woah:
     else
         boo;
     
-    if (a);
+    if (h);
     else
 label:
-        if (b) {
-            hi;
+        if (nice) {
+            boo;
         }
     
-    if (a)
-        if (b)
+    if (1)
+        if (2)
 hi:
-            if (c)
+            if (3)
 x:
                 {
                     nice;
@@ -52,18 +57,20 @@ x:
             woof;
         }
     
-    if (no_else);
+    if (4);
     
     while (true)
         while (false)
 do_something:
-            useful;
+            boo;
     
     while (true) if(false) meow;
     
 meow:
-    goto meow;
-    continue;
-    break;
-    return nope;
+    while (true) {
+        goto meow;
+        continue;
+        break;
+        return nope;
+    }
 }
