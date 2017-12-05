@@ -1,1 +1,1 @@
-tests/sema/assign_rvalue_add/input.c:2:6: error: lhs is not an lvalue
+tests/sema/assign_rvalue_add/input.c:2:11: error: lhs is not an lvalue
