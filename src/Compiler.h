@@ -294,7 +294,7 @@ public:
     std::vector<Ptr<Type>> parameters;
     
     virtual bool isScalar() { return false; }
-    virtual bool isCompatible(const Type &other) const { return false; }
+    virtual bool isCompatible(const Type &other) const;
     
     virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
         if (argTypes.size() != parameters.size())
@@ -319,6 +319,10 @@ public:
     
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
         return base;
+    }
+    
+    virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
+        return base->call(argTypes, pos);
     }
 };
 
