@@ -5,15 +5,11 @@ int (*getFunc(void))(int, int) {}
 int (*test(int x, int y))(int, int) {
 }
 
-int (*(*wtf)(int))(int) = &x;
+int (*(*wtf)(int))(int) = (void *)&x;
 
 struct hello {
     struct { int inception; } rules;
-} kitty = {
-    .rules = 2,
-    [a ? b : c] = 4,
-    5
-};
+} kitty;
 
 int b = sizeof(int);
 int c = sizeof(int) { 0 };
@@ -36,9 +32,7 @@ int **assignments;
         the following statement is valid,
         but wtf does it mean?
     */
-    int x = (int (int *(*), long x)) 2;
-
-    !(int) { 4 };
+    (int (*)(int *(*), int x)) 0;
 
     int c = 1 << 8;
     4 + 2 * 3;
