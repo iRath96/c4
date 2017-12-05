@@ -185,6 +185,16 @@ bool Type::canCompare(const Type &a, const Type &b) {
 
 Ptr<Type> Type::ptrdiffType = std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT);
 
+bool PointerType::isCompatible(const Type &other) const {
+    if (dynamic_cast<const NullPointerType *>(&other)) return true;
+    auto p = dynamic_cast<const PointerType *>(&other);
+    if (!p)
+        return false;
+    if (dynamic_cast<const VoidType *>(base.get())) return true;
+    if (dynamic_cast<const VoidType *>(p->base.get())) return true;
+    return base->isCompatible(*p->base);
+}
+
 bool NullPointerType::isCompatible(const Type &other) const {
     return dynamic_cast<const ArithmeticType *>(&other) || dynamic_cast<const PointerType *>(&other);
 }

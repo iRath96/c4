@@ -315,11 +315,7 @@ public:
     PointerType(Ptr<Type> base) : base(base) {}
     
     virtual bool isScalar() { return true; }
-    virtual bool isCompatible(const Type &other) const {
-        if (dynamic_cast<const NullPointerType *>(&other)) return true;
-        auto p = dynamic_cast<const PointerType *>(&other);
-        return p && base->isCompatible(*p->base);
-    }
+    virtual bool isCompatible(const Type &other) const;
     
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
         return base;
@@ -360,6 +356,7 @@ protected:
     ExpressionStack exprStack;
     
     void inspect(Node &node) {
+        std::cout << node.pos.line << ":" << node.pos.column << std::endl;
         node.accept(*this);
     }
     
@@ -468,12 +465,19 @@ public:
         Ptr<Type> type = Type::create(specifiers, node.pos);
         for (auto &decl : node.declarators) {
             inspect(decl);
+            Ptr<Type> dtype = type->applyDeclarator(decl);
             
             // find identifier
             if (decl.isAbstract())
                 error("abstract declarator in declaration", node);
             else
-                scope->declare(decl.name, type->applyDeclarator(decl), decl.pos);
+                scope->declare(decl.name, dtype, decl.pos);
+            
+            if (decl.initializer.get()) {
+                auto itp = exprType(*decl.initializer);
+                if (!itp.type->isCompatible(*dtype))
+                    error("invalid initialization", *decl.initializer);
+            }
         }
     }
 
@@ -711,8 +715,10 @@ public:
 
     virtual void visit(DesignatorWithIdentifier &) {}
     virtual void visit(DesignatorWithExpression &) {}
-    virtual void visit(Initializer &) {}
-    virtual void visit(InitializerList &) {}
+    
+    virtual void visit(Initializer &node) { error("not supported", node); }
+    virtual void visit(InitializerList &node) { error("not supported", node); }
+    
     virtual void visit(InitializerExpression &node) {
         exprStack.push(TypePair(false, Type::create(node.type.specifiers, node.type.declarator, node.pos)));
     }
