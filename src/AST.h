@@ -77,8 +77,8 @@ struct ExternalDeclarationVariable;
 struct ExternalDeclarationFunction;
 
 // Types
-struct NamedType;
-struct ComposedType;
+struct NamedTypeSpecifier;
+struct ComposedTypeSpecifier;
 
 // Visitor
 struct Visitor {
@@ -133,8 +133,8 @@ struct Visitor {
     virtual void visit(ExternalDeclarationFunction &) = 0;
 
     // Types
-    virtual void visit(NamedType &) = 0;
-    virtual void visit(ComposedType &) = 0;
+    virtual void visit(NamedTypeSpecifier &) = 0;
+    virtual void visit(ComposedTypeSpecifier &) = 0;
 };
 
 #pragma mark - Base classes
@@ -401,17 +401,17 @@ struct ExternalDeclarationFunction : ExternalDeclaration {
 
 #pragma mark - Types
 
-struct NamedType : TypeSpecifier {
+struct NamedTypeSpecifier : TypeSpecifier {
     const char *id;
     lexer::Token::Keyword keyword;
     
     ACCEPT
 };
 
-struct ComposedType : TypeSpecifier {
+struct ComposedTypeSpecifier : TypeSpecifier {
     const char *name = NULL;
     
-    lexer::Token::Keyword type; // STRUCT or UNION
+    lexer::Token::Keyword kind; // STRUCT or UNION
     Vector<Declaration> declarations;
     
     bool isQualified() const {

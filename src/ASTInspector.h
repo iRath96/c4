@@ -62,8 +62,8 @@ public:
         std::cout << indent << "Identifier[" << node.id << "]" << std::endl;
     }
 
-    virtual void visit(NamedType &node) {
-        std::cout << indent << "NamedType[" << node.id << "]" << std::endl;
+    virtual void visit(NamedTypeSpecifier &node) {
+        std::cout << indent << "NamedTypeSpecifier[" << node.id << "]" << std::endl;
     }
 
     virtual void visit(CompoundStatement &node) {
@@ -113,8 +113,8 @@ public:
         inspect(node.declarator);
     }
 
-    virtual void visit(ComposedType &node) {
-        std::cout << indent << "ComposedType[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
+    virtual void visit(ComposedTypeSpecifier &node) {
+        std::cout << indent << "ComposedTypeSpecifier[" << (node.name ? node.name : "(unnamed)") << "]" << std::endl;
         inspect_vector("declarations", node.declarations);
     }
 

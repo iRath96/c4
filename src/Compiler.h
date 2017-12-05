@@ -33,15 +33,17 @@ public:
 
 class Scope {
 public:
-    virtual ~Scope() {}
+    virtual void open() {};
+    virtual void close() {};
 };
 
 class Type;
 class BlockScope : public Scope {
 public:
     std::map<std::string, Ptr<Type>> variables;
+    std::map<std::string, Ptr<Type>> composedTypes;
     
-    void declare(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
+    void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
         for (auto &v : variables)
             if (v.first == name)
                 throw CompilerError("variable " + name + " redefined", pos);
@@ -49,48 +51,21 @@ public:
         variables.insert(std::make_pair(name, type));
     }
     
-    bool resolve(std::string name, Ptr<Type> &result) {
+    bool resolveVariable(std::string name, Ptr<Type> &result) {
         auto it = variables.find(name);
         if (it == variables.end())
             return false;
         result = it->second;
         return true;
     }
+    
+    Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
+    
+    virtual void close();
 };
 
 class FileScope : public BlockScope {
 public:
-    std::map<std::string, ast::Ptr<TypeSpecifier>> composedTypes;
-    
-protected:
-    void declareComposedType(ast::ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
-        if (!type->isNamed())
-            return;
-        
-        if (composedTypes.find(type->name) != composedTypes.end())
-            throw CompilerError("type " + std::string(type->name) + " redefined", type->pos);
-        
-        composedTypes.insert(std::make_pair(type->name, ptr));
-    }
-    
-    void resolveComposedType(ast::ComposedType *type, ast::Ptr<TypeSpecifier> &ptr) {
-        if (type->isQualified()) {
-            declareComposedType(type, ptr);
-            return;
-        }
-        
-        auto it = composedTypes.find(type->name);
-        if (it == composedTypes.end())
-            throw CompilerError(std::string(type->name) + " has not been declared before", type->pos);
-        else
-            ptr = it->second;
-    }
-    
-public:
-    void resolveType(ast::Ptr<TypeSpecifier> &type) {
-        if (auto ct = dynamic_cast<ast::ComposedType *>(type.get()))
-            resolveComposedType(ct, type);
-    }
 };
 
 class FunctionScope : public BlockScope {
@@ -112,6 +87,16 @@ public:
         if (resolvedLabels.find(id) == resolvedLabels.end())
             unresolvedLabels.insert(std::make_pair(id, pos));
     }
+    
+    virtual void close() {
+        BlockScope::close();
+        
+        if (unresolvedLabels.empty())
+            return;
+        
+        auto lab = *unresolvedLabels.begin();
+        throw CompilerError("could not resolve label " + lab.first, lab.second);
+    }
 };
 
 class SwitchScope : public Scope {
@@ -126,14 +111,15 @@ class ScopeStack {
 public:
     std::vector<ast::Ptr<Scope>> stack;
     
-    ast::Ptr<Scope> &top() {
+    Ptr<Scope> top() {
         return stack.back();
     }
     
     template<typename T>
-    ast::Ptr<T> &push() {
+    T &push() {
         stack.push_back(std::make_shared<T>());
-        return reinterpret_cast<ast::Ptr<T> &>(top());
+        top()->open();
+        return reinterpret_cast<T &>(*top());
     }
     
     template<typename T>
@@ -144,6 +130,7 @@ public:
     }
     
     void pop() {
+        top()->close();
         stack.pop_back();
     }
     
@@ -159,7 +146,7 @@ public:
     bool resolve(std::string name, Ptr<Type> &result) {
         for (auto it = stack.rbegin(); it != stack.rend(); ++it)
             if (auto bs = dynamic_cast<BlockScope *>(it->get()))
-                if (bs->resolve(name, result))
+                if (bs->resolveVariable(name, result))
                     return true;
         return false;
     }
@@ -169,8 +156,8 @@ class Type : public std::enable_shared_from_this<Type> {
 public:
     static Ptr<Type> ptrdiffType;
     
-    Ptr<Type> cast(const TypeName &target, lexer::TextPosition pos) const {
-        Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos);
+    Ptr<Type> cast(const TypeName &target, lexer::TextPosition pos, ScopeStack &scopes) const {
+        Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos, scopes);
         if (!isCompatible(*type))
             throw CompilerError("casting incompatible types", pos);
         return type;
@@ -190,10 +177,10 @@ public:
     
     Ptr<Type> reference();
     
-    static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos);
-    static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos);
+    static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos, ScopeStack &scopes);
+    static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos, ScopeStack &scopes);
     
-    Ptr<Type> applyDeclarator(Declarator decl);
+    Ptr<Type> applyDeclarator(Declarator decl, ScopeStack &scopes);
     
     virtual bool isScalar() = 0;
     virtual bool isCompatible(const Type &other) const = 0;
@@ -254,20 +241,24 @@ public:
 
 class ComposedType : public Type {
 public:
-    lexer::Token::Keyword type; // @todo
+    lexer::TextPosition pos;
+    lexer::Token::Keyword kind;
+    
     std::vector<std::pair<std::string, Ptr<Type>>> members;
     
     virtual bool isScalar() { return false; }
     virtual bool isCompatible(const Type &other) const {
-        auto c = dynamic_cast<const ComposedType *>(&other);
-        if (!c || c->type != type || c->members.size() != members.size())
+        return this == &other;
+        
+        /*auto c = dynamic_cast<const ComposedType *>(&other);
+        if (!c || c->kind != kind || c->members.size() != members.size())
             return false;
         
         for (int i = 0; i < members.size(); ++i)
             if (!members[i].second->isCompatible(*c->members[i].second))
                 return false;
         
-        return true;
+        return true;*/
     }
     
     virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
@@ -286,6 +277,10 @@ public:
         
         members.push_back(std::make_pair(std::string(name), type));
     }
+    
+    bool isQualified() {
+        return members.size() > 0;
+    }
 };
 
 class FunctionType : public Type {
@@ -302,6 +297,13 @@ public:
                 std::to_string(argTypes.size()) + " arguments given, " +
                 std::to_string(parameters.size()) + " expected"
             , pos);
+        
+        for (size_t i = 0; i < parameters.size(); ++i)
+            if (!parameters[i]->isCompatible(*argTypes[i]))
+                throw CompilerError(
+                    "argument " + std::to_string(i) + " has invalid type"
+                , pos);
+        
         return returnType;
     }
 };
@@ -383,13 +385,21 @@ protected:
     
 public:
     Compiler() {
-        scopes.push<FileScope>();
-        
         intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT));
         charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::CHAR));
         stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
         voidType = TypePair(false, std::make_shared<VoidType>());
         nullptrType = TypePair(false, std::make_shared<NullPointerType>());
+        
+        open();
+    }
+    
+    void open() {
+        scopes.push<FileScope>();
+    }
+    
+    void close() {
+        scopes.pop();
     }
     
     virtual void visit(CaseLabel &node) {
@@ -451,47 +461,36 @@ public:
     virtual void visit(DeclaratorParameterList &) {}
     virtual void visit(Declarator &) {}
     
-    bool resolveTypeSpecifiers(ast::PtrVector<ast::TypeSpecifier> &specifiers) {
-         // @todo be more efficient and reuse ::ComposedTypes
-        auto scope = scopes.find<FileScope>();
-        bool result = false;
-        for (auto &spec : specifiers) {
-            if (auto ct = dynamic_cast<const ast::ComposedType *>(spec.get()))
-                if (ct->isNamed() && ct->isQualified())
-                    result = true;
-            
-            scope->resolveType(spec);
-        }
-        
-        return result;
-    }
-    
     virtual void visit(TypeName &node) {
-        resolveTypeSpecifiers(node.specifiers);
+        Type::create(node.specifiers, node.declarator, node.pos, scopes);
     }
 
     virtual void visit(Declaration &node) {
         auto scope = scopes.find<BlockScope>();
         auto specifiers = node.specifiers;
-        bool declaredStruct = resolveTypeSpecifiers(specifiers);
+        
+        Ptr<Type> type = Type::create(specifiers, node.pos, scopes);
         
         if (node.declarators.empty()) {
-            if (!declaredStruct)
-                error("declaration does not declare anything", node);
-            return;
+            for (auto &spec : node.specifiers)
+                if (auto ct = dynamic_cast<const ComposedTypeSpecifier *>(spec.get()))
+                    if (ct->isNamed() && ct->isQualified())
+                        // some composed type was declared, this is valid.
+                        return;
+          
+            error("declaration does not declare anything", node);
         }
         
-        Ptr<Type> type = Type::create(specifiers, node.pos);
         for (auto &decl : node.declarators) {
             inspect(decl);
-            Ptr<Type> dtype = type->applyDeclarator(decl);
+            Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
             
             // find identifier
             if (decl.isAbstract())
                 // @todo assert(false) here
                 error("abstract declarator in declaration", node);
             else
-                scope->declare(decl.name, dtype, decl.pos);
+                scope->declareVariable(decl.name, dtype, decl.pos);
             
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
@@ -515,7 +514,7 @@ public:
         scopes.execute<FunctionScope>([&]() {
             auto scope = scopes.find<FunctionScope>(); // @todo as param?
             
-            auto t = Type::create(node.specifiers, decl, node.pos);
+            auto t = Type::create(node.specifiers, decl, node.pos, scopes);
             auto fn = dynamic_cast<FunctionType *>(t.get());
             scope->returnType = fn->returnType;
             
@@ -533,20 +532,17 @@ public:
                 inspect(declaration);
             
             visitBlockItems(node.body);
-            
-            if (!scope->unresolvedLabels.empty()) {
-                auto lab = *scope->unresolvedLabels.begin();
-                throw CompilerError("could not resolve label " + lab.first, lab.second);
-            }
         });
     }
     
     virtual void visit(ParameterDeclaration &node) {
+        Ptr<Type> type = Type::create(node.specifiers, node.declarator, node.pos, scopes);
+        
         if (node.declarator.isAbstract())
             return;
         
         auto scope = scopes.find<FunctionScope>();
-        scope->declare(node.declarator.name, Type::create(node.specifiers, node.declarator, node.pos), node.declarator.pos);
+        scope->declareVariable(node.declarator.name, type, node.declarator.pos);
     }
 
 #pragma mark - Expressions
@@ -570,7 +566,7 @@ public:
     
     virtual void visit(CastExpression &node) {
         auto tp = exprType(*node.expression);
-        exprStack.push(TypePair(tp.lvalue, tp.type->cast(node.type, node.pos)));
+        exprStack.push(TypePair(tp.lvalue, tp.type->cast(node.type, node.pos, scopes)));
     }
 
     virtual void visit(UnaryExpression &node) {
@@ -730,8 +726,8 @@ public:
         exprStack.push(intType);
     }
 
-    virtual void visit(ast::ComposedType &) {}
-    virtual void visit(NamedType &) {}
+    virtual void visit(ComposedTypeSpecifier &) {}
+    virtual void visit(NamedTypeSpecifier &) {}
 
     virtual void visit(DesignatorWithIdentifier &) {}
     virtual void visit(DesignatorWithExpression &) {}
@@ -740,7 +736,7 @@ public:
     virtual void visit(InitializerList &node) { error("not supported", node); }
     
     virtual void visit(InitializerExpression &node) {
-        exprStack.push(TypePair(false, Type::create(node.type.specifiers, node.type.declarator, node.pos)));
+        exprStack.push(TypePair(false, Type::create(node.type.specifiers, node.type.declarator, node.pos, scopes)));
     }
 
     virtual void visit(IterationStatement &node) {

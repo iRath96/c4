@@ -75,7 +75,7 @@ public:
     virtual void visit(DefaultLabel &) { std::cout << "default:"; }
     virtual void visit(IdentifierLabel &node) { std::cout << node.id << ":"; }
     virtual void visit(Identifier &node) { std::cout << node.id; }
-    virtual void visit(NamedType &node) { std::cout << node.id; }
+    virtual void visit(NamedTypeSpecifier &node) { std::cout << node.id; }
     virtual void visit(ContinueStatement &node) {
         if (node.keyword == lexer::Token::Keyword::CONTINUE)
             std::cout << "continue;";
@@ -266,7 +266,7 @@ public:
         inspect(node.declarator);
     }
     
-    virtual void visit(ComposedType &node) {
+    virtual void visit(ComposedTypeSpecifier &node) {
         std::cout << "struct";
         if (node.name)
             std::cout << " " << node.name;

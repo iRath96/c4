@@ -9,11 +9,33 @@
 #include <stdio.h>
 #include "Compiler.h"
 
+Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
+    auto it = composedTypes.find(ct->name);
+    if (it == composedTypes.end()) {
+        auto type = std::make_shared<ComposedType>();
+        type->kind = ct->kind;
+        type->pos = ct->pos;
+        
+        Ptr<Type> t = type;
+        composedTypes.insert(std::make_pair(std::string(ct->name), t));
+        return t;
+    } else
+        return it->second;
+}
+
+void BlockScope::close() {
+    for (auto &comp : composedTypes) {
+        auto ct = dynamic_cast<ComposedType *>(comp.second.get());
+        if (!ct->isQualified())
+            throw CompilerError("type " + std::string(comp.first) + " is never resolved", ct->pos);
+    }
+}
+
 Ptr<Type> Type::reference() {
     return std::make_shared<PointerType>(shared_from_this());
 }
 
-Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos) {
+Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos, ScopeStack &scopes) {
     using Keyword = lexer::Token::Keyword;
     const auto NAK = Keyword::NOT_A_KEYWORD;
 
@@ -22,10 +44,10 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         throw CompilerError("no type specifiers", pos);
 
     Keyword size = Keyword::NOT_A_KEYWORD, sign = Keyword::NOT_A_KEYWORD;
-    ast::ComposedType *comp = NULL;
+    ComposedTypeSpecifier *comp = NULL;
 
     for (auto &spec : specifiers) {
-        if (auto nt = dynamic_cast<NamedType *>(spec.get())) {
+        if (auto nt = dynamic_cast<NamedTypeSpecifier *>(spec.get())) {
             switch (nt->keyword) {
             case Keyword::CHAR:
             case Keyword::INT:
@@ -49,7 +71,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
             default:
                 throw CompilerError("unknown type", spec->pos);
             }
-        } else if (auto ct = dynamic_cast<ast::ComposedType *>(spec.get())) {
+        } else if (auto ct = dynamic_cast<ComposedTypeSpecifier *>(spec.get())) {
             if (comp)
                 // multiple composed types
                 throw CompilerError("multiple composed types specified", spec->pos);
@@ -71,22 +93,34 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         // @todo
         return s;
     } else {
-        auto c = std::make_shared<::ComposedType>();
-        c->type = comp->type;
+        Ptr<Type> c;
+        if (comp->isNamed()) {
+            auto bs = scopes.find<BlockScope>();
+            c = bs->resolveComposedType(comp);
+        } else
+            // anonymous
+            c = std::make_shared<ComposedType>();
+        
+        auto &cc = dynamic_cast<ComposedType &>(*c);
+        
+        if (cc.isQualified() && comp->isQualified())
+            throw CompilerError("redefinition of '" + std::string(comp->name) + "'", comp->pos);
+        
         for (auto &declaration : comp->declarations) {
-            Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos);
+            Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos, scopes);
             for (auto &decl : declaration.declarators)
-                c->addMember(std::string(decl.name), type->applyDeclarator(decl), decl.pos);
+                cc.addMember(std::string(decl.name), type->applyDeclarator(decl, scopes), decl.pos);
         }
+        
         return c;
     }
 }
 
-Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos) {
-    return create(specifiers, pos)->applyDeclarator(decl);
+Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos, ScopeStack &scopes) {
+    return create(specifiers, pos, scopes)->applyDeclarator(decl, scopes);
 }
 
-Ptr<Type> Type::applyDeclarator(Declarator decl) {
+Ptr<Type> Type::applyDeclarator(Declarator decl, ScopeStack &scopes) {
     Ptr<Type> result = shared_from_this();
     
     for (auto &mod : decl.modifiers) {
@@ -98,7 +132,7 @@ Ptr<Type> Type::applyDeclarator(Declarator decl) {
         } else if (auto plist = dynamic_cast<DeclaratorParameterList *>(mod.get())) {
             auto p = std::make_shared<FunctionType>();
             for (auto &param : plist->parameters)
-                p->parameters.push_back(create(param.specifiers, param.declarator, param.pos));
+                p->parameters.push_back(create(param.specifiers, param.declarator, param.pos, scopes));
             
             p->returnType = result;
             result = p;

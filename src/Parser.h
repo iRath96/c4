@@ -199,7 +199,7 @@ protected:
     
     bool eof(int offset = 0) {
         int i = this->i + offset;
-        return (lexer.has_ended() && (int)token_queue.size() <= i) || peek(offset).type == Token::Type::END;
+        return (lexer.has_ended() && (int)token_queue.size() <= i) || peek(offset).kind == Token::Kind::END;
     }
     
     Token &peek(int offset = 0) {
@@ -260,9 +260,9 @@ protected:
         }
     OTHERWISE_FAIL("unary operator expected")
     
-    bool read_token(Token::Type type, const char *&text)
+    bool read_token(Token::Kind kind, const char *&text)
     OPTION
-        NON_OPTIONAL(peek().type == type)
+        NON_OPTIONAL(peek().kind == kind)
     
         text = peek().text;
         shift();
@@ -270,22 +270,22 @@ protected:
     
     bool read_identifier(const char *&text)
     OPTION
-        NON_OPTIONAL(read_token(Token::Type::IDENTIFIER, text))
+        NON_OPTIONAL(read_token(Token::Kind::IDENTIFIER, text))
     OTHERWISE_FAIL("identifier expected")
     
     bool read_constant(const char *&text)
     OPTION
-        NON_OPTIONAL(read_token(Token::Type::CONSTANT, text))
+        NON_OPTIONAL(read_token(Token::Kind::CONSTANT, text))
     OTHERWISE_FAIL("constant expected")
     
     bool read_string_literal(const char *&text)
     OPTION
-        NON_OPTIONAL(read_token(Token::Type::STRING_LITERAL, text))
+        NON_OPTIONAL(read_token(Token::Kind::STRING_LITERAL, text))
     OTHERWISE_FAIL("string literal expected")
     
 #pragma mark - Other stuff
     
-    bool read_type_specifier_keyword(ast::NamedType &node) {
+    bool read_type_specifier_keyword(ast::NamedTypeSpecifier &node) {
         switch (peek().keyword) {
             case Token::Keyword::VOID:
             case Token::Keyword::CHAR:
@@ -405,7 +405,7 @@ protected:
                 auto p = p_suffix->parameters.front();
                 if (p.declarator.isAbstract() && p.declarator.modifiers.empty() && p.specifiers.size() == 1) {
                     auto s = p.specifiers.front();
-                    if (auto nt = dynamic_cast<ast::NamedType *>(s.get()))
+                    if (auto nt = dynamic_cast<ast::NamedTypeSpecifier *>(s.get()))
                         if (!strcmp(nt->id, "void"))
                             p_suffix->parameters.clear(); // no parameters taken
                 }
@@ -544,7 +544,7 @@ protected:
         NON_OPTIONAL(read_list(&Parser::read_struct_declaration, node))
     OTHERWISE_FAIL("struct declaration list expected")
     
-    bool read_struct_body(ast::ComposedType &node)
+    bool read_struct_body(ast::ComposedTypeSpecifier &node)
     OPTION
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_OPEN))
         NON_OPTIONAL(read_struct_declaration_list(node.declarations))
@@ -570,9 +570,9 @@ protected:
     
     bool read_type_specifier(ast::Ptr<ast::TypeSpecifier> &node)
     OPTION
-        ast::NamedType type_name;
+        ast::NamedTypeSpecifier type_name;
         if (read_type_specifier_keyword(type_name)) {
-            node = std::make_shared<ast::NamedType>(type_name);
+            node = std::make_shared<ast::NamedTypeSpecifier>(type_name);
         } else {
             Token &token = peek();
             switch (token.keyword) {
@@ -580,11 +580,11 @@ protected:
                 case Token::Keyword::UNION: {
                     shift();
                     
-                    auto n = new ast::ComposedType();
+                    auto n = new ast::ComposedTypeSpecifier();
                     node.reset(n);
                     
                     n->pos = token.pos;
-                    n->type = token.keyword;
+                    n->kind = token.keyword;
                     
                     NON_UNIQUE
                     
@@ -796,7 +796,7 @@ protected:
             label = n;
         } else if (read_keyword(Token::Keyword::DEFAULT)) {
             label = std::make_shared<ast::DefaultLabel>();
-        } else if (peek(0).type == Token::Type::IDENTIFIER) {
+        } else if (peek(0).kind == Token::Kind::IDENTIFIER) {
             auto n = std::make_shared<ast::IdentifierLabel>();
             read_identifier(n->id);
             label = n;

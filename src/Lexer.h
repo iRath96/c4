@@ -141,7 +141,7 @@ struct Token {
         _GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
     };
 
-    enum class Type : uint8_t {
+    enum class Kind : uint8_t {
         KEYWORD, IDENTIFIER, CONSTANT, STRING_LITERAL, PUNCTUATOR,
         END
     };
@@ -150,7 +150,7 @@ struct Token {
     
     const char *text;
     
-    Type type;
+    Kind kind;
     Keyword keyword = Keyword::NOT_A_KEYWORD;
     Punctuator punctuator = Punctuator::NOT_A_PUNCTUATOR;
 };
@@ -307,7 +307,7 @@ private:
         return pos.index + offset >= input.length;
     }
     
-    Token create_token(Token::Type type, int length);
+    Token create_token(Token::Kind kind, int length);
     void error(const std::string &message, int offset);
     
     int read_whitespace();

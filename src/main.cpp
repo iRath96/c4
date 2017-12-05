@@ -23,14 +23,16 @@
 bool debug_mode = false;
 bool enable_output = true;
 
-const char *token_type_name(Token::Type type) {
-    switch (type) {
-        case Token::Type::KEYWORD: return "keyword";
-        case Token::Type::IDENTIFIER: return "identifier";
-        case Token::Type::CONSTANT: return "constant";
-        case Token::Type::STRING_LITERAL: return "string-literal";
-        case Token::Type::PUNCTUATOR: return "punctuator";
-        case Token::Type::END: return "end";
+const char *token_kind_name(Token::Kind kind) {
+    using Kind = Token::Kind;
+    
+    switch (kind) {
+        case Kind::KEYWORD: return "keyword";
+        case Kind::IDENTIFIER: return "identifier";
+        case Kind::CONSTANT: return "constant";
+        case Kind::STRING_LITERAL: return "string-literal";
+        case Kind::PUNCTUATOR: return "punctuator";
+        case Kind::END: return "end";
     }
     return "unknown";
 }
@@ -59,11 +61,10 @@ void tokenize(const char *filename) {
     try {
         while (true) {
             Token t = lexer.next_token();
-        
-            if (t.type == Token::Type::END)
+            if (t.kind == Token::Kind::END)
                 break;
-        
-            enable_output && printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_type_name(t.type), t.text);
+            
+            enable_output && printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_kind_name(t.kind), t.text);
         }
     } catch (Lexer::Error e) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
@@ -92,6 +93,7 @@ void parse(const char *filename, bool printAST) {
         Compiler comp; // @todo rename this to Analyzer or something
         for (auto &decl : parser.declarations)
             decl->accept(comp);
+        comp.close();
     } catch (CompilerError e) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
         exit(1);

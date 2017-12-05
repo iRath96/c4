@@ -46,6 +46,8 @@ bool is_octal(char c) {
 }
 
 Token Lexer::next_token() {
+    using Kind = Token::Kind;
+    
     peek(0); // make sure eof flag is set appropriately
     
     while (!eof(0)) {
@@ -60,34 +62,34 @@ Token Lexer::next_token() {
             consume(length);
             continue;
         } else if (c == '"')
-            return create_token(Token::Type::STRING_LITERAL, read_string());
+            return create_token(Kind::STRING_LITERAL, read_string());
         else if (c == '\'')
-            return create_token(Token::Type::CONSTANT, read_char());
+            return create_token(Kind::CONSTANT, read_char());
         else if (TEST_CHAR(is_alpha, c) || c == '_')
-            return create_token(Token::Type::IDENTIFIER, read_identifier());
+            return create_token(Kind::IDENTIFIER, read_identifier());
         else if (isdigit(c))
-            return create_token(Token::Type::CONSTANT, read_constant());
+            return create_token(Kind::CONSTANT, read_constant());
         else if ((length = read_punctuator()))
-            return create_token(Token::Type::PUNCTUATOR, length);
+            return create_token(Kind::PUNCTUATOR, length);
         
         // no token was found
         error("unrecognized character", 0);
     }
     
-    return create_token(Token::Type::END, 0);
+    return create_token(Kind::END, 0);
 }
 
-Token Lexer::create_token(Token::Type type, int length) {
+Token Lexer::create_token(Token::Kind kind, int length) {
     Token token;
     token.pos = pos;
-    token.type = type;
+    token.kind = kind;
     token.text = NULL;
     
     const char *raw_text = input.data.get() + pos.index;
     
-    if (token.type == Token::Type::IDENTIFIER) {
+    if (token.kind == Token::Kind::IDENTIFIER) {
 #define K(x, y, z) if (length == z && !strncmp(raw_text, x, length)) {\
-    token.type = Token::Type::KEYWORD; \
+    token.kind = Token::Kind::KEYWORD; \
     token.text = x; \
     token.keyword = Token::Keyword::y; \
 } else
@@ -117,7 +119,7 @@ Token Lexer::create_token(Token::Type type, int length) {
                 {}; break;
         }
 #undef K
-    } else if (token.type == Token::Type::PUNCTUATOR) {
+    } else if (token.kind == Token::Kind::PUNCTUATOR) {
         token.punctuator = last_punctuator;
     }
     
