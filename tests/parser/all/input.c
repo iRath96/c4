@@ -37,7 +37,7 @@ int **assignments;
     */
     (int (*)(int *(*), int x)) 0;
 
-    int c = 1 << 8;
+    int cc = 1 << 8;
     4 + 2 * 3;
     4 + 4 << 8;
     (*(array[1](1,2,3)) << 8 || 1 + ++a);
