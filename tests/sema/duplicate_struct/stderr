@@ -1,1 +1,1 @@
-tests/sema/duplicate_struct/input.c:2:1: error: type x redefined
+tests/sema/duplicate_struct/input.c:2:1: error: redefinition of 'x'

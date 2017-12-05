@@ -17,7 +17,7 @@ struct hello {
 int b = sizeof(int);
 int c = sizeof(int) { 0 };
 
-int fn(int)(void);
+int fn(void *)(void);
 int say(char *);
 
 char *kitten(char *hi)
