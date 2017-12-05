@@ -1,0 +1,1 @@
+tests/sema/ptrdiff_illegal/input.c:3:7: error: subtracting incompatible pointer types
