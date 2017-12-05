@@ -260,7 +260,7 @@ public:
     virtual bool isScalar() { return false; }
     virtual bool isCompatible(const Type &other) const {
         auto c = dynamic_cast<const ComposedType *>(&other);
-        if (!c || c->members.size() != members.size())
+        if (!c || c->type != type || c->members.size() != members.size())
             return false;
         
         for (int i = 0; i < members.size(); ++i)

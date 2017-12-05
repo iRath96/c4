@@ -72,6 +72,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         return s;
     } else {
         auto c = std::make_shared<::ComposedType>();
+        c->type = comp->type;
         for (auto &declaration : comp->declarations) {
             Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos);
             for (auto &decl : declaration.declarators)
