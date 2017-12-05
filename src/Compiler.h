@@ -434,12 +434,16 @@ public:
     
     virtual void visit(Identifier &) {}
 
+    virtual void visitBlockItems(CompoundStatement &node) {
+        for (auto &item : node.items)
+            inspect(item);
+    }
+    
     virtual void visit(CompoundStatement &node) {
         visit((Statement &)node);
         
         scopes.execute<BlockScope>([&]() {
-            for (auto &item : node.items)
-                inspect(item);
+            visitBlockItems(node);
         });
     }
     
@@ -528,7 +532,7 @@ public:
             for (auto &declaration : node.declarations)
                 inspect(declaration);
             
-            inspect(node.body);
+            visitBlockItems(node.body);
             
             if (!scope->unresolvedLabels.empty()) {
                 auto lab = *scope->unresolvedLabels.begin();
