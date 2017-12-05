@@ -167,6 +167,8 @@ public:
 
 class Type : public std::enable_shared_from_this<Type> {
 public:
+    static Ptr<Type> ptrdiffType;
+    
     Ptr<Type> cast(const TypeName &target, lexer::TextPosition pos) const {
         Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos);
         if (!isCompatible(*type))
@@ -195,6 +197,11 @@ public:
     
     virtual bool isScalar() = 0;
     virtual bool isCompatible(const Type &other) const = 0;
+    
+    static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
+    static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
+    
+    static bool canCompare(const Type &a, const Type &b);
 };
 
 class TypePair {
@@ -209,16 +216,24 @@ public:
 class ArithmeticType : public Type {
 public:
     enum Sign {
-        SIGNED,
-        UNSIGNED
+        SIGNED = 1,
+        UNSIGNED = 0
     };
     
     enum Size {
-        LONG,
-        INT,
-        SHORT,
-        CHAR
+        LONG  = 8,
+        INT   = 4,
+        SHORT = 2,
+        CHAR  = 1
     };
+    
+    static Sign max(Sign a, Sign b) {
+        return (Sign)((int)a > (int)b ? a : b);
+    }
+    
+    static Size max(Size a, Size b) {
+        return (Size)((int)a > (int)b ? a : b);
+    }
     
     Sign sign;
     Size size;
@@ -230,6 +245,10 @@ public:
     virtual bool isCompatible(const Type &other) const {
         return dynamic_cast<const ArithmeticType *>(&other);
     }
+};
+
+class NullPointerType : public ArithmeticType {
+public:
 };
 
 class ComposedType : public Type {
@@ -357,7 +376,7 @@ protected:
         return exprStack.pop();
     }
     
-    TypePair intType, charType, stringType, voidType;
+    TypePair intType, charType, stringType, voidType, nullptrType;
     
 public:
     Compiler() {
@@ -367,6 +386,7 @@ public:
         charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::CHAR));
         stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
         voidType = TypePair(false, std::make_shared<VoidType>());
+        nullptrType = TypePair(false, std::make_shared<NullPointerType>());
     }
     
     virtual void visit(CaseLabel &node) {
@@ -518,7 +538,7 @@ public:
         switch (node.text[0]) {
         case '\'': exprStack.push(charType); break;
         case '\"': exprStack.push(stringType); break;
-        default: exprStack.push(intType); break;
+        default: exprStack.push(!strcmp(node.text, "0") ? nullptrType : intType); break;
         }
     }
     
@@ -552,21 +572,61 @@ public:
 
     virtual void visit(BinaryExpression &node) {
         using namespace lexer;
+        using Op = lexer::Token::Punctuator;
+        using Prec = lexer::Token::Precedence;
         
         auto lhs = exprType(*node.lhs);
         auto rhs = exprType(*node.rhs);
-        
-        if (!lhs.type->isScalar()) error("lhs is not scalar", *node.lhs);
-        if (!rhs.type->isScalar()) error("rhs is not scalar", *node.rhs);
         
         if (Token::precedence(node.op) == Token::Precedence::ASSIGNMENT)
             if (!lhs.lvalue)
                 error("lhs is not an lvalue", *node.lhs);
         
-        // @todo check compatibility
-        
-        lhs.lvalue = false;
-        exprStack.push(lhs);
+        switch (node.op) {
+        case Op::PLUS: exprStack.push(TypePair(false, Type::add(lhs.type, rhs.type, node.pos))); break;
+        case Op::MINUS: exprStack.push(TypePair(false, Type::subtract(lhs.type, rhs.type, node.pos))); break;
+        default:
+            switch (Token::precedence(node.op)) {
+            case Prec::MULTIPLICATIVE: // integer for %, arithmetic otherwise
+            case Prec::SHIFT: // integer
+            case Prec::AND:
+            case Prec::INCLUSIVE_OR:
+            case Prec::EXCLUSIVE_OR:
+            {
+                auto a = dynamic_cast<ArithmeticType *>(lhs.type.get());
+                auto b = dynamic_cast<ArithmeticType *>(lhs.type.get());
+                if (!a || !b) error("operands must be arithmetic", node);
+                exprStack.push(TypePair(a, lhs.type)); // @todo?
+                break;
+            }
+            
+            case Prec::LOGICAL_OR:
+            case Prec::LOGICAL_AND:
+                if (!lhs.type->isScalar() || !rhs.type->isScalar()) error("operands must be scalar", node);
+                exprStack.push(intType);
+                break;
+            
+            case Prec::ASSIGNMENT:
+                if (!lhs.lvalue) error("lhs is not an lvalue", *node.lhs);
+                if (!lhs.type->isCompatible(*rhs.type)) error("assignment with incompatible type", *node.rhs);
+                exprStack.push(TypePair(false, lhs.type));
+                break;
+            
+            case Prec::EQUALITY: {
+                if (!Type::canCompare(*lhs.type, *rhs.type)) error("invalid comparison", node);
+                exprStack.push(intType);
+                break;
+            }
+            
+            case Prec::RELATIONAL:
+                if (!lhs.type->isCompatible(*rhs.type)) error("comparison of incompatible types", node);
+                exprStack.push(intType);
+                break;
+            
+            default:
+                error("operator not implemented", node);
+            }
+        }
     }
 
     virtual void visit(ConditionalExpression &node) {

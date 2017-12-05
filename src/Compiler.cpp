@@ -108,3 +108,79 @@ Ptr<Type> Type::applyDeclarator(Declarator decl) {
     
     return result;
 }
+
+Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
+    auto arA = dynamic_cast<ArithmeticType *>(a.get());
+    auto arB = dynamic_cast<ArithmeticType *>(b.get());
+
+    if (arA && arB) {
+        auto size = ArithmeticType::max(arA->size, arB->size);
+        auto sign = ArithmeticType::max(arA->sign, arB->sign);
+        
+        if (arA->size == size && arA->sign == sign) return a;
+        if (arB->size == size && arB->sign == sign) return a;
+        
+        return std::make_shared<ArithmeticType>(sign, size);
+    }
+    
+    auto ptrA = dynamic_cast<PointerType *>(a.get());
+    auto ptrB = dynamic_cast<PointerType *>(b.get());
+    
+    if (arA && ptrB) return b;
+    if (ptrA && arB) return a;
+    
+    throw CompilerError("cannot add incompatible types", pos);
+}
+
+Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
+    auto arA = dynamic_cast<ArithmeticType *>(a.get());
+    auto arB = dynamic_cast<ArithmeticType *>(b.get());
+
+    if (arA && arB) { // @todo not DRY
+        auto size = ArithmeticType::max(arA->size, arB->size);
+        auto sign = ArithmeticType::max(arA->sign, arB->sign);
+        
+        if (arA->size == size && arA->sign == sign) return a;
+        if (arB->size == size && arB->sign == sign) return a;
+        
+        return std::make_shared<ArithmeticType>(sign, size);
+    }
+    
+    auto ptrA = dynamic_cast<PointerType *>(a.get());
+    auto ptrB = dynamic_cast<PointerType *>(b.get());
+    
+    if (ptrA && arB) return a;
+    
+    if (ptrA && ptrB) {
+        if (!ptrA->base->isCompatible(*ptrB->base))
+            throw CompilerError("subtracting incompatible pointer types", pos);
+        return Type::ptrdiffType;
+    }
+    
+    throw CompilerError("cannot subtract incompatible types", pos);
+}
+
+bool Type::canCompare(const Type &a, const Type &b) {
+    auto arA = dynamic_cast<const ArithmeticType *>(&a);
+    auto arB = dynamic_cast<const ArithmeticType *>(&b);
+    if (arA && arB) return true;
+    
+    auto ptrA = dynamic_cast<const PointerType *>(&a);
+    auto ptrB = dynamic_cast<const PointerType *>(&b);
+    if (ptrA && ptrB) {
+        if (ptrA->base->isCompatible(*ptrB->base)) return true;
+        
+        auto vA = dynamic_cast<const VoidType *>(ptrA->base.get());
+        auto vB = dynamic_cast<const VoidType *>(ptrB->base.get());
+        if (vA || vB) return true; // one is a void pointer
+    }
+    
+    auto npA = dynamic_cast<const NullPointerType *>(&a);
+    auto npB = dynamic_cast<const NullPointerType *>(&b);
+    if (ptrA && npB) return true;
+    if (npA && ptrB) return true;
+    
+    return false;
+}
+
+Ptr<Type> Type::ptrdiffType = std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT);
