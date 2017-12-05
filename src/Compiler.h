@@ -606,7 +606,7 @@ public:
         
         if (Token::precedence(node.op) == Token::Precedence::ASSIGNMENT)
             if (!lhs.lvalue)
-                error("lhs is not an lvalue", *node.lhs);
+                error("lhs is not an lvalue", node);
         
         switch (node.op) {
         case Op::PLUS: exprStack.push(TypePair(false, Type::add(lhs.type, rhs.type, node.pos))); break;
