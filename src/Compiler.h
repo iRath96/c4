@@ -249,6 +249,7 @@ public:
 
 class NullPointerType : public ArithmeticType {
 public:
+    virtual bool isCompatible(const Type &other) const;
 };
 
 class ComposedType : public Type {
@@ -315,6 +316,7 @@ public:
     
     virtual bool isScalar() { return true; }
     virtual bool isCompatible(const Type &other) const {
+        if (dynamic_cast<const NullPointerType *>(&other)) return true;
         auto p = dynamic_cast<const PointerType *>(&other);
         return p && base->isCompatible(*p->base);
     }
