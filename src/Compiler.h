@@ -447,11 +447,19 @@ public:
     virtual void visit(DeclaratorParameterList &) {}
     virtual void visit(Declarator &) {}
     
-    void resolveTypeSpecifiers(ast::PtrVector<ast::TypeSpecifier> &specifiers) {
+    bool resolveTypeSpecifiers(ast::PtrVector<ast::TypeSpecifier> &specifiers) {
          // @todo be more efficient and reuse ::ComposedTypes
         auto scope = scopes.find<FileScope>();
-        for (auto &spec : specifiers)
+        bool result = false;
+        for (auto &spec : specifiers) {
+            if (auto ct = dynamic_cast<const ast::ComposedType *>(spec.get()))
+                if (ct->isNamed() && ct->isQualified())
+                    result = true;
+            
             scope->resolveType(spec);
+        }
+        
+        return result;
     }
     
     virtual void visit(TypeName &node) {
@@ -461,10 +469,13 @@ public:
     virtual void visit(Declaration &node) {
         auto scope = scopes.find<BlockScope>();
         auto specifiers = node.specifiers;
-        resolveTypeSpecifiers(specifiers);
+        bool declaredStruct = resolveTypeSpecifiers(specifiers);
         
-        if (node.declarators.empty())
-            error("declaration without declarators", node);
+        if (node.declarators.empty()) {
+            if (!declaredStruct)
+                error("declaration does not declare anything", node);
+            return;
+        }
         
         Ptr<Type> type = Type::create(specifiers, node.pos);
         for (auto &decl : node.declarators) {
@@ -473,6 +484,7 @@ public:
             
             // find identifier
             if (decl.isAbstract())
+                // @todo assert(false) here
                 error("abstract declarator in declaration", node);
             else
                 scope->declare(decl.name, dtype, decl.pos);

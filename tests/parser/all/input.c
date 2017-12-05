@@ -1,5 +1,8 @@
 unsigned int x = 4, **y;
 
+struct example { int x; };
+struct example var;
+
 int (*functionPtr)(int, int);
 int (*getFunc(void))(int, int) {}
 int (*test(int x, int y))(int, int) {

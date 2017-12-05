@@ -1,1 +1,1 @@
-tests/sema/decl_without_declarator/input.c:2:5: error: declaration without declarators
+tests/sema/decl_without_declarator/input.c:2:5: error: declaration does not declare anything
