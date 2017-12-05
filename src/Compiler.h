@@ -356,7 +356,7 @@ protected:
     ExpressionStack exprStack;
     
     void inspect(Node &node) {
-        std::cout << node.pos.line << ":" << node.pos.column << std::endl;
+        //std::cout << node.pos.line << ":" << node.pos.column << std::endl;
         node.accept(*this);
     }
     
