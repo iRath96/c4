@@ -313,7 +313,7 @@ public:
     Ptr<Type> returnType;
     std::vector<Ptr<Type>> parameters;
     
-    virtual bool isScalar() { return false; }
+    virtual bool isScalar() { return true; } // will evaluate to address
     virtual bool isCompatible(const Type &other) const;
     
     virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {

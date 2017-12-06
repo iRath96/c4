@@ -112,7 +112,11 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         for (auto &declaration : comp->declarations) {
             Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos, scopes);
             for (auto &decl : declaration.declarators) {
-                cc.addMember(std::string(decl.name), type->applyDeclarator(decl, scopes), decl.pos);
+                Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
+                if (!dtype->isComplete())
+                    throw CompilerError("field has incomplete type", decl.pos);
+                
+                cc.addMember(std::string(decl.name), dtype, decl.pos);
             }
         }
         
