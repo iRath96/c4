@@ -237,7 +237,7 @@ bool FunctionType::isCompatible(const Type &other) const {
         if (parameters.size() != f->parameters.size())
             return false;
         
-        for (int i = 0; i < parameters.size(); ++i)
+        for (size_t i = 0; i < parameters.size(); ++i)
             if (!parameters[i]->isCompatible(*f->parameters[i])) // @todo isEqual
                 return false;
         

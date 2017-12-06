@@ -182,11 +182,11 @@ public:
         throw CompilerError("cannot dereference non-pointer", pos);
     }
     
-    virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
+    virtual Ptr<Type> call(ast::PtrVector<Type>, lexer::TextPosition pos) const {
         throw CompilerError("cannot call non-function", pos);
     }
     
-    virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
+    virtual Ptr<Type> getMember(std::string, lexer::TextPosition pos) const {
         throw CompilerError("cannot access member in non-composed type", pos);
     }
     
@@ -747,7 +747,7 @@ public:
         exprType(node.expressions);
     }
 
-    virtual void visit(SizeofExpressionTypeName &node) {
+    virtual void visit(SizeofExpressionTypeName &) {
         exprStack.push(intType);
     }
 
