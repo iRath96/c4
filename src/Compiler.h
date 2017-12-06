@@ -43,6 +43,12 @@ public:
     std::map<std::string, Ptr<Type>> variables;
     std::map<std::string, Ptr<Type>> composedTypes;
     
+    bool declaresComposedType(ComposedTypeSpecifier *ct) const {
+        return composedTypes.find(ct->name) != composedTypes.end();
+    }
+    
+    Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
+    
     void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
         for (auto &v : variables)
             if (v.first == name)
@@ -58,8 +64,6 @@ public:
         result = it->second;
         return true;
     }
-    
-    Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
     
     virtual void close();
 };
@@ -143,16 +147,27 @@ public:
         return nullptr;
     }
     
-    bool resolve(std::string name, Ptr<Type> &result) {
+    bool resolveVariable(std::string name, Ptr<Type> &result) {
         for (auto it = stack.rbegin(); it != stack.rend(); ++it)
             if (auto bs = dynamic_cast<BlockScope *>(it->get()))
                 if (bs->resolveVariable(name, result))
                     return true;
         return false;
     }
+    
+    Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct) {
+        for (auto it = stack.rbegin(); it != stack.rend(); ++it)
+            if (auto bs = dynamic_cast<BlockScope *>(it->get()))
+                if (bs->declaresComposedType(ct))
+                    return bs->resolveComposedType(ct);
+        return find<BlockScope>()->resolveComposedType(ct);
+    }
 };
 
 class Type : public std::enable_shared_from_this<Type> {
+protected:
+    static std::set<Type *> typeQueue;
+    
 public:
     static Ptr<Type> ptrdiffType;
     
@@ -184,6 +199,7 @@ public:
     
     virtual bool isScalar() = 0;
     virtual bool isCompatible(const Type &other) const = 0;
+    virtual bool isComplete() const { return true; }
     
     static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
@@ -237,9 +253,16 @@ public:
 class NullPointerType : public ArithmeticType {
 public:
     virtual bool isCompatible(const Type &other) const;
+    
+    virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+        throw CompilerError("cannot dereference null pointer", pos);
+    }
 };
 
 class ComposedType : public Type {
+protected:
+    bool _isComplete = false;
+    
 public:
     lexer::TextPosition pos;
     lexer::Token::Keyword kind;
@@ -262,6 +285,9 @@ public:
     }
     
     virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
+        if (!isComplete())
+            throw CompilerError("member access into incomplete type", pos);
+        
         for (auto &member : members) { // @todo not efficient
             if (member.first == name)
                 return member.second;
@@ -278,9 +304,8 @@ public:
         members.push_back(std::make_pair(std::string(name), type));
     }
     
-    bool isQualified() {
-        return members.size() > 0;
-    }
+    virtual bool isComplete() const { return _isComplete; }
+    void markAsComplete() { _isComplete = true; }
 };
 
 class FunctionType : public Type {
@@ -320,6 +345,8 @@ public:
     virtual bool isCompatible(const Type &other) const;
     
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+        if (!base->isComplete())
+            throw CompilerError("dereference of incomplete type", pos);
         return base;
     }
     
@@ -470,7 +497,6 @@ public:
         auto specifiers = node.specifiers;
         
         Ptr<Type> type = Type::create(specifiers, node.pos, scopes);
-        
         if (node.declarators.empty()) {
             for (auto &spec : node.specifiers)
                 if (auto ct = dynamic_cast<const ComposedTypeSpecifier *>(spec.get()))
@@ -483,7 +509,10 @@ public:
         
         for (auto &decl : node.declarators) {
             inspect(decl);
+            
             Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
+            if (!dtype->isComplete())
+                error("variable has incomplete type", node);
             
             // find identifier
             if (decl.isAbstract())
@@ -505,17 +534,20 @@ public:
     }
 
     virtual void visit(ExternalDeclarationFunction &node) {
-        visit((Declaration &)node);
-        
         auto &decl = node.declarators.front();
         if (decl.modifiers.empty())
             error("no parameter list given", node);
         
+        auto t = Type::create(node.specifiers, decl, node.pos, scopes);
+        auto fn = dynamic_cast<FunctionType *>(t.get());
+        if (!fn->returnType->isComplete())
+            error("incomplete return type", node);
+        
+        auto scope = scopes.find<BlockScope>();
+        scope->declareVariable(decl.name, t, node.pos);
+        
         scopes.execute<FunctionScope>([&]() {
             auto scope = scopes.find<FunctionScope>(); // @todo as param?
-            
-            auto t = Type::create(node.specifiers, decl, node.pos, scopes);
-            auto fn = dynamic_cast<FunctionType *>(t.get());
             scope->returnType = fn->returnType;
             
             if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
@@ -550,7 +582,7 @@ public:
     virtual void visit(ConstantExpression &node) {
         if (node.isIdentifier) {
             Ptr<Type> type;
-            if (!scopes.resolve(node.text, type))
+            if (!scopes.resolveVariable(node.text, type))
                 error(std::string(node.text) + " was not declared in this scope", node);
             
             exprStack.push(TypePair(true, type));

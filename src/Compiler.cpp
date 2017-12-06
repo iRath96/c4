@@ -26,8 +26,8 @@ Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
 void BlockScope::close() {
     for (auto &comp : composedTypes) {
         auto ct = dynamic_cast<ComposedType *>(comp.second.get());
-        if (!ct->isQualified())
-            throw CompilerError("type " + std::string(comp.first) + " is never resolved", ct->pos);
+        if (!ct->isComplete())
+            throw CompilerError("type " + std::string(comp.first) + " is never defined", ct->pos);
     }
 }
 
@@ -94,23 +94,31 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         return s;
     } else {
         Ptr<Type> c;
-        if (comp->isNamed()) {
-            auto bs = scopes.find<BlockScope>();
-            c = bs->resolveComposedType(comp);
-        } else
+        if (comp->isNamed())
+            c = scopes.resolveComposedType(comp);
+        else
             // anonymous
             c = std::make_shared<ComposedType>();
         
         auto &cc = dynamic_cast<ComposedType &>(*c);
+        if (!comp->isQualified())
+            return c;
         
-        if (cc.isQualified() && comp->isQualified())
+        if (cc.isComplete() || typeQueue.find(&cc) != typeQueue.end())
             throw CompilerError("redefinition of '" + std::string(comp->name) + "'", comp->pos);
+        
+        typeQueue.insert(&cc);
         
         for (auto &declaration : comp->declarations) {
             Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos, scopes);
-            for (auto &decl : declaration.declarators)
+            for (auto &decl : declaration.declarators) {
                 cc.addMember(std::string(decl.name), type->applyDeclarator(decl, scopes), decl.pos);
+            }
         }
+        
+        typeQueue.erase(&cc);
+        
+        cc.markAsComplete();
         
         return c;
     }
@@ -219,6 +227,7 @@ bool Type::canCompare(const Type &a, const Type &b) {
 }
 
 Ptr<Type> Type::ptrdiffType = std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT);
+std::set<Type *> Type::typeQueue = std::set<Type *>();
 
 bool FunctionType::isCompatible(const Type &other) const {
     if (auto p = dynamic_cast<const PointerType *>(&other))

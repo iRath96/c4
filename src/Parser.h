@@ -702,6 +702,8 @@ protected:
     
     bool read_external_declaration(ast::Ptr<ast::ExternalDeclaration> &node)
     OPTION
+        auto pos = peek().pos;
+    
         ast::PtrVector<ast::TypeSpecifier> specifiers;
         ast::Declarator declarator;
         bool has_declarator, needs_declaration_list, needs_initialization, is_declaration;
@@ -756,6 +758,8 @@ protected:
             OPTIONAL(read_declaration_list(n->declarations))
             NON_OPTIONAL(read_compound_statement(n->body))
         }
+    
+        node->pos = pos;
     END_OPTION
     
 #pragma mark - Statements
