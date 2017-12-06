@@ -685,13 +685,11 @@ public:
     
     virtual void visit(SubscriptExpression &node) {
         auto base = exprType(*node.base);
-        // @todo this is actually incorrect, need to add first
-        
         auto subscript = exprType(node.subscript);
-        if (!subscript.type->isScalar())
-            error("invalid subscript", node);
         
-        exprStack.push(TypePair(true, base.type->dereference(node.pos)));
+        auto result = Type::add(base.type, subscript.type, node.pos);
+        
+        exprStack.push(TypePair(true, result->dereference(node.pos)));
     }
     
     virtual void visit(MemberExpression &node) {
