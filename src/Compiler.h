@@ -771,6 +771,11 @@ public:
 
     virtual void visit(IterationStatement &node) {
         visit((Statement &)node);
+        
+        auto cond = exprType(node.condition);
+        if (!cond.type->isScalar())
+            error("condition not scalar", node.condition);
+        
         scopes.execute<IterationScope>([&]() {
             inspect(node.body);
         });
