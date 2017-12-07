@@ -203,6 +203,8 @@ public:
     virtual bool isScalar() = 0;
     virtual bool isCompatible(const Type &other) const = 0;
     virtual bool isComplete() const { return true; }
+    virtual bool isVoidPointer() const { return false; }
+    virtual bool isNullPointer() const { return false; }
     
     static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
@@ -278,6 +280,8 @@ public:
     virtual std::string name() const {
         return "nullptr";
     }
+    
+    virtual bool isNullPointer() const { return true; }
 };
 
 class ComposedType : public Type {
@@ -391,6 +395,18 @@ public:
     }
 };
 
+class VoidType : public Type {
+public:
+    virtual bool isScalar() { return false; }
+    virtual bool isCompatible(const Type &other) const {
+        return dynamic_cast<const VoidType *>(&other);
+    }
+    
+     virtual std::string describe() const {
+        return "void";
+    }
+};
+
 class PointerType : public Type {
 public:
     Ptr<Type> base;
@@ -415,17 +431,9 @@ public:
     virtual std::string describe() const {
         return base->describe() + "*";
     }
-};
-
-class VoidType : public Type {
-public:
-    virtual bool isScalar() { return false; }
-    virtual bool isCompatible(const Type &other) const {
-        return dynamic_cast<const VoidType *>(&other);
-    }
     
-     virtual std::string describe() const {
-        return "void";
+    virtual bool isVoidPointer() const {
+        return dynamic_cast<const VoidType *>(base.get());
     }
 };
 
@@ -751,13 +759,23 @@ public:
                 break;
             
             case Prec::EQUALITY: {
-                if (!Type::canCompare(*lhs.type, *rhs.type)) error("invalid comparison", node);
+                if (!Type::canCompare(*lhs.type, *rhs.type))
+                    error(
+                        "comparison of distinct pointer types ('" + lhs.type->describe() + "' and '" +
+                        rhs.type->describe() + "')",
+                        node
+                    );
                 exprStack.push(intType);
                 break;
             }
             
             case Prec::RELATIONAL:
-                if (!lhs.type->isCompatible(*rhs.type)) error("comparison of incompatible types", node);
+                if (!lhs.type->isCompatible(*rhs.type))
+                    error(
+                        "comparison of distinct pointer types ('" + lhs.type->describe() + "' and '" +
+                        rhs.type->describe() + "')",
+                        node
+                    );
                 exprStack.push(intType);
                 break;
             

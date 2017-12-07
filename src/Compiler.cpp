@@ -243,16 +243,11 @@ bool Type::canCompare(const Type &a, const Type &b) {
     auto ptrB = dynamic_cast<const PointerType *>(&b);
     if (ptrA && ptrB) {
         if (ptrA->base->isCompatible(*ptrB->base)) return true;
-        
-        auto vA = dynamic_cast<const VoidType *>(ptrA->base.get());
-        auto vB = dynamic_cast<const VoidType *>(ptrB->base.get());
-        if (vA || vB) return true; // one is a void pointer
+        if (ptrA->isVoidPointer() || ptrB->isVoidPointer()) return true;
     }
     
-    auto npA = dynamic_cast<const NullPointerType *>(&a);
-    auto npB = dynamic_cast<const NullPointerType *>(&b);
-    if (ptrA && npB) return true;
-    if (npA && ptrB) return true;
+    if (ptrA && b.isNullPointer()) return true;
+    if (a.isNullPointer() && ptrB) return true;
     
     return false;
 }
@@ -283,10 +278,7 @@ bool PointerType::isCompatible(const Type &other) const {
     if (dynamic_cast<const FunctionType *>(&other)) return other.isCompatible(*this);
     
     auto p = dynamic_cast<const PointerType *>(&other);
-    if (!p)
-        return false;
-    if (dynamic_cast<const VoidType *>(base.get())) return true;
-    if (dynamic_cast<const VoidType *>(p->base.get())) return true;
+    if (!p) return false;
     return base->isCompatible(*p->base);
 }
 
