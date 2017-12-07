@@ -574,10 +574,9 @@ public:
         }
         
         for (auto &decl : node.declarators) {
-            inspect(decl);
-            
             Ptr<Type> dtype;
             scopes.execute<FunctionScope>([&]() {
+                inspect(decl);
                 dtype = type->applyDeclarator(decl, scopes);
             });
             
