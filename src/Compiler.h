@@ -52,7 +52,7 @@ public:
     void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
         for (auto &v : variables)
             if (v.first == name)
-                throw CompilerError("variable " + name + " redefined", pos);
+                throw CompilerError("redefinition of '" + name + "'", pos);
         
         variables.insert(std::make_pair(name, type));
     }
@@ -70,6 +70,9 @@ public:
 
 class FileScope : public BlockScope {
 public:
+    std::vector<std::pair<Ptr<Type>, lexer::TextPosition>> unresolvedTentative;
+    
+    virtual void close();
 };
 
 class FunctionScope : public BlockScope {
@@ -81,7 +84,7 @@ public:
     
     void resolveLabel(std::string id, lexer::TextPosition pos) {
         if (resolvedLabels.find(id) != resolvedLabels.end())
-            throw CompilerError("label " + id + " redefined", pos);
+            throw CompilerError("redefinition of label '" + id + "'", pos);
         
         resolvedLabels.insert(id);
         unresolvedLabels.erase(id);
@@ -179,15 +182,15 @@ public:
     }
     
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
-        throw CompilerError("cannot dereference non-pointer", pos);
+        throw CompilerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos);
     }
     
     virtual Ptr<Type> call(ast::PtrVector<Type>, lexer::TextPosition pos) const {
-        throw CompilerError("cannot call non-function", pos);
+        throw CompilerError("called object type '" + describe() + "' is not a function or function pointer", pos);
     }
     
     virtual Ptr<Type> getMember(std::string, lexer::TextPosition pos) const {
-        throw CompilerError("cannot access member in non-composed type", pos);
+        throw CompilerError("member reference base type '" + describe() + "' is not a structure or union", pos);
     }
     
     Ptr<Type> reference();
@@ -205,6 +208,8 @@ public:
     static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     
     static bool canCompare(const Type &a, const Type &b);
+    
+    virtual std::string describe() const = 0;
 };
 
 class TypePair {
@@ -248,6 +253,18 @@ public:
     virtual bool isCompatible(const Type &other) const {
         return dynamic_cast<const ArithmeticType *>(&other);
     }
+    
+    virtual std::string describe() const {
+        std::string result = sign == UNSIGNED ? "unsigned" : "";
+        if (!result.empty() && size != INT) result += " ";
+        switch (size) {
+        case CHAR:  return result + "char";
+        case SHORT: return result + "short";
+        case INT:   return result.empty() ? "int" : result + " int";
+        case LONG:  return result + "long";
+        default: return "(error)";
+        }
+    }
 };
 
 class NullPointerType : public ArithmeticType {
@@ -257,6 +274,10 @@ public:
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
         throw CompilerError("cannot dereference null pointer", pos);
     }
+    
+    virtual std::string name() const {
+        return "nullptr";
+    }
 };
 
 class ComposedType : public Type {
@@ -264,6 +285,8 @@ protected:
     bool _isComplete = false;
     
 public:
+    std::string name;
+    
     lexer::TextPosition pos;
     lexer::Token::Keyword kind;
     
@@ -293,7 +316,7 @@ public:
                 return member.second;
         }
         
-        throw CompilerError("unknown member " + name, pos);
+        throw CompilerError("no member named '" + name + "' in '" + describe() + "'", pos);
     }
     
     void addMember(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
@@ -306,6 +329,15 @@ public:
     
     virtual bool isComplete() const { return _isComplete; }
     void markAsComplete() { _isComplete = true; }
+    
+    virtual std::string describe() const {
+        std::string result = kind == lexer::Token::Keyword::STRUCT ? "struct " : "union ";
+        if (name.empty())
+            // @todo file name
+            return result + "(anonymous at " + std::to_string(pos.line) + ":" + std::to_string(pos.column) + ")";
+        else
+            return result + name;
+    }
 };
 
 class FunctionType : public Type {
@@ -317,19 +349,45 @@ public:
     virtual bool isCompatible(const Type &other) const;
     
     virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
-        if (argTypes.size() != parameters.size())
+        if (argTypes.size() != parameters.size()) {
+            std::string q = argTypes.size() > parameters.size() ? "many" : "few";
             throw CompilerError(
-                std::to_string(argTypes.size()) + " arguments given, " +
-                std::to_string(parameters.size()) + " expected"
+                "too " + q + " arguments to function call, expected " +
+                std::to_string(parameters.size()) + ", have " +
+                std::to_string(argTypes.size())
             , pos);
+        }
         
-        for (size_t i = 0; i < parameters.size(); ++i)
+        for (size_t i = 0; i < parameters.size(); ++i) {
+            if (!parameters[i]->isComplete())
+                throw CompilerError(
+                    "argument type '" + parameters[i]->describe() + "' is incomplete"
+                , pos);
+            
             if (!parameters[i]->isCompatible(*argTypes[i]))
                 throw CompilerError(
-                    "argument " + std::to_string(i) + " has invalid type"
+                    "passing '" + argTypes[i]->describe() + "' to parameter of " +
+                    "incompatible type '" + parameters[i]->describe() + "'"
                 , pos);
+        }
         
         return returnType;
+    }
+    
+    virtual std::string describe() const {
+        std::string result = returnType->describe();
+        result += "(";
+        
+        bool first = true;
+        for (auto &param : parameters) {
+            if (first)
+                first = false;
+            else
+                result += ", ";
+            result += param->describe();
+        }
+        
+        return result + ")";
     }
 };
 
@@ -353,6 +411,10 @@ public:
     virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
         return base->call(argTypes, pos);
     }
+    
+    virtual std::string describe() const {
+        return base->describe() + "*";
+    }
 };
 
 class VoidType : public Type {
@@ -360,6 +422,10 @@ public:
     virtual bool isScalar() { return false; }
     virtual bool isCompatible(const Type &other) const {
         return dynamic_cast<const VoidType *>(&other);
+    }
+    
+     virtual std::string describe() const {
+        return "void";
     }
 };
 
@@ -412,7 +478,7 @@ protected:
     
 public:
     Compiler() {
-        intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::UNSIGNED, ArithmeticType::INT));
+        intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::INT));
         charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::CHAR));
         stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
         voidType = TypePair(false, std::make_shared<VoidType>());
@@ -510,9 +576,18 @@ public:
         for (auto &decl : node.declarators) {
             inspect(decl);
             
-            Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
-            if (!dtype->isComplete())
-                error("variable has incomplete type", node);
+            Ptr<Type> dtype;
+            scopes.execute<FunctionScope>([&]() {
+                dtype = type->applyDeclarator(decl, scopes);
+            });
+            
+            if (!dtype->isComplete()) {
+                if (dynamic_cast<ExternalDeclarationVariable *>(&node)) {
+                    auto scope = scopes.find<FileScope>();
+                    scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
+                } else
+                    error("variable has incomplete type '" + dtype->describe() + "'", node);
+            }
             
             // find identifier
             if (decl.isAbstract())
@@ -524,7 +599,11 @@ public:
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
                 if (!itp.type->isCompatible(*dtype))
-                    error("invalid initialization", *decl.initializer);
+                    error(
+                        "initializing '" + dtype->describe() + "' with an expression of " +
+                        "incompatible type '" + itp.type->describe() + "'",
+                        *decl.initializer
+                    );
             }
         }
     }
@@ -536,29 +615,35 @@ public:
     virtual void visit(ExternalDeclarationFunction &node) {
         auto &decl = node.declarators.front();
         if (decl.modifiers.empty())
-            error("no parameter list given", node);
+            error("expected ';' after top level declarator", node);
         
-        auto t = Type::create(node.specifiers, decl, node.pos, scopes);
-        auto fn = dynamic_cast<FunctionType *>(t.get());
-        if (!fn->returnType->isComplete())
-            error("incomplete return type", node);
+        auto t = Type::create(node.specifiers, node.pos, scopes);
         
         auto scope = scopes.find<BlockScope>();
-        scope->declareVariable(decl.name, t, node.pos);
-        
         scopes.execute<FunctionScope>([&]() {
-            auto scope = scopes.find<FunctionScope>(); // @todo as param?
+            scopes.execute<FunctionScope>([&]() {
+                // structs need to have FunctionScope
+                // @todo not DRY with Declaration &, also: not very elegant
+                t = t->applyDeclarator(decl, scopes);
+            });
+            
+            auto fn = dynamic_cast<FunctionType *>(t.get());
+            if (!fn->returnType->isComplete())
+                error("incomplete result type in function definition", node);
+            
+            scope->declareVariable(decl.name, t, node.pos);
+            
+            auto scope = scopes.find<FunctionScope>(); // @todo as callback param?
             scope->returnType = fn->returnType;
             
             if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
                 for (auto &param : plist->parameters) {
                     if (param.declarator.isAbstract())
-                        error("parameter without name", param);
+                        error("parameter name omitted", param);
                     
                     inspect(param);
                 }
-            } else
-                error("no parameter list given", node);
+            } // @todo else assert(false);
             
             for (auto &declaration : node.declarations)
                 inspect(declaration);
@@ -800,7 +885,11 @@ public:
         auto givenType = exprType(node.expressions);
         
         if (!expectedType->isCompatible(*givenType.type))
-            throw CompilerError("illegal return", node.pos);
+            throw CompilerError(
+                "returning '" + givenType.type->describe() + "' from a function with incompatible " +
+                "result type '" + expectedType->describe() + "'",
+                node.pos
+            );
     }
 };
 

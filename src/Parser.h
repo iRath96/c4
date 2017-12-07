@@ -399,7 +399,7 @@ protected:
                 break;
             
             UNIQUE
-            NON_OPTIONAL(read_parameter_type_list(p_suffix->parameters));
+            OPTIONAL(read_parameter_type_list(p_suffix->parameters));
             
             if (p_suffix->parameters.size() == 1) {
                 auto p = p_suffix->parameters.front();

@@ -1,1 +1,1 @@
-tests/sema/struct_resolution/input.c:15:1: error: variable has incomplete type
+tests/sema/struct_resolution/input.c:15:10: error: tentative definition has type 'struct z' that is never completed

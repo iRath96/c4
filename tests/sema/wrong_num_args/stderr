@@ -1,1 +1,1 @@
-tests/sema/wrong_num_args/input.c:2:9: error: 2 arguments given, 1 expected
+tests/sema/wrong_num_args/input.c:2:9: error: too many arguments to function call, expected 1, have 2

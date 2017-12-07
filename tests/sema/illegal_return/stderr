@@ -1,1 +1,1 @@
-tests/sema/illegal_return/input.c:2:5: error: illegal return
+tests/sema/illegal_return/input.c:2:5: error: returning 'int' from a function with incompatible result type 'void'

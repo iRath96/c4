@@ -1,1 +1,1 @@
-tests/sema/duplicate_var/input.c:2:12: error: variable a redefined
+tests/sema/duplicate_var/input.c:2:12: error: redefinition of 'a'

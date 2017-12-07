@@ -9,10 +9,21 @@
 #include <stdio.h>
 #include "Compiler.h"
 
+void FileScope::close() {
+    BlockScope::close();
+
+    for (auto &ut : unresolvedTentative)
+        if (!ut.first->isComplete())
+            throw CompilerError(
+                "tentative definition has type '" + ut.first->describe()  + "' that is never completed"
+            , ut.second);
+}
+
 Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
     auto it = composedTypes.find(ct->name);
     if (it == composedTypes.end()) {
         auto type = std::make_shared<ComposedType>();
+        type->name = ct->name;
         type->kind = ct->kind;
         type->pos = ct->pos;
         
@@ -24,11 +35,11 @@ Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
 }
 
 void BlockScope::close() {
-    for (auto &comp : composedTypes) {
+    /*for (auto &comp : composedTypes) {
         auto ct = dynamic_cast<ComposedType *>(comp.second.get());
         if (!ct->isComplete())
             throw CompilerError("type " + std::string(comp.first) + " is never defined", ct->pos);
-    }
+    }*/
 }
 
 Ptr<Type> Type::reference() {
@@ -90,15 +101,31 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 
     if (isArithmetic) {
         auto s = std::make_shared<ArithmeticType>();
-        // @todo
+        
+        switch (size) {
+        case Keyword::LONG:  s->size = ArithmeticType::LONG;  break;
+        case Keyword::SHORT: s->size = ArithmeticType::SHORT; break;
+        case Keyword::CHAR:  s->size = ArithmeticType::CHAR;  break;
+        default: s->size = ArithmeticType::INT;
+        }
+        
+        switch (sign) {
+        case Keyword::UNSIGNED: s->sign = ArithmeticType::UNSIGNED; break;
+        default: s->sign = ArithmeticType::SIGNED;
+        }
+        
         return s;
     } else {
         Ptr<Type> c;
         if (comp->isNamed())
             c = scopes.resolveComposedType(comp);
-        else
+        else {
             // anonymous
             c = std::make_shared<ComposedType>();
+            auto &cc = dynamic_cast<ComposedType &>(*c);
+            cc.kind = comp->kind;
+            cc.pos = pos;
+        }
         
         auto &cc = dynamic_cast<ComposedType &>(*c);
         if (!comp->isQualified())

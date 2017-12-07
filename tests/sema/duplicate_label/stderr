@@ -1,1 +1,1 @@
-tests/sema/duplicate_label/input.c:4:1: error: label a redefined
+tests/sema/duplicate_label/input.c:4:1: error: redefinition of label 'a'
