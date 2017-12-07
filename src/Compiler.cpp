@@ -234,7 +234,10 @@ Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
     throw CompilerError("cannot subtract incompatible types", pos);
 }
 
-bool Type::canCompare(const Type &a, const Type &b) {
+bool Type::canCompare(const Type &a, const Type &b, bool broad) {
+    if (broad && a.isCompatible(b))
+        return true;
+    
     auto arA = dynamic_cast<const ArithmeticType *>(&a);
     auto arB = dynamic_cast<const ArithmeticType *>(&b);
     if (arA && arB) return true;

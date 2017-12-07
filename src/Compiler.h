@@ -205,7 +205,7 @@ public:
     static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     
-    static bool canCompare(const Type &a, const Type &b);
+    static bool canCompare(const Type &a, const Type &b, bool broad = false);
     
     virtual std::string describe() const = 0;
 };
@@ -364,7 +364,7 @@ public:
                     "argument type '" + parameters[i]->describe() + "' is incomplete"
                 , pos);
             
-            if (!Type::canCompare(*parameters[i], *argTypes[i]))
+            if (!Type::canCompare(*parameters[i], *argTypes[i], true))
                 throw CompilerError(
                     "passing '" + argTypes[i]->describe() + "' to parameter of " +
                     "incompatible type '" + parameters[i]->describe() + "'"
@@ -603,7 +603,7 @@ public:
             
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
-                if (!Type::canCompare(*itp.type, *dtype))
+                if (!Type::canCompare(*itp.type, *dtype, true))
                     error(
                         "initializing '" + dtype->describe() + "' with an expression of " +
                         "incompatible type '" + itp.type->describe() + "'",
@@ -761,7 +761,7 @@ public:
             
             case Prec::ASSIGNMENT:
                 if (!lhs.lvalue) error("lhs is not an lvalue", *node.lhs);
-                if (!Type::canCompare(*lhs.type, *rhs.type)) error("assignment with incompatible type", *node.rhs);
+                if (!Type::canCompare(*lhs.type, *rhs.type, true)) error("assignment with incompatible type", *node.rhs);
                 exprStack.push(TypePair(false, lhs.type));
                 break;
             
@@ -908,7 +908,7 @@ public:
         auto expectedType = scope->returnType;
         auto givenType = exprType(node.expressions);
         
-        if (!Type::canCompare(*expectedType, *givenType.type))
+        if (!Type::canCompare(*expectedType, *givenType.type, true))
             throw CompilerError(
                 "returning '" + givenType.type->describe() + "' from a function with incompatible " +
                 "result type '" + expectedType->describe() + "'",
