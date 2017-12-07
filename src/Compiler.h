@@ -51,8 +51,10 @@ public:
     
     void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
         for (auto &v : variables)
-            if (v.first == name)
+            if (v.first == name) {
+                // @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
                 throw CompilerError("redefinition of '" + name + "'", pos);
+            }
         
         variables.insert(std::make_pair(name, type));
     }
@@ -174,13 +176,6 @@ protected:
 public:
     static Ptr<Type> ptrdiffType;
     
-    Ptr<Type> cast(const TypeName &target, lexer::TextPosition pos, ScopeStack &scopes) const {
-        Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos, scopes);
-        if (!isCompatible(*type))
-            throw CompilerError("casting incompatible types", pos);
-        return type;
-    }
-    
     virtual Ptr<Type> dereference(lexer::TextPosition pos) {
         throw CompilerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos);
     }
@@ -205,6 +200,7 @@ public:
     virtual bool isComplete() const { return true; }
     virtual bool isVoidPointer() const { return false; }
     virtual bool isNullPointer() const { return false; }
+    virtual bool isVoid() const { return false; }
     
     static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
@@ -368,7 +364,7 @@ public:
                     "argument type '" + parameters[i]->describe() + "' is incomplete"
                 , pos);
             
-            if (!parameters[i]->isCompatible(*argTypes[i]))
+            if (!Type::canCompare(*parameters[i], *argTypes[i]))
                 throw CompilerError(
                     "passing '" + argTypes[i]->describe() + "' to parameter of " +
                     "incompatible type '" + parameters[i]->describe() + "'"
@@ -399,12 +395,14 @@ class VoidType : public Type {
 public:
     virtual bool isScalar() { return false; }
     virtual bool isCompatible(const Type &other) const {
-        return dynamic_cast<const VoidType *>(&other);
+        return other.isVoid();
     }
     
      virtual std::string describe() const {
         return "void";
     }
+    
+    virtual bool isVoid() const { return true; }
 };
 
 class PointerType : public Type {
@@ -433,7 +431,7 @@ public:
     }
     
     virtual bool isVoidPointer() const {
-        return dynamic_cast<const VoidType *>(base.get());
+        return base->isVoid();
     }
 };
 
@@ -605,7 +603,7 @@ public:
             
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
-                if (!itp.type->isCompatible(*dtype))
+                if (!Type::canCompare(*itp.type, *dtype))
                     error(
                         "initializing '" + dtype->describe() + "' with an expression of " +
                         "incompatible type '" + itp.type->describe() + "'",
@@ -690,7 +688,16 @@ public:
     
     virtual void visit(CastExpression &node) {
         auto tp = exprType(*node.expression);
-        exprStack.push(TypePair(tp.lvalue, tp.type->cast(node.type, node.pos, scopes)));
+        
+        auto &target = node.type;
+        Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos, scopes);
+        
+        if (type->isVoid())
+            exprStack.push(TypePair(false, type));
+        else if (!tp.type->isScalar())
+            error("operand of type '" + tp.type->describe() + "' where arithmetic or pointer type is required", node);
+        else
+            exprStack.push(TypePair(tp.lvalue, type));
     }
 
     virtual void visit(UnaryExpression &node) {
@@ -754,7 +761,7 @@ public:
             
             case Prec::ASSIGNMENT:
                 if (!lhs.lvalue) error("lhs is not an lvalue", *node.lhs);
-                if (!lhs.type->isCompatible(*rhs.type)) error("assignment with incompatible type", *node.rhs);
+                if (!Type::canCompare(*lhs.type, *rhs.type)) error("assignment with incompatible type", *node.rhs);
                 exprStack.push(TypePair(false, lhs.type));
                 break;
             
@@ -901,7 +908,7 @@ public:
         auto expectedType = scope->returnType;
         auto givenType = exprType(node.expressions);
         
-        if (!expectedType->isCompatible(*givenType.type))
+        if (!Type::canCompare(*expectedType, *givenType.type))
             throw CompilerError(
                 "returning '" + givenType.type->describe() + "' from a function with incompatible " +
                 "result type '" + expectedType->describe() + "'",

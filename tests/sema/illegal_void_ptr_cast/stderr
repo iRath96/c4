@@ -1,0 +1,1 @@
+tests/sema/illegal_void_ptr_cast/input.c:3:5: error: operand of type 'struct (anonymous at 2:5)' where arithmetic or pointer type is required
