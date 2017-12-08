@@ -48,37 +48,55 @@ Ptr<Type> Type::reference() {
 
 Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos, ScopeStack &scopes) {
     using Keyword = lexer::Token::Keyword;
-    const auto NAK = Keyword::NOT_A_KEYWORD;
 
     if (specifiers.empty())
         // invalid type
         throw CompilerError("no type specifiers", pos);
 
-    bool isLongLong = false;
-    Keyword size = Keyword::NOT_A_KEYWORD, sign = Keyword::NOT_A_KEYWORD;
+    ArithmeticType::Size size = ArithmeticType::INT;
+    ArithmeticType::Sign sign = ArithmeticType::SIGNED;
+    bool hasInt = false, hasSize = false, hasSign = false;
+    
     ComposedTypeSpecifier *comp = NULL;
 
     for (auto &spec : specifiers) {
         if (auto nt = dynamic_cast<NamedTypeSpecifier *>(spec.get())) {
             switch (nt->keyword) {
             case Keyword::LONG:
+                if (hasSize) {
+                    if (size == ArithmeticType::LONG)
+                        size = ArithmeticType::LONG_LONG;
+                    else
+                        throw CompilerError("cannot combine with previous declaration specifier", spec->pos);
+                } else {
+                    hasSize = true;
+                    size = ArithmeticType::LONG;
+                }
+                
+                break;
+            
             case Keyword::SHORT:
             case Keyword::CHAR:
-            case Keyword::INT:
-                if (size != NAK) {
-                    if (isLongLong || size != Keyword::LONG || nt->keyword != Keyword::LONG)
-                        throw CompilerError("multiple sizes specified", spec->pos);
-                    else
-                        isLongLong = true;
+                if (hasSize)
+                    throw CompilerError("cannot combine with previous declaration specifier", spec->pos);
+                else {
+                    hasSize = true;
+                    size = nt->keyword == Keyword::SHORT ? ArithmeticType::SHORT : ArithmeticType::CHAR;
+                    break;
                 }
-                size = nt->keyword;
+                
+            case Keyword::INT:
+                if (hasInt)
+                    throw CompilerError("cannot combine with previous 'int' declaration specifier", spec->pos);
+                hasInt = true;
                 break;
             
             case Keyword::SIGNED:
             case Keyword::UNSIGNED:
-                if (sign != NAK)
-                    throw CompilerError("multiple signednesses specified", spec->pos);
-                sign = nt->keyword;
+                if (hasSign)
+                    throw CompilerError("cannot combine with previous declaration specifier", spec->pos);
+                hasSign = true;
+                sign = nt->keyword == Keyword::SIGNED ? ArithmeticType::SIGNED : ArithmeticType::UNSIGNED;
                 break;
                 
             case Keyword::VOID:
@@ -99,7 +117,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
             throw CompilerError("unimplemented", spec->pos);
     }
 
-    bool isArithmetic = size != NAK || sign != NAK;
+    bool isArithmetic = hasInt || hasSign || hasSize;
     bool isComposed = comp;
 
     if (isComposed && isArithmetic)
@@ -108,19 +126,8 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 
     if (isArithmetic) {
         auto s = std::make_shared<ArithmeticType>();
-        
-        switch (size) {
-        case Keyword::LONG:  s->size = isLongLong ? ArithmeticType::LONG_LONG : ArithmeticType::LONG; break;
-        case Keyword::SHORT: s->size = ArithmeticType::SHORT; break;
-        case Keyword::CHAR:  s->size = ArithmeticType::CHAR;  break;
-        default: s->size = ArithmeticType::INT;
-        }
-        
-        switch (sign) {
-        case Keyword::UNSIGNED: s->sign = ArithmeticType::UNSIGNED; break;
-        default: s->sign = ArithmeticType::SIGNED;
-        }
-        
+        s->sign = sign;
+        s->size = size;
         return s;
     } else {
         Ptr<Type> c;
