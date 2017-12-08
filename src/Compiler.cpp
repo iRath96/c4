@@ -110,7 +110,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         auto s = std::make_shared<ArithmeticType>();
         
         switch (size) {
-        case Keyword::LONG:  s->size = ArithmeticType::LONG;  break;
+        case Keyword::LONG:  s->size = isLongLong ? ArithmeticType::LONG_LONG : ArithmeticType::LONG; break;
         case Keyword::SHORT: s->size = ArithmeticType::SHORT; break;
         case Keyword::CHAR:  s->size = ArithmeticType::CHAR;  break;
         default: s->size = ArithmeticType::INT;
