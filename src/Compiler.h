@@ -540,7 +540,12 @@ public:
         visit((Statement &)node);
         
         if (!scopes.find<IterationScope>().get())
-            error("break/continue outside of iteration stmt", node);
+            error(
+                std::string("'") +
+                (node.keyword == lexer::Token::Keyword::BREAK ? "break" : "continue") +
+                "' statement not in loop statement",
+                node
+            );
     }
     
     virtual void visit(Identifier &) {}

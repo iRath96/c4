@@ -765,29 +765,37 @@ protected:
 #pragma mark - Statements
     
     bool read_statement(ast::Ptr<ast::Statement> &node)
+    {
+    auto pos = peek().pos;
     OPTION
         ALLOW_FAILURE(read_labeled_statement(node))
     ELSE_OPTION
         auto c = std::make_shared<ast::CompoundStatement>();
         ALLOW_FAILURE(read_compound_statement(*c))
+        c->pos = pos;
         node = c;
     ELSE_OPTION
         auto e = std::make_shared<ast::ExpressionStatement>();
         ALLOW_FAILURE(read_expression_statement(*e))
+        e->pos = pos;
         node = e;
     ELSE_OPTION
         ast::Ptr<ast::SelectionStatement> s;
         ALLOW_FAILURE(read_selection_statement(s))
+        s->pos = pos;
         node = s;
     ELSE_OPTION
         ast::Ptr<ast::IterationStatement> stmt;
         ALLOW_FAILURE(read_iteration_statement(stmt))
+        stmt->pos = pos;
         node = stmt;
     ELSE_OPTION
         ast::Ptr<ast::JumpStatement> j;
         ALLOW_FAILURE(read_jump_statement(j))
+        j->pos = pos;
         node = j;
     OTHERWISE_FAIL("statement expected")
+    }
     
     bool read_labeled_statement(ast::Ptr<ast::Statement> &node)
     OPTION
@@ -824,9 +832,7 @@ protected:
         node = n;
     ELSE_OPTION
         ast::Ptr<ast::Statement> stmt;
-        auto pos = peek().pos;
         NON_OPTIONAL(read_statement(stmt))
-        stmt->pos = pos;
         node = stmt;
     END_OPTION
     

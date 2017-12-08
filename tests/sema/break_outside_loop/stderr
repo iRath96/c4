@@ -1,1 +1,1 @@
-tests/sema/break_outside_loop/input.c:2:5: error: break/continue outside of iteration stmt
+tests/sema/break_outside_loop/input.c:3:9: error: 'break' statement not in loop statement

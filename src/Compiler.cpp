@@ -65,12 +65,12 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
             case Keyword::SHORT:
             case Keyword::CHAR:
             case Keyword::INT:
-                if (size != NAK)
-                    if (isLongLong || size != Keyword::LONG || nt->keyword != Keyword::LONG) {
+                if (size != NAK) {
+                    if (isLongLong || size != Keyword::LONG || nt->keyword != Keyword::LONG)
                         throw CompilerError("multiple sizes specified", spec->pos);
-                    } else {
+                    else
                         isLongLong = true;
-                    }
+                }
                 size = nt->keyword;
                 break;
             

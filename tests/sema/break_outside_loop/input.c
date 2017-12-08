@@ -1,3 +1,4 @@
 int main(void) {
-    break;
+    if (1)
+        break;
 }
