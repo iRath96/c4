@@ -227,6 +227,7 @@ public:
     };
     
     enum Size {
+        LONG_LONG = 16,
         LONG  = 8,
         INT   = 4,
         SHORT = 2,

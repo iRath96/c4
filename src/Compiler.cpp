@@ -54,16 +54,23 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         // invalid type
         throw CompilerError("no type specifiers", pos);
 
+    bool isLongLong = false;
     Keyword size = Keyword::NOT_A_KEYWORD, sign = Keyword::NOT_A_KEYWORD;
     ComposedTypeSpecifier *comp = NULL;
 
     for (auto &spec : specifiers) {
         if (auto nt = dynamic_cast<NamedTypeSpecifier *>(spec.get())) {
             switch (nt->keyword) {
+            case Keyword::LONG:
+            case Keyword::SHORT:
             case Keyword::CHAR:
             case Keyword::INT:
                 if (size != NAK)
-                    throw CompilerError("multiple sizes specified", spec->pos);
+                    if (isLongLong || size != Keyword::LONG || nt->keyword != Keyword::LONG) {
+                        throw CompilerError("multiple sizes specified", spec->pos);
+                    } else {
+                        isLongLong = true;
+                    }
                 size = nt->keyword;
                 break;
             
