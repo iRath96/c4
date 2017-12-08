@@ -249,7 +249,8 @@ public:
     
     virtual bool isScalar() { return true; }
     virtual bool isCompatible(const Type &other) const {
-        return dynamic_cast<const ArithmeticType *>(&other);
+        auto at = dynamic_cast<const ArithmeticType *>(&other);
+        return at && at->sign == sign && at->size == size;
     }
     
     virtual std::string describe() const {

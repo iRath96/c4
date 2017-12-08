@@ -1,4 +1,5 @@
 int main(void) {
-    int *x, **y;
-    if (x > y);
+    int *x;
+    unsigned *y;
+    x == y;
 }
