@@ -505,12 +505,12 @@ public:
     
     virtual void visit(CaseLabel &node) {
         if (!scopes.find<SwitchScope>().get())
-            error("case outside switch", node);
+            error("'case' statement not in switch statement", node);
     }
     
     virtual void visit(DefaultLabel &node) {
         if (!scopes.find<SwitchScope>().get())
-            error("default outside switch", node);
+            error("'default' statement not in switch statement", node);
     }
     
     virtual void visit(IdentifierLabel &node) {
