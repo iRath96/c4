@@ -583,7 +583,7 @@ public:
                         // some composed type was declared, this is valid.
                         return;
           
-            error("declaration does not declare anything", node);
+            // @experiment error("declaration does not declare anything", node);
         }
         
         for (auto &decl : node.declarators) {
@@ -598,7 +598,7 @@ public:
                     auto scope = scopes.find<FileScope>();
                     scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
                 } else
-                    error("variable has incomplete type '" + dtype->describe() + "'", node);
+                    ;// @experiment error("variable has incomplete type '" + dtype->describe() + "'", node);
             }
             
             // find identifier
@@ -611,11 +611,11 @@ public:
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
                 if (!Type::canCompare(*itp.type, *dtype, true))
-                    error(
+                    /*error(
                         "initializing '" + dtype->describe() + "' with an expression of " +
                         "incompatible type '" + itp.type->describe() + "'",
                         *decl.initializer
-                    );
+                    )*/;
             }
         }
     }
