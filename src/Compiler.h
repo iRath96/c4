@@ -41,6 +41,8 @@ class Type;
 class BlockScope : public Scope {
 public:
     std::map<std::string, Ptr<Type>> variables;
+    std::map<std::string, bool> definitions; // @todo could be more elegant
+    
     std::map<std::string, Ptr<Type>> composedTypes;
     
     bool declaresComposedType(ComposedTypeSpecifier *ct) const {
@@ -49,12 +51,16 @@ public:
     
     Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
     
-    void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
-        for (auto &v : variables)
-            if (v.first == name) {
-                // @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-                throw CompilerError("redefinition of '" + name + "'", pos);
-            }
+    void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
+        if (isDefined) {
+            for (auto &d : definitions)
+                if (d.first == name) {
+                    // @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
+                    throw CompilerError("redefinition of '" + name + "'", pos);
+                }
+            
+            definitions.insert(std::make_pair(name, true));
+        }
         
         variables.insert(std::make_pair(name, type));
     }
@@ -176,7 +182,7 @@ protected:
 public:
     static Ptr<Type> ptrdiffType;
     
-    virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+    virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
         throw CompilerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos);
     }
     
@@ -188,19 +194,21 @@ public:
         throw CompilerError("member reference base type '" + describe() + "' is not a structure or union", pos);
     }
     
-    Ptr<Type> reference();
+    Ptr<Type> reference(); // @todo should be const
     
     static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos, ScopeStack &scopes);
     static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos, ScopeStack &scopes);
     
     Ptr<Type> applyDeclarator(Declarator decl, ScopeStack &scopes);
     
-    virtual bool isScalar() = 0;
+    virtual bool isScalar() const = 0;
     virtual bool isCompatible(const Type &other) const = 0;
     virtual bool isComplete() const { return true; }
     virtual bool isVoidPointer() const { return false; }
     virtual bool isNullPointer() const { return false; }
     virtual bool isVoid() const { return false; }
+    virtual bool isFunction() const { return false; }
+    virtual bool isArithmetic() const { return false; }
     
     static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
     static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
@@ -248,7 +256,9 @@ public:
     ArithmeticType() : sign(UNSIGNED), size(INT) {}
     ArithmeticType(Sign sign, Size size) : sign(sign), size(size) {}
     
-    virtual bool isScalar() { return true; }
+    virtual bool isScalar() const { return true; }
+    virtual bool isArithmetic() const { return true; }
+    
     virtual bool isCompatible(const Type &other) const {
         auto at = dynamic_cast<const ArithmeticType *>(&other);
         return at && at->sign == sign && at->size == size;
@@ -271,7 +281,7 @@ class NullPointerType : public ArithmeticType {
 public:
     virtual bool isCompatible(const Type &other) const;
     
-    virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+    virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
         throw CompilerError("cannot dereference null pointer", pos);
     }
     
@@ -294,7 +304,7 @@ public:
     
     std::vector<std::pair<std::string, Ptr<Type>>> members;
     
-    virtual bool isScalar() { return false; }
+    virtual bool isScalar() const { return false; }
     virtual bool isCompatible(const Type &other) const {
         return this == &other;
         
@@ -347,7 +357,9 @@ public:
     Ptr<Type> returnType;
     std::vector<Ptr<Type>> parameters;
     
-    virtual bool isScalar() { return true; } // will evaluate to address
+    virtual bool isScalar() const { return true; } // will evaluate to address
+    virtual bool isFunction() const { return true; }
+    
     virtual bool isCompatible(const Type &other) const;
     
     virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
@@ -395,7 +407,7 @@ public:
 
 class VoidType : public Type {
 public:
-    virtual bool isScalar() { return false; }
+    virtual bool isScalar() const { return false; }
     virtual bool isCompatible(const Type &other) const {
         return other.isVoid();
     }
@@ -415,10 +427,10 @@ public:
     PointerType() {}
     PointerType(Ptr<Type> base) : base(base) {}
     
-    virtual bool isScalar() { return true; }
+    virtual bool isScalar() const { return true; }
     virtual bool isCompatible(const Type &other) const;
     
-    virtual Ptr<Type> dereference(lexer::TextPosition pos) {
+    virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
         if (!base->isComplete())
             throw CompilerError("dereference of incomplete type", pos);
         return base;
@@ -582,8 +594,8 @@ public:
                     if (ct->isNamed() && ct->isQualified())
                         // some composed type was declared, this is valid.
                         return;
-          
-            // @experiment error("declaration does not declare anything", node);
+            
+            error("declaration does not declare anything", node);
         }
         
         for (auto &decl : node.declarators) {
@@ -598,7 +610,7 @@ public:
                     auto scope = scopes.find<FileScope>();
                     scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
                 } else
-                    ;// @experiment error("variable has incomplete type '" + dtype->describe() + "'", node);
+                    error("variable has incomplete type '" + dtype->describe() + "'", node);
             }
             
             // find identifier
@@ -606,16 +618,16 @@ public:
                 // @todo assert(false) here
                 error("abstract declarator in declaration", node);
             else
-                scope->declareVariable(decl.name, dtype, decl.pos);
+                scope->declareVariable(decl.name, dtype, decl.pos, !dtype->isFunction());
             
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
                 if (!Type::canCompare(*itp.type, *dtype, true))
-                    /*error(
+                    error(
                         "initializing '" + dtype->describe() + "' with an expression of " +
                         "incompatible type '" + itp.type->describe() + "'",
                         *decl.initializer
-                    )*/;
+                    );
             }
         }
     }
@@ -643,7 +655,7 @@ public:
             if (!fn->returnType->isComplete())
                 error("incomplete result type in function definition", node);
             
-            scope->declareVariable(decl.name, t, node.pos);
+            scope->declareVariable(decl.name, t, node.pos, true);
             
             auto scope = scopes.find<FunctionScope>(); // @todo as callback param?
             scope->returnType = fn->returnType;
@@ -671,7 +683,7 @@ public:
             return;
         
         auto scope = scopes.find<FunctionScope>();
-        scope->declareVariable(node.declarator.name, type, node.declarator.pos);
+        scope->declareVariable(node.declarator.name, type, node.declarator.pos, true);
     }
 
 #pragma mark - Expressions
@@ -753,10 +765,8 @@ public:
             case Prec::INCLUSIVE_OR:
             case Prec::EXCLUSIVE_OR:
             {
-                auto a = dynamic_cast<ArithmeticType *>(lhs.type.get());
-                auto b = dynamic_cast<ArithmeticType *>(lhs.type.get());
-                if (!a || !b) error("operands must be arithmetic", node);
-                exprStack.push(TypePair(a, lhs.type)); // @todo?
+                if (!lhs.type->isArithmetic() || !rhs.type->isArithmetic()) error("operands must be arithmetic", node);
+                exprStack.push(TypePair(false, lhs.type)); // @todo?
                 break;
             }
             
