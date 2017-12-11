@@ -1,1 +1,1 @@
-tests/sema/missing_label/input.c:2:5: error: could not resolve label hi
+tests/sema/missing_label/input.c:2:5: error: use of undeclared label 'hi'

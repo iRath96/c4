@@ -72,8 +72,6 @@ public:
         result = it->second;
         return true;
     }
-    
-    virtual void close();
 };
 
 class FileScope : public BlockScope {
@@ -110,7 +108,7 @@ public:
             return;
         
         auto lab = *unresolvedLabels.begin();
-        throw CompilerError("could not resolve label " + lab.first, lab.second);
+        throw CompilerError("use of undeclared label '" + lab.first + "'", lab.second);
     }
 };
 
@@ -166,11 +164,13 @@ public:
         return false;
     }
     
-    Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct) {
-        for (auto it = stack.rbegin(); it != stack.rend(); ++it)
-            if (auto bs = dynamic_cast<BlockScope *>(it->get()))
-                if (bs->declaresComposedType(ct))
-                    return bs->resolveComposedType(ct);
+    Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct, bool direct = false) {
+        if (!direct)
+            for (auto it = stack.rbegin(); it != stack.rend(); ++it)
+                if (auto bs = dynamic_cast<BlockScope *>(it->get()))
+                    if (bs->declaresComposedType(ct))
+                        return bs->resolveComposedType(ct);
+        
         return find<BlockScope>()->resolveComposedType(ct);
     }
 };
@@ -432,7 +432,7 @@ public:
     
     virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
         if (!base->isComplete())
-            throw CompilerError("dereference of incomplete type", pos);
+            throw CompilerError("incomplete type '" + base->describe() + "' where a complete type is required", pos);
         return base;
     }
     
@@ -526,11 +526,8 @@ public:
     }
     
     virtual void visit(IdentifierLabel &node) {
-        auto scope = scopes.find<FunctionScope>();
-        if (scope.get())
-            scope->resolveLabel(node.id, node.pos);
-        else
-            error("label outside of function?!", node);
+        auto &scope = *scopes.find<FunctionScope>();
+        scope.resolveLabel(node.id, node.pos);
     }
     
     void visit(Statement &node) {
@@ -541,11 +538,8 @@ public:
     virtual void visit(GotoStatement &node) {
         visit((Statement &)node);
         
-        auto scope = scopes.find<FunctionScope>();
-        if (scope.get())
-            scope->referenceLabel(node.target, node.pos);
-        else
-            error("goto outside of function?!", node);
+        auto &scope = *scopes.find<FunctionScope>();
+        scope.referenceLabel(node.target, node.pos); // @todo target pos
     }
     
     virtual void visit(ContinueStatement &node) {
@@ -692,7 +686,7 @@ public:
         if (node.isIdentifier) {
             Ptr<Type> type;
             if (!scopes.resolveVariable(node.text, type))
-                error(std::string(node.text) + " was not declared in this scope", node);
+                error("use of undeclared identifier '" + std::string(node.text) + "'", node);
             
             exprStack.push(TypePair(true, type));
             return;
@@ -731,12 +725,12 @@ public:
         
         case Punctuator::BIT_AND:
             if (!tp.lvalue)
-                error("cannot reference non lvalue", node);
+                error("cannot take the address of an rvalue of type '" + tp.type->describe() + "'", node);
             exprStack.push(TypePair(false, tp.type->reference()));
             break;
         
         default:
-            //error("unary operation is not supported", node);
+            // @todo
             exprStack.push(tp);
             break;
         }
@@ -750,10 +744,6 @@ public:
         auto lhs = exprType(*node.lhs);
         auto rhs = exprType(*node.rhs);
         
-        if (Token::precedence(node.op) == Token::Precedence::ASSIGNMENT)
-            if (!lhs.lvalue)
-                error("lhs is not an lvalue", node);
-        
         switch (node.op) {
         case Op::PLUS: exprStack.push(TypePair(false, Type::add(lhs.type, rhs.type, node.pos))); break;
         case Op::MINUS: exprStack.push(TypePair(false, Type::subtract(lhs.type, rhs.type, node.pos))); break;
@@ -765,20 +755,35 @@ public:
             case Prec::INCLUSIVE_OR:
             case Prec::EXCLUSIVE_OR:
             {
-                if (!lhs.type->isArithmetic() || !rhs.type->isArithmetic()) error("operands must be arithmetic", node);
+                if (!lhs.type->isArithmetic() || !rhs.type->isArithmetic())
+                    error(
+                        "invalid operands to binary expression ('" + lhs.type->describe() +
+                        "' and '" + rhs.type->describe() + "')",
+                        node
+                    );
                 exprStack.push(TypePair(false, lhs.type)); // @todo?
                 break;
             }
             
             case Prec::LOGICAL_OR:
             case Prec::LOGICAL_AND:
-                if (!lhs.type->isScalar() || !rhs.type->isScalar()) error("operands must be scalar", node);
+                if (!lhs.type->isScalar() || !rhs.type->isScalar())
+                    error(
+                        "invalid operands to binary expression ('" + lhs.type->describe() +
+                        "' and '" + rhs.type->describe() + "')",
+                        node
+                    );
                 exprStack.push(intType);
                 break;
             
             case Prec::ASSIGNMENT:
-                if (!lhs.lvalue) error("lhs is not an lvalue", *node.lhs);
-                if (!Type::canCompare(*lhs.type, *rhs.type, true)) error("assignment with incompatible type", *node.rhs);
+                if (!lhs.lvalue) error("expression is not assignable", *node.lhs);
+                if (!Type::canCompare(*lhs.type, *rhs.type, true))
+                    error(
+                        "assigning to '" + lhs.type->describe() +
+                        "' from incompatible type '" + rhs.type->describe() + "'",
+                        *node.rhs
+                    );
                 exprStack.push(TypePair(false, lhs.type));
                 break;
             
@@ -812,7 +817,10 @@ public:
     virtual void visit(ConditionalExpression &node) {
         auto cond = exprType(*node.condition);
         if (!cond.type->isScalar())
-            error("condition not scalar", *node.condition);
+            error(
+                "used type '" + cond.type->describe() +
+                "' where arithmetic or pointer type is required", *node.condition
+            );
         
         auto lhs = exprType(*node.when_true);
         auto rhs = exprType(*node.when_false);
@@ -900,7 +908,10 @@ public:
         
         auto cond = exprType(node.condition);
         if (!cond.type->isScalar())
-            error("condition not scalar", node.condition);
+            error(
+                "statement requires expression of scalar type ('" + cond.type->describe() +
+                "' invalid)", node.condition
+            );
         
         scopes.execute<IterationScope>([&]() {
             inspect(node.body);
@@ -912,7 +923,10 @@ public:
         
         auto cond = exprType(node.condition);
         if (!cond.type->isScalar())
-            error("condition not scalar", node.condition);
+            error(
+                "statement requires expression of scalar type ('" + cond.type->describe() +
+                "' invalid)", node.condition
+            );
         
         inspect(node.when_true);
         inspect(node.when_false);

@@ -34,14 +34,6 @@ Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
         return it->second;
 }
 
-void BlockScope::close() {
-    /*for (auto &comp : composedTypes) {
-        auto ct = dynamic_cast<ComposedType *>(comp.second.get());
-        if (!ct->isComplete())
-            throw CompilerError("type " + std::string(comp.first) + " is never defined", ct->pos);
-    }*/
-}
-
 Ptr<Type> Type::reference() {
     return std::make_shared<PointerType>(shared_from_this());
 }
@@ -76,14 +68,16 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
                 break;
             
             case Keyword::SHORT:
-            case Keyword::CHAR:
-                if (hasSize)
+            case Keyword::CHAR: {
+                auto s = nt->keyword == Keyword::SHORT ? ArithmeticType::SHORT : ArithmeticType::CHAR;
+                if (hasSize && (s == ArithmeticType::CHAR || s != size))
                     throw CompilerError("cannot combine with previous declaration specifier", spec->pos);
                 else {
                     hasSize = true;
-                    size = nt->keyword == Keyword::SHORT ? ArithmeticType::SHORT : ArithmeticType::CHAR;
+                    size = s;
                     break;
                 }
+            }
                 
             case Keyword::INT:
                 if (hasInt)
@@ -92,12 +86,14 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
                 break;
             
             case Keyword::SIGNED:
-            case Keyword::UNSIGNED:
-                if (hasSign)
+            case Keyword::UNSIGNED: {
+                auto s = nt->keyword == Keyword::SIGNED ? ArithmeticType::SIGNED : ArithmeticType::UNSIGNED;
+                if (hasSign && sign != s)
                     throw CompilerError("cannot combine with previous declaration specifier", spec->pos);
                 hasSign = true;
-                sign = nt->keyword == Keyword::SIGNED ? ArithmeticType::SIGNED : ArithmeticType::UNSIGNED;
+                sign = s;
                 break;
+            }
                 
             case Keyword::VOID:
                 if (specifiers.size() != 1)
@@ -132,7 +128,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
     } else {
         Ptr<Type> c;
         if (comp->isNamed())
-            c = scopes.resolveComposedType(comp);
+            c = scopes.resolveComposedType(comp, comp->isQualified());
         else {
             // anonymous
             c = std::make_shared<ComposedType>();
@@ -145,8 +141,13 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         if (!comp->isQualified())
             return c;
         
-        if (cc.isComplete() || typeQueue.find(&cc) != typeQueue.end())
-            throw CompilerError("redefinition of '" + std::string(comp->name) + "'", comp->pos);
+        bool isNested = typeQueue.find(&cc) != typeQueue.end();
+        if (cc.isComplete() || isNested)
+            throw CompilerError(
+                std::string(isNested ? "nested " : "") +
+                "redefinition of '" + std::string(comp->name) + "'",
+                comp->pos
+            );
         
         typeQueue.insert(&cc);
         
@@ -155,7 +156,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
             for (auto &decl : declaration.declarators) {
                 Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
                 if (!dtype->isComplete())
-                    throw CompilerError("field has incomplete type", decl.pos);
+                    throw CompilerError("field has incomplete type '" + dtype->describe() + "'", decl.pos);
                 
                 cc.addMember(std::string(decl.name), dtype, decl.pos);
             }
@@ -206,7 +207,7 @@ Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
         auto sign = ArithmeticType::max(arA->sign, arB->sign);
         
         if (arA->size == size && arA->sign == sign) return a;
-        if (arB->size == size && arB->sign == sign) return a;
+        if (arB->size == size && arB->sign == sign) return b;
         
         return std::make_shared<ArithmeticType>(sign, size);
     }
@@ -229,7 +230,7 @@ Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
         auto sign = ArithmeticType::max(arA->sign, arB->sign);
         
         if (arA->size == size && arA->sign == sign) return a;
-        if (arB->size == size && arB->sign == sign) return a;
+        if (arB->size == size && arB->sign == sign) return b;
         
         return std::make_shared<ArithmeticType>(sign, size);
     }
