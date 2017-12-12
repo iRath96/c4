@@ -23,8 +23,7 @@ protected:
     
     template<typename T>
     void inspect(Ptr<T> &ptr) {
-        if (ptr.get())
-            inspect(*ptr);
+        if (ptr.get()) inspect(*ptr);
     }
     
     template<typename T>
@@ -38,8 +37,7 @@ protected:
             inspect(child);
         }
         
-        if (!vector.empty())
-            std::cout << suffix;
+        if (!vector.empty()) std::cout << suffix;
     }
     
     template<typename T>
@@ -53,7 +51,6 @@ protected:
         }
         
         indent = prev_indent;
-        
         std::cout << std::endl << indent;
     }
     
@@ -241,8 +238,7 @@ public:
     
     virtual void visit(ComposedTypeSpecifier &node) {
         std::cout << "struct";
-        if (node.name)
-            std::cout << " " << node.name;
+        if (node.isNamed()) std::cout << " " << node.name;
         
         if (!node.declarations.empty()) {
             std::cout << std::endl << indent << "{";

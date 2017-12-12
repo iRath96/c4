@@ -147,9 +147,7 @@ public:
     TextPosition pos;
     
     ParserError(const std::string &message, TextPosition pos)
-    : message(message), pos(pos) {
-        
-    }
+    : message(message), pos(pos) {}
 };
 
 class Parser {
@@ -217,13 +215,6 @@ protected:
     }
     
     [[noreturn]] void error(const std::string &message, int offset = 0) {
-        /*
-        // I prefer this kind of error reporting, however the tests don't…
-        TextPosition start_pos = i + offset > 0 ?
-            peek(offset - 1).end_pos :
-            peek(offset).pos
-        ;
-        */
         TextPosition start_pos = peek(offset).pos;
         throw ParserError(message, start_pos);
     }
@@ -260,7 +251,7 @@ protected:
         }
     OTHERWISE_FAIL("unary operator expected")
     
-    bool read_token(Token::Kind kind, const char *&text)
+    bool read_token(Token::Kind kind, std::string &text)
     OPTION
         NON_OPTIONAL(peek().kind == kind)
     
@@ -268,17 +259,17 @@ protected:
         shift();
     END_OPTION
     
-    bool read_identifier(const char *&text)
+    bool read_identifier(std::string &text)
     OPTION
         NON_OPTIONAL(read_token(Token::Kind::IDENTIFIER, text))
     OTHERWISE_FAIL("identifier expected")
     
-    bool read_constant(const char *&text)
+    bool read_constant(std::string &text)
     OPTION
         NON_OPTIONAL(read_token(Token::Kind::CONSTANT, text))
     OTHERWISE_FAIL("constant expected")
     
-    bool read_string_literal(const char *&text)
+    bool read_string_literal(std::string &text)
     OPTION
         NON_OPTIONAL(read_token(Token::Kind::STRING_LITERAL, text))
     OTHERWISE_FAIL("string literal expected")
@@ -314,15 +305,10 @@ protected:
         bool _initial_ef = error_flag;
         
         while (!eof()) {
-            if (peek().punctuator == end_marker)
-                break;
+            if (peek().punctuator == end_marker) break;
             
             T temp;
-            if (!(this->*method)(temp))
-                break;
-            
-            //error_flag = false;
-            
+            if (!(this->*method)(temp)) break;
             result.push_back(temp);
         }
         
@@ -338,17 +324,13 @@ protected:
         
         while (!eof()) {
             T temp;
-            if (!(this->*method)(temp))
-                break;
+            if (!(this->*method)(temp)) break;
             
             result.push_back(temp);
             last_good_i = i;
             
             error_flag = false;
-            
-            if (!read_punctuator(separator))
-                break;
-            
+            if (!read_punctuator(separator)) break;
             error_flag = true;
         }
         
@@ -400,13 +382,8 @@ protected:
         last_good_i = i;
         while (!eof()) {
             NON_UNIQUE
-            
-            // try reading parameter-list / identifier-list
-            
             auto p_suffix = std::make_shared<ast::DeclaratorParameterList>();
-            
-            if (!read_punctuator(Token::Punctuator::RB_OPEN))
-                break;
+            if (!read_punctuator(Token::Punctuator::RB_OPEN)) break;
             
             UNIQUE
             OPTIONAL(read_parameter_type_list(p_suffix->parameters));
@@ -416,16 +393,13 @@ protected:
                 if (p.declarator.isAbstract() && p.declarator.modifiers.empty() && p.specifiers.size() == 1) {
                     auto s = p.specifiers.front();
                     if (auto nt = dynamic_cast<ast::NamedTypeSpecifier *>(s.get()))
-                        if (!strcmp(nt->id, "void"))
+                        if (nt->id == "void")
                             p_suffix->parameters.clear(); // no parameters taken
                 }
             }
             
+            if (!read_punctuator(Token::Punctuator::RB_CLOSE)) break;
             node.modifiers.insert(node.modifiers.begin() + insertionIndex, p_suffix);
-            
-            if (!read_punctuator(Token::Punctuator::RB_CLOSE))
-                break;
-            
             last_good_i = i;
         }
     
@@ -618,10 +592,8 @@ protected:
         } else {
             // function definition: ... declaration-list(opt) compound-statement
             
-            if (!has_declarator) {
+            if (!has_declarator)
                 read_declarator(declarator, false);
-                //error("declarator expected");
-            }
             
             auto n = new ast::ExternalDeclarationFunction();
             node.reset(n);

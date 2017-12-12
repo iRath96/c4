@@ -121,21 +121,12 @@ struct Token {
     enum class Keyword : uint8_t {
         NOT_A_KEYWORD = 0,
         
-        AUTO,
-        BREAK,
-        CASE, CHAR, CONST, CONTINUE,
-        DEFAULT, DO, DOUBLE,
-        ELSE, ENUM, EXTERN,
-        FLOAT, FOR,
-        GOTO,
-        IF, INLINE, INT,
-        LONG,
+        AUTO, BREAK, CASE, CHAR, CONST, CONTINUE,
+        DEFAULT, DO, DOUBLE, ELSE, ENUM, EXTERN,
+        FLOAT, FOR, GOTO, IF, INLINE, INT, LONG,
         REGISTER, RESTRICT, RETURN,
         SHORT, SIGNED, SIZEOF, STATIC, STRUCT, SWITCH,
-        TYPEDEF,
-        UNION, UNSIGNED,
-        VOID, VOLATILE,
-        WHILE,
+        TYPEDEF, UNION, UNSIGNED, VOID, VOLATILE, WHILE,
         
         _ALIGNAS, _ALIGNOF, _ATOMIC, _BOOL, _COMPLEX,
         _GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
@@ -148,48 +139,12 @@ struct Token {
 
     TextPosition pos, end_pos;
     
-    const char *text;
+    std::string text;
     
     Kind kind;
     Keyword keyword = Keyword::NOT_A_KEYWORD;
     Punctuator punctuator = Punctuator::NOT_A_PUNCTUATOR;
 };
-
-struct StringWithLength {
-    const char *data;
-    int length;
-
-    StringWithLength(const char *data, int length) : data(data), length(length) {}
-
-    bool operator<(const StringWithLength &other) const {
-        if (length != other.length)
-            return length < other.length;
-        
-        return strncmp(data, other.data, length) == -1;
-    }
-
-    bool operator==(const StringWithLength &other) const {
-        return length == other.length && !strncmp(data, other.data, length);
-    }
-};
-
-}
-
-namespace std {
-    template <>
-    struct hash<lexer::StringWithLength> {
-        std::size_t operator()(const lexer::StringWithLength &k) const {
-            size_t hash = std::hash<int>()(k.length);
-            hash ^= (k.data[0] * (k.length > 0)) << 2;
-            hash ^= (k.data[1] * (k.length > 1)) << 3;
-            hash ^= (k.data[2] * (k.length > 2)) << 5;
-            hash ^= (k.data[3] * (k.length > 3)) << 7;
-            return hash;
-        }
-    };
-}
-
-namespace lexer {
 
 class Lexer {
 public:
@@ -204,46 +159,21 @@ public:
         TextPosition start_pos, end_pos;
         
         Error(const std::string &message, TextPosition start_pos, TextPosition end_pos)
-        : message(message), start_pos(start_pos), end_pos(end_pos) {
-            
-        }
+        : message(message), start_pos(start_pos), end_pos(end_pos) {}
     };
 
     Lexer(char *data, int length) {
         input.data = std::shared_ptr<char>(data);
         input.length = length;
         
-        symbol_table.reserve(1024);
-        
         replace_eol();
     }
     
-    bool has_ended() {
-        return eof(0);
-    }
+    bool has_ended() { return eof(0); }
     
     Token next_token();
     
 private:
-    std::unordered_map<StringWithLength, std::shared_ptr<char>> symbol_table;
-    
-    const char *find_text(const char *source, int length) {
-        StringWithLength s(source, length);
-        
-        auto it = symbol_table.find(s);
-        if (it != symbol_table.end())
-            return it->second.get();
-        
-        char *buffer = (char *)malloc(length + 1);
-        memcpy(buffer, source, length);
-        buffer[length] = 0;
-        
-        //printf("Creating token %s\n", buffer);
-        symbol_table[s] = std::shared_ptr<char>(buffer);
-        
-        return buffer;
-    }
-    
     Input input;
     TextPosition pos;
     

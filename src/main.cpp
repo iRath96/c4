@@ -60,10 +60,10 @@ void tokenize(const char *filename) {
     try {
         while (true) {
             Token t = lexer.next_token();
-            if (t.kind == Token::Kind::END)
-                break;
+            if (t.kind == Token::Kind::END) break;
             
-            enable_output && printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_kind_name(t.kind), t.text);
+            enable_output &&
+            printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_kind_name(t.kind), t.text.c_str());
         }
     } catch (Lexer::Error e) {
         fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
@@ -102,10 +102,8 @@ void parse(const char *filename, bool printAST) {
         Beautifier beautifier;
         bool isFirst = true;
         for (auto &decl : parser.declarations) {
-            if (isFirst)
-                isFirst = false;
-            else
-                std::cout << std::endl;
+            if (isFirst) isFirst = false;
+            else std::cout << std::endl;
             
             decl->accept(beautifier);
         }

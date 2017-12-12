@@ -143,7 +143,7 @@ struct Statement : BlockItem {
 #pragma mark - Nodes
 
 struct Identifier : Node {
-    const char *id;
+    std::string id;
     ACCEPT
 };
 
@@ -161,7 +161,7 @@ struct DefaultLabel : Label {
 };
 
 struct IdentifierLabel : Label {
-    const char *id;
+    std::string id;
     ACCEPT
 };
 
@@ -182,8 +182,8 @@ struct Declarator : Node {
     PtrVector<DeclaratorModifier> modifiers;
     Ptr<Expression> initializer;
     
-    const char *name = NULL;
-    bool isAbstract() const { return !name; }
+    std::string name;
+    bool isAbstract() const { return name.empty(); }
     
     ACCEPT
 };
@@ -191,30 +191,26 @@ struct Declarator : Node {
 struct TypeName : Node {
     PtrVector<TypeSpecifier> specifiers;
     Declarator declarator;
-    
     ACCEPT
 };
 
 #pragma mark - Expressions
 
 struct ConstantExpression : Expression {
-    const char *text;
+    std::string text;
     bool isIdentifier;
-    
     ACCEPT
 };
 
 struct CastExpression : Expression {
     TypeName type;
     Ptr<Expression> expression;
-    
     ACCEPT
 };
 
 struct UnaryExpression : Expression {
     Ptr<Expression> operand;
     lexer::Token::Punctuator op;
-    
     ACCEPT
 };
 
@@ -222,7 +218,6 @@ struct BinaryExpression : Expression {
 public:
     Ptr<Expression> lhs, rhs;
     lexer::Token::Punctuator op;
-    
     ACCEPT
 };
 
@@ -239,14 +234,12 @@ struct ExpressionList : Expression {
 struct CallExpression : Expression {
     Ptr<Expression> function;
     PtrVector<Expression> arguments;
-    
     ACCEPT
 };
 
 struct SubscriptExpression : Expression {
     Ptr<Expression> base;
     ast::ExpressionList subscript;
-    
     ACCEPT
 };
 
@@ -254,7 +247,7 @@ struct MemberExpression : Expression {
     bool dereference; // false for '.', true for '->'
     
     Ptr<Expression> base;
-    const char *id;
+    std::string id;
     
     ACCEPT
 };
@@ -262,7 +255,6 @@ struct MemberExpression : Expression {
 struct PostExpression : Expression {
     Ptr<Expression> base;
     lexer::Token::Punctuator op;
-    
     ACCEPT
 };
 
@@ -293,21 +285,19 @@ struct ExpressionStatement : Statement {
 struct IterationStatement : Statement {
     ExpressionList condition;
     Ptr<Statement> body;
-    
     ACCEPT
 };
 
 struct SelectionStatement : Statement {
     ExpressionList condition;
     Ptr<Statement> when_true, when_false;
-    
     ACCEPT
 };
 
 struct JumpStatement : Statement {};
 
 struct GotoStatement : JumpStatement {
-    const char *target;
+    std::string target;
     ACCEPT
 };
 
@@ -326,14 +316,12 @@ struct ReturnStatement : JumpStatement {
 struct Declaration : BlockItem {
     PtrVector<TypeSpecifier> specifiers;
     Vector<Declarator> declarators;
-    
     ACCEPT
 };
 
 struct ParameterDeclaration : Node {
     PtrVector<TypeSpecifier> specifiers;
     Declarator declarator;
-    
     ACCEPT
 };
 
@@ -346,27 +334,25 @@ struct ExternalDeclarationVariable : ExternalDeclaration {
 struct ExternalDeclarationFunction : ExternalDeclaration {
     Vector<Declaration> declarations;
     CompoundStatement body;
-    
     ACCEPT
 };
 
 #pragma mark - Types
 
 struct NamedTypeSpecifier : TypeSpecifier {
-    const char *id;
+    std::string id;
     lexer::Token::Keyword keyword;
-    
     ACCEPT
 };
 
 struct ComposedTypeSpecifier : TypeSpecifier {
-    const char *name = NULL;
+    std::string name;
     
     lexer::Token::Keyword kind; // STRUCT or UNION
     Vector<Declaration> declarations;
     
     bool isQualified() const { return !declarations.empty(); }
-    bool isNamed() const { return name; }
+    bool isNamed() const { return !name.empty(); }
     
     ACCEPT
 };

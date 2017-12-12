@@ -83,7 +83,6 @@ Token Lexer::create_token(Token::Kind kind, int length) {
     Token token;
     token.pos = pos;
     token.kind = kind;
-    token.text = NULL;
     
     const char *raw_text = input.data.get() + pos.index;
     
@@ -123,8 +122,8 @@ Token Lexer::create_token(Token::Kind kind, int length) {
         token.punctuator = last_punctuator;
     }
     
-    if (token.text == NULL)
-        token.text = find_text(raw_text, length);
+    if (token.text.empty())
+        token.text = std::string(raw_text, length);
     
     consume(length);
     token.end_pos = pos;
@@ -134,21 +133,17 @@ Token Lexer::create_token(Token::Kind kind, int length) {
 
 int Lexer::read_whitespace() {
     int i = 0;
-    while (isspace(peek(i)))
-        ++i;
+    while (isspace(peek(i))) ++i;
     return i;
 }
 
 int Lexer::read_string() {
-    if (peek(0) != '"')
-        // not a string
-        return 0;
+    if (peek(0) != '"') return 0; // not a string
     
     int i = 1;
     while (!eof(i)) {
         char c = peek(i);
-        if (c == '"')
-            return i + 1;
+        if (c == '"') return i + 1;
         i = read_escape_seq(i);
     }
     
@@ -157,9 +152,7 @@ int Lexer::read_string() {
 }
 
 int Lexer::read_escape_seq(int i) {
-    if (eof(i))
-        // can't read anything
-        return i;
+    if (eof(i)) return i; // can't read anything
     
     if (peek(i) == '\n') {
         // newlines are not allowed in string-literals
@@ -180,8 +173,7 @@ int Lexer::read_escape_seq(int i) {
         int max_i = i + 2; // two more octal digits are allowed
         
         // octal escape sequence
-        while (i < max_i && is_octal(peek(i)))
-            ++i;
+        while (i < max_i && is_octal(peek(i))) ++i;
         return i;
     }
     
@@ -202,16 +194,12 @@ int Lexer::read_char() {
         // not a character
         return 0;
     
-    if (peek(1) == '\'')
-        error("empty character constant", 1);
+    if (peek(1) == '\'') error("empty character constant", 1);
     
     int i = read_escape_seq(1);
     
-    if (eof(i))
-        error("EOF encountered while reading character constant", i);
-    
-    if (peek(i) != '\'')
-        error("character constant too long", i);
+    if (eof(i)) error("EOF encountered while reading character constant", i);
+    if (peek(i) != '\'') error("character constant too long", i);
     
     return i + 1;
 }
@@ -227,19 +215,15 @@ int Lexer::read_comment() {
         
         i = 3;
         while (!eof(i))
-            if (peek(i - 1) == '*' && peek(i) == '/')
-                return i + 1;
-            else
-                ++i;
+            if (peek(i - 1) == '*' && peek(i) == '/') return i + 1;
+            else ++i;
     } else if (peek(1) == '/') {
         // single line comment
         
         i = 2;
         while (!eof(i))
-            if (peek(i) == '\n')
-                return i;
-            else
-                ++i;
+            if (peek(i) == '\n') return i;
+            else ++i;
     } else
         return 0;
     
@@ -315,16 +299,12 @@ int Lexer::read_punctuator() {
 
 int Lexer::read_identifier() {
     char c = peek(0);
-    if (!TEST_CHAR(is_alpha, c) && c != '_')
-        // not an identifier
-        return 0;
+    if (!TEST_CHAR(is_alpha, c) && c != '_') return 0; // not an identifier
     
     int i = 1;
     while (!eof(i)) {
         c = peek(i);
-        if (!TEST_CHAR(is_alphanum, c) && c != '_')
-            return i;
-        
+        if (!TEST_CHAR(is_alphanum, c) && c != '_') return i;
         ++i;
     }
     
@@ -332,13 +312,10 @@ int Lexer::read_identifier() {
 }
 
 int Lexer::read_constant() {
-    if (peek(0) == '0')
-        // octal constants are now allowed
-        return 1;
+    if (peek(0) == '0') return 1; // octal constants are now allowed
     
     int i = 0;
-    while (isdigit(peek(i)))
-        ++i;
+    while (isdigit(peek(i))) ++i;
     return i;
 }
 

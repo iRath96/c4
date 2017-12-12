@@ -668,7 +668,7 @@ public:
         switch (node.text[0]) {
         case '\'': exprStack.push(charType); break;
         case '\"': exprStack.push(stringType); break;
-        default: exprStack.push(!strcmp(node.text, "0") ? nullptrType : intType); break;
+        default: exprStack.push(node.text == "0" ? nullptrType : intType); break;
         }
     }
     
