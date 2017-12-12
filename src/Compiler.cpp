@@ -158,8 +158,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
         }
         
         auto &cc = dynamic_cast<ComposedType &>(*c);
-        if (!comp->isQualified())
-            return c;
+        if (!comp->isQualified()) return c;
         
         bool isNested = typeQueue.find(&cc) != typeQueue.end();
         if (cc.isComplete() || isNested)
@@ -256,7 +255,6 @@ Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
     
     auto ptrA = dynamic_cast<PointerType *>(a.get());
     auto ptrB = dynamic_cast<PointerType *>(b.get());
-    
     if (ptrA && arB) return a;
     
     if (ptrA && ptrB) {
@@ -269,12 +267,8 @@ Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
 }
 
 bool Type::canCompare(const Type &a, const Type &b, bool broad) {
-    if (broad && a.isCompatible(b))
-        return true;
-    
-    auto arA = dynamic_cast<const ArithmeticType *>(&a);
-    auto arB = dynamic_cast<const ArithmeticType *>(&b);
-    if (arA && arB) return true;
+    if (broad && a.isCompatible(b)) return true;
+    if (a.isArithmetic() && b.isArithmetic()) return true;
     
     auto ptrA = dynamic_cast<const PointerType *>(&a);
     auto ptrB = dynamic_cast<const PointerType *>(&b);
@@ -293,13 +287,9 @@ Ptr<Type> Type::ptrdiffType = std::make_shared<ArithmeticType>(ArithmeticType::U
 std::set<Type *> Type::typeQueue = std::set<Type *>();
 
 bool FunctionType::isCompatible(const Type &other) const {
-    if (auto p = dynamic_cast<const PointerType *>(&other))
-        return p->base->isCompatible(*this);
-    
+    if (auto p = dynamic_cast<const PointerType *>(&other)) return p->base->isCompatible(*this);
     if (auto f = dynamic_cast<const FunctionType *>(&other)) {
-        if (parameters.size() != f->parameters.size())
-            return false;
-        
+        if (parameters.size() != f->parameters.size()) return false;
         for (size_t i = 0; i < parameters.size(); ++i)
             if (!parameters[i]->isCompatible(*f->parameters[i])) // @todo isEqual
                 return false;

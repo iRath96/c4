@@ -55,8 +55,7 @@ public:
     
     bool resolveVariable(std::string name, Ptr<Type> &result) {
         auto it = variables.find(name);
-        if (it == variables.end())
-            return false;
+        if (it == variables.end()) return false;
         result = it->second;
         return true;
     }
@@ -92,8 +91,7 @@ public:
     virtual void close() {
         BlockScope::close();
         
-        if (unresolvedLabels.empty())
-            return;
+        if (unresolvedLabels.empty()) return;
         
         auto lab = *unresolvedLabels.begin();
         throw CompilerError("use of undeclared label '" + lab.first + "'", lab.second);
@@ -112,9 +110,7 @@ class ScopeStack {
 public:
     std::vector<ast::Ptr<Scope>> stack;
     
-    Ptr<Scope> top() {
-        return stack.back();
-    }
+    Ptr<Scope> top() { return stack.back(); }
     
     template<typename T>
     T &push() {
@@ -136,7 +132,7 @@ public:
     }
     
     template<typename T>
-    ast::Ptr<T> find() {
+    ast::Ptr<T> find() { // @todo I doubt this is a good idea…
         for (auto it = stack.rbegin(); it != stack.rend(); ++it)
             if (dynamic_cast<T *>(it->get()))
                 return reinterpret_cast<ast::Ptr<T> &>(*it);
@@ -273,10 +269,7 @@ public:
         throw CompilerError("cannot dereference null pointer", pos);
     }
     
-    virtual std::string name() const {
-        return "nullptr";
-    }
-    
+    virtual std::string name() const { return "nullptr"; }
     virtual bool isNullPointer() const { return true; }
 };
 
@@ -293,18 +286,15 @@ public:
     std::vector<std::pair<std::string, Ptr<Type>>> members;
     
     virtual bool isScalar() const { return false; }
-    virtual bool isCompatible(const Type &other) const {
-        return this == &other;
-    }
+    virtual bool isCompatible(const Type &other) const { return this == &other; }
     
     virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
         if (!isComplete())
             throw CompilerError("member access into incomplete type", pos);
         
-        for (auto &member : members) { // @todo not efficient
+        for (auto &member : members) // @todo not efficient
             if (member.first == name)
                 return member.second;
-        }
         
         throw CompilerError("no member named '" + name + "' in '" + describe() + "'", pos);
     }
@@ -409,13 +399,8 @@ public:
         return base->call(argTypes, pos);
     }
     
-    virtual std::string describe() const {
-        return base->describe() + "*";
-    }
-    
-    virtual bool isVoidPointer() const {
-        return base->isVoid();
-    }
+    virtual std::string describe() const { return base->describe() + "*"; }
+    virtual bool isVoidPointer() const { return base->isVoid(); }
 };
 
 class ExpressionStack {
@@ -450,8 +435,7 @@ protected:
     
     template<typename T>
     void inspect(ast::Ptr<T> &node) {
-        if (node.get())
-            node->accept(*this);
+        if (node.get()) node->accept(*this);
     }
     
     [[noreturn]] void error(std::string message, Node &node) {
@@ -485,13 +469,11 @@ public:
     }
     
     virtual void visit(CaseLabel &node) {
-        if (!scopes.find<SwitchScope>().get())
-            error("'case' statement not in switch statement", node);
+        if (!scopes.find<SwitchScope>().get()) error("'case' statement not in switch statement", node);
     }
     
     virtual void visit(DefaultLabel &node) {
-        if (!scopes.find<SwitchScope>().get())
-            error("'default' statement not in switch statement", node);
+        if (!scopes.find<SwitchScope>().get()) error("'default' statement not in switch statement", node);
     }
     
     virtual void visit(IdentifierLabel &node) {
@@ -500,8 +482,7 @@ public:
     }
     
     void visit(Statement &node) {
-        for (auto &lab : node.labels)
-            inspect(lab);
+        for (auto &lab : node.labels) inspect(lab);
     }
     
     virtual void visit(GotoStatement &node) {
@@ -526,8 +507,7 @@ public:
     virtual void visit(Identifier &) {}
 
     virtual void visitBlockItems(CompoundStatement &node) {
-        for (auto &item : node.items)
-            inspect(item);
+        for (auto &item : node.items) inspect(item);
     }
     
     virtual void visit(CompoundStatement &node) {
@@ -646,8 +626,7 @@ public:
     virtual void visit(ParameterDeclaration &node) {
         Ptr<Type> type = Type::create(node.specifiers, node.declarator, node.pos, scopes);
         
-        if (node.declarator.isAbstract())
-            return;
+        if (node.declarator.isAbstract()) return;
         
         auto scope = scopes.find<FunctionScope>();
         scope->declareVariable(node.declarator.name, type, node.declarator.pos, true);
@@ -805,8 +784,7 @@ public:
 
     virtual void visit(ExpressionList &node) {
         TypePair lastType = voidType;
-        for (auto &child : node.children)
-            lastType = exprType(*child);
+        for (auto &child : node.children) lastType = exprType(*child);
         exprStack.push(lastType);
     }
 

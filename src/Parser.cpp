@@ -29,8 +29,7 @@ void DebugTree::dump(Parser *parser, std::string indent) {
         std::cout << std::endl;
     //}
     
-    for (auto &child : children)
-        child->dump(parser, indent + "  ");
+    for (auto &child : children) child->dump(parser, indent + "  ");
 }
 
 const char *operator_name(Token::Punctuator punctuator) {

@@ -188,20 +188,17 @@ private:
             char c_out = c_in;
             
             switch (c_in) {
-                // @todo could as well replace other EOL characters with LF here.
                 case '\r':
                     c_out = '\n';
                     break;
+                
                 case '\n':
                     if (last_char_was_cr) {
                         // don't replace CRLF with LFLF, replace it with one LF only
                         --input.length;
                         ++skip;
                         
-                        if (i == input.length)
-                            // CRLF at end of file, we're done
-                            return;
-                        
+                        if (i == input.length) return; // CRLF at end of file, we're done
                         c_out = input.data.get()[i + skip];
                     }
             }
@@ -220,16 +217,13 @@ private:
             if (buffer[i] == '\n') {
                 ++pos.line;
                 pos.column = 1;
-            } else {
+            } else
                 ++pos.column;
-            }
         }
     }
     
     __attribute__((always_inline)) inline char peek(int offset) const {
-        if (eof(offset))
-            return 0;
-        
+        if (eof(offset)) return 0;
         return input.data.get()[pos.index + offset];
     }
     

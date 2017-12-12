@@ -160,9 +160,7 @@ int Lexer::read_escape_seq(int i) {
         return 0;
     }
     
-    if (peek(i++) != '\\')
-        // ordinary character of length 1
-        return i;
+    if (peek(i++) != '\\') return i; // ordinary character of length 1
     
     char c = peek(i++);
     if (c == '\'' || c == '"' || c == '?' || c == '\\' ||
@@ -178,9 +176,7 @@ int Lexer::read_escape_seq(int i) {
     }
     
     if (c == 'x') {
-        if (!isxdigit(peek(i)))
-            error("hexadecimal escape sequence expected", i);
-        
+        if (!isxdigit(peek(i))) error("hexadecimal escape sequence expected", i);
         while (isxdigit(peek(++i)));
         return i;
     }
@@ -205,9 +201,7 @@ int Lexer::read_char() {
 }
 
 int Lexer::read_comment() {
-    if (peek(0) != '/')
-        // not a comment
-        return 0;
+    if (peek(0) != '/') return 0; // not a comment
     
     int i;
     if (peek(1) == '*') {
@@ -284,9 +278,8 @@ int Lexer::read_punctuator() {
         P('<', AB_OPEN) P('>', AB_CLOSE)
             
         P('.', PERIOD) P('#', HASH) P(',', COMMA) P('=', ASSIGN) P('?', QMARK) P(':', COLON) P(';', SEMICOLON)
-            
         P('+', PLUS) P('-', MINUS) P('*', ASTERISK) P('/', SLASH) P('%', MODULO)
-            
+        
         P('&', BIT_AND) P('|', BIT_OR) P('^', BIT_XOR) P('~', BIT_NOT)
         P('!', LOG_NOT)
     }

@@ -160,28 +160,23 @@ public:
     void parse() {
         read_list(&Parser::read_external_declaration, declarations);
         
-        if (!eof() || declarations.empty())
-            error("declaration expected");
+        if (!eof() || declarations.empty()) error("declaration expected");
         
         //dbg_tree_root.dump(this);
     }
     
     void print_context(int index = -1) {
-        if (index < 0)
-            index = i;
+        if (index < 0) index = i;
         
         for (int j = -(index >= 5 ? 5 : index); j <= 5; ++j) {
-            if (!j)
-                std::cout << "(here) ";
+            if (!j) std::cout << "(here) ";
             std::cout << peek(index - i + j).text << " ";
         }
         
         std::cout << std::endl;
     }
     
-    void print_debug_tree() {
-        dbg_tree_root.dump(this);
-    }
+    void print_debug_tree() { dbg_tree_root.dump(this); }
     
 protected:
     int i = 0;
