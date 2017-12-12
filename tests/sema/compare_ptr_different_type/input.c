@@ -1,5 +1,5 @@
 int main(void) {
     int *x;
-    unsigned *y;
+    char *y;
     x == y;
 }

@@ -1,2 +1,2 @@
 int b();
-long b();
+char b();

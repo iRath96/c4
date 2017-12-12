@@ -1,1 +1,1 @@
-tests/sema/compare_ptr_different_type/input.c:4:7: error: comparison of distinct pointer types ('int*' and 'unsigned int*')
+tests/sema/compare_ptr_different_type/input.c:4:7: error: comparison of distinct pointer types ('int*' and 'char*')

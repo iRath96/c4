@@ -1,4 +1,4 @@
-unsigned int x = 4, **y;
+char x = 4, **y;
 
 struct example { int x; };
 struct example var;

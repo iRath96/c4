@@ -18,9 +18,7 @@ public:
     lexer::TextPosition pos;
     
     CompilerError(const std::string &message, lexer::TextPosition pos)
-    : message(message), pos(pos) {
-        
-    }
+    : message(message), pos(pos) {}
 };
 
 class Scope {
@@ -44,7 +42,6 @@ public:
     Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
     
     void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined);
-    
     bool resolveVariable(std::string name, Ptr<Type> &result) {
         auto it = variables.find(name);
         if (it == variables.end()) return false;
@@ -56,7 +53,6 @@ public:
 class FileScope : public BlockScope {
 public:
     std::vector<std::pair<Ptr<Type>, lexer::TextPosition>> unresolvedTentative;
-    
     virtual void close();
 };
 
@@ -205,51 +201,28 @@ public:
 
 class ArithmeticType : public Type {
 public:
-    enum Sign {
-        SIGNED = 1,
-        UNSIGNED = 0
-    };
-    
     enum Size {
-        LONG_LONG = 16,
-        LONG  = 8,
         INT   = 4,
-        SHORT = 2,
         CHAR  = 1
     };
     
-    static Sign max(Sign a, Sign b) {
-        return (Sign)((int)a > (int)b ? a : b);
-    }
+    static Size max(Size a, Size b) { return (Size)((int)a > (int)b ? a : b); }
     
-    static Size max(Size a, Size b) {
-        return (Size)((int)a > (int)b ? a : b);
-    }
-    
-    Sign sign;
     Size size;
     
-    ArithmeticType() : sign(UNSIGNED), size(INT) {}
-    ArithmeticType(Sign sign, Size size) : sign(sign), size(size) {}
+    ArithmeticType() : size(INT) {}
+    ArithmeticType(Size size) : size(size) {}
     
     virtual bool isScalar() const { return true; }
     virtual bool isArithmetic() const { return true; }
     
     virtual bool isCompatible(const Type &other) const {
         auto at = dynamic_cast<const ArithmeticType *>(&other);
-        return at && at->sign == sign && at->size == size;
+        return at && at->size == size;
     }
     
     virtual std::string describe() const {
-        std::string result = sign == UNSIGNED ? "unsigned" : "";
-        if (!result.empty() && size != INT) result += " ";
-        switch (size) {
-        case CHAR:  return result + "char";
-        case SHORT: return result + "short";
-        case INT:   return result.empty() ? "int" : result + " int";
-        case LONG:  return result + "long";
-        default: return "(error)";
-        }
+        return size == INT ? "int" : "char";
     }
 };
 
@@ -443,8 +416,8 @@ protected:
     
 public:
     Compiler() {
-        intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::INT));
-        charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::SIGNED, ArithmeticType::CHAR));
+        intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::INT));
+        charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::CHAR));
         stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
         voidType = TypePair(false, std::make_shared<VoidType>());
         nullptrType = TypePair(false, std::make_shared<NullPointerType>());
@@ -452,13 +425,8 @@ public:
         open();
     }
     
-    void open() {
-        scopes.push<FileScope>();
-    }
-    
-    void close() {
-        scopes.pop();
-    }
+    void open() { scopes.push<FileScope>(); }
+    void close() { scopes.pop(); }
     
     virtual void visit(CaseLabel &node) {
         if (!scopes.find<SwitchScope>().get()) error("'case' statement not in switch statement", node);

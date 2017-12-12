@@ -267,18 +267,9 @@ protected:
         switch (peek().keyword) {
             case Token::Keyword::VOID:
             case Token::Keyword::CHAR:
-            case Token::Keyword::SHORT:
             case Token::Keyword::INT:
-            case Token::Keyword::LONG:
-            case Token::Keyword::FLOAT:
-            case Token::Keyword::DOUBLE:
-            case Token::Keyword::SIGNED:
-            case Token::Keyword::UNSIGNED:
-            case Token::Keyword::_BOOL:
-            case Token::Keyword::_COMPLEX:
                 node.id = peek().text;
                 node.keyword = peek().keyword;
-                
                 return shift();
                 
             default:
