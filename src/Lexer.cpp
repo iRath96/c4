@@ -1,11 +1,3 @@
-//
-//  Lexer.cpp
-//  c4
-//
-//  Created by Alexander Rath on 26.10.17.
-//  Copyright © 2017 Alexander Rath. All rights reserved.
-//
-
 #include "Lexer.h"
 #include <ctype.h>
 
@@ -41,9 +33,7 @@ bool is_alphanum[256] = {
     1, 1, 1, 1, 1, 1
 };
 
-bool is_octal(char c) {
-    return c >= '0' && c <= '7';
-}
+bool is_octal(char c) { return c >= '0' && c <= '7'; }
 
 Token Lexer::next_token() {
     using Kind = Token::Kind;

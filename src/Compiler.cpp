@@ -1,11 +1,3 @@
-//
-//  Compiler.cpp
-//  c4
-//
-//  Created by Alexander Rath on 04.12.17.
-//  Copyright © 2017 Alexander Rath. All rights reserved.
-//
-
 #include <stdio.h>
 #include "Compiler.h"
 

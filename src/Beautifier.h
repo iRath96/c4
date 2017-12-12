@@ -1,11 +1,3 @@
-//
-//  Beautifier.h
-//  c4
-//
-//  Created by Alexander Rath on 12.11.17.
-//  Copyright © 2017 Alexander Rath. All rights reserved.
-//
-
 #ifndef Beautifier_h
 #define Beautifier_h
 

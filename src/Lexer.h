@@ -1,11 +1,3 @@
-//
-//  Lexer.hpp
-//  c4
-//
-//  Created by Alexander Rath on 26.10.17.
-//  Copyright © 2017 Alexander Rath. All rights reserved.
-//
-
 #ifndef Lexer_hpp
 #define Lexer_hpp
 

@@ -1,11 +1,3 @@
-//
-//  Compiler.h
-//  c4
-//
-//  Created by Alexander Rath on 03.12.17.
-//  Copyright © 2017 Alexander Rath. All rights reserved.
-//
-
 #ifndef Compiler_h
 #define Compiler_h
 

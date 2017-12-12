@@ -1,11 +1,3 @@
-//
-//  main.cpp
-//  c4
-//
-//  Created by Alexander Rath on 26.10.17.
-//  Copyright © 2017 Alexander Rath. All rights reserved.
-//
-
 #include <iostream>
 #include <fstream>
 #include <string.h>
@@ -17,7 +9,6 @@
 
 #include "Beautifier.h"
 #include "Compiler.h"
-
 
 bool debug_mode = false;
 bool enable_output = true;
