@@ -18,101 +18,53 @@ using PtrVector = Vector<Ptr<T>>;
 
 #pragma mark - Visitor
 
-// Nodes
-struct Identifier;
-struct TypeName;
-
-// Labels
-struct CaseLabel;
-struct DefaultLabel;
-struct IdentifierLabel;
-
-// Declarators
-struct DeclaratorParameterList;
-struct DeclaratorPointer;
-struct Declarator;
-
-// Expressions
-struct ConstantExpression;
-struct CastExpression;
-struct UnaryExpression;
-struct BinaryExpression;
-struct ConditionalExpression;
-struct ExpressionList;
-struct CallExpression;
-struct SubscriptExpression;
-struct MemberExpression;
-struct PostExpression;
-struct SizeofExpressionUnary;
-struct SizeofExpressionTypeName;
-
-// Statements
-struct CompoundStatement;
-struct IterationStatement;
-struct ExpressionStatement;
-struct SelectionStatement;
-struct GotoStatement;
-struct ContinueStatement;
-struct ReturnStatement;
-
-// Declarations
-struct Declaration;
-struct ParameterDeclaration;
-struct ExternalDeclarationVariable;
-struct ExternalDeclarationFunction;
-
-// Types
-struct NamedTypeSpecifier;
-struct ComposedTypeSpecifier;
-
-// Visitor
 struct Visitor {
     // Nodes
-    virtual void visit(Identifier &) = 0;
-    virtual void visit(TypeName &) = 0;
+    virtual void visit(struct Identifier &) = 0;
+    virtual void visit(struct TypeName &) = 0;
 
     // Labels
-    virtual void visit(CaseLabel &) = 0;
-    virtual void visit(DefaultLabel &) = 0;
-    virtual void visit(IdentifierLabel &) = 0;
+    virtual void visit(struct CaseLabel &) = 0;
+    virtual void visit(struct DefaultLabel &) = 0;
+    virtual void visit(struct IdentifierLabel &) = 0;
 
     // Declarators
-    virtual void visit(DeclaratorParameterList &) = 0;
-    virtual void visit(DeclaratorPointer &) = 0;
-    virtual void visit(Declarator &) = 0;
+    virtual void visit(struct DeclaratorParameterList &) = 0;
+    virtual void visit(struct DeclaratorPointer &) = 0;
+    virtual void visit(struct Declarator &) = 0;
 
     // Expressions
-    virtual void visit(ConstantExpression &) = 0;
-    virtual void visit(CastExpression &) = 0;
-    virtual void visit(UnaryExpression &) = 0;
-    virtual void visit(BinaryExpression &) = 0;
-    virtual void visit(ConditionalExpression &) = 0;
-    virtual void visit(ExpressionList &) = 0;
-    virtual void visit(CallExpression &) = 0;
-    virtual void visit(SubscriptExpression &) = 0;
-    virtual void visit(MemberExpression &) = 0;
-    virtual void visit(PostExpression &) = 0;
-    virtual void visit(SizeofExpressionUnary &) = 0;
-    virtual void visit(SizeofExpressionTypeName &) = 0;
+    virtual void visit(struct ConstantExpression &) = 0;
+    virtual void visit(struct CastExpression &) = 0;
+    virtual void visit(struct UnaryExpression &) = 0;
+    virtual void visit(struct BinaryExpression &) = 0;
+    virtual void visit(struct ConditionalExpression &) = 0;
+    virtual void visit(struct ExpressionList &) = 0;
+    virtual void visit(struct CallExpression &) = 0;
+    virtual void visit(struct SubscriptExpression &) = 0;
+    virtual void visit(struct MemberExpression &) = 0;
+    virtual void visit(struct PostExpression &) = 0;
+    virtual void visit(struct SizeofExpressionUnary &) = 0;
+    virtual void visit(struct SizeofExpressionTypeName &) = 0;
 
     // Statements
-    virtual void visit(CompoundStatement &) = 0;
-    virtual void visit(IterationStatement &) = 0;
-    virtual void visit(ExpressionStatement &) = 0;
-    virtual void visit(SelectionStatement &) = 0;
-    virtual void visit(GotoStatement &) = 0;
-    virtual void visit(ContinueStatement &) = 0;
-    virtual void visit(ReturnStatement &) = 0;
+    virtual void visit(struct CompoundStatement &) = 0;
+    virtual void visit(struct IterationStatement &) = 0;
+    virtual void visit(struct ExpressionStatement &) = 0;
+    virtual void visit(struct SelectionStatement &) = 0;
+    virtual void visit(struct GotoStatement &) = 0;
+    virtual void visit(struct ContinueStatement &) = 0;
+    virtual void visit(struct ReturnStatement &) = 0;
 
     // Declarations
-    virtual void visit(Declaration &) = 0;
-    virtual void visit(ParameterDeclaration &) = 0;
-    virtual void visit(ExternalDeclarationVariable &) = 0;
-    virtual void visit(ExternalDeclarationFunction &) = 0;
+    virtual void visit(struct Declaration &) = 0;
+    virtual void visit(struct ParameterDeclaration &) = 0;
+    virtual void visit(struct ExternalDeclarationVariable &) = 0;
+    virtual void visit(struct ExternalDeclarationFunction &) = 0;
 
     // Types
-    virtual void visit(NamedTypeSpecifier &) = 0;
-    virtual void visit(ComposedTypeSpecifier &) = 0;
+    virtual void visit(struct NamedTypeSpecifier &) = 0;
+    virtual void visit(struct ComposedTypeSpecifier &) = 0;
 };
 
 #pragma mark - Base classes
