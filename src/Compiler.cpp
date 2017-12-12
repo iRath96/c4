@@ -19,6 +19,26 @@ void FileScope::close() {
             , ut.second);
 }
 
+void BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
+    if (isDefined) {
+        for (auto &d : definitions)
+            if (d.first == name) {
+                // @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
+                throw CompilerError("redefinition of '" + name + "'", pos);
+            }
+        
+        definitions.insert(std::make_pair(name, true));
+    }
+
+    for (auto &v : variables)
+        if (v.first == name && !v.second->isCompatible(*type)) {
+            // @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
+            throw CompilerError("conflicting types for '" + name + "'", pos);
+        }
+
+    variables.insert(std::make_pair(name, type));
+}
+
 Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
     auto it = composedTypes.find(ct->name);
     if (it == composedTypes.end()) {
@@ -285,7 +305,7 @@ bool FunctionType::isCompatible(const Type &other) const {
             if (!parameters[i]->isCompatible(*f->parameters[i])) // @todo isEqual
                 return false;
         
-        return true;
+        return returnType->isCompatible(*f->returnType);
     }
     
     return false;

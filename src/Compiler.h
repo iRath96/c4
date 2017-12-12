@@ -51,19 +51,7 @@ public:
     
     Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
     
-    void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
-        if (isDefined) {
-            for (auto &d : definitions)
-                if (d.first == name) {
-                    // @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-                    throw CompilerError("redefinition of '" + name + "'", pos);
-                }
-            
-            definitions.insert(std::make_pair(name, true));
-        }
-        
-        variables.insert(std::make_pair(name, type));
-    }
+    void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined);
     
     bool resolveVariable(std::string name, Ptr<Type> &result) {
         auto it = variables.find(name);

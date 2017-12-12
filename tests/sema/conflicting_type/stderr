@@ -1,0 +1,1 @@
+tests/sema/conflicting_type/input.c:2:6: error: conflicting types for 'b'
