@@ -777,7 +777,7 @@ public:
                 break;
             
             case Prec::ASSIGNMENT:
-                if (!lhs.lvalue) error("expression is not assignable", *node.lhs);
+                if (!lhs.lvalue) error("expression is not assignable", node);
                 if (!Type::canCompare(*lhs.type, *rhs.type, true))
                     error(
                         "assigning to '" + lhs.type->describe() +

@@ -1,1 +1,1 @@
-tests/sema/assign_rvalue_addr/input.c:2:5: error: expression is not assignable
+tests/sema/assign_rvalue_addr/input.c:2:8: error: expression is not assignable
