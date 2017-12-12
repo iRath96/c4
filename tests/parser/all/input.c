@@ -15,7 +15,7 @@ struct hello {
 } kitty;
 
 int b = sizeof(int);
-int c = sizeof(int) { 0 };
+//int c = sizeof(int) { 0 };
 
 int fn(void *)(void);
 int say(char *);
@@ -43,7 +43,7 @@ int **assignments;
     (*(array[1](1,2,3)) << 8 || 1 + ++a);
     fn(&c + 1)();
     
-    sizeof(int) { [2] = 2 };
+    //sizeof(int) { [2] = 2 };
     
     label: {
         42;

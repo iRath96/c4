@@ -372,10 +372,8 @@ public:
         
         bool first = true;
         for (auto &param : parameters) {
-            if (first)
-                first = false;
-            else
-                result += ", ";
+            if (first) first = false;
+            else result += ", ";
             result += param->describe();
         }
         
@@ -386,21 +384,14 @@ public:
 class VoidType : public Type {
 public:
     virtual bool isScalar() const { return false; }
-    virtual bool isCompatible(const Type &other) const {
-        return other.isVoid();
-    }
-    
-     virtual std::string describe() const {
-        return "void";
-    }
-    
+    virtual bool isCompatible(const Type &other) const { return other.isVoid(); }
+    virtual std::string describe() const { return "void"; }
     virtual bool isVoid() const { return true; }
 };
 
 class PointerType : public Type {
 public:
     Ptr<Type> base;
-    Vector<const char *> qualifiers;
     
     PointerType() {}
     PointerType(Ptr<Type> base) : base(base) {}
@@ -874,16 +865,6 @@ public:
 
     virtual void visit(ComposedTypeSpecifier &) {}
     virtual void visit(NamedTypeSpecifier &) {}
-
-    virtual void visit(DesignatorWithIdentifier &) {}
-    virtual void visit(DesignatorWithExpression &) {}
-    
-    virtual void visit(Initializer &node) { error("not supported", node); }
-    virtual void visit(InitializerList &node) { error("not supported", node); }
-    
-    virtual void visit(InitializerExpression &node) {
-        exprStack.push(TypePair(false, Type::create(node.type.specifiers, node.type.declarator, node.pos, scopes)));
-    }
 
     virtual void visit(IterationStatement &node) {
         visit((Statement &)node);

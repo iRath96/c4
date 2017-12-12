@@ -200,7 +200,6 @@ Ptr<Type> Type::applyDeclarator(Declarator decl, ScopeStack &scopes) {
     for (auto &mod : decl.modifiers) {
         if (auto pt = dynamic_cast<DeclaratorPointer *>(mod.get())) {
             auto p = std::make_shared<PointerType>();
-            p->qualifiers = pt->qualifiers;
             p->base = result;
             result = p;
         } else if (auto plist = dynamic_cast<DeclaratorParameterList *>(mod.get())) {

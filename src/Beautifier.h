@@ -18,13 +18,8 @@ class Beautifier : public Visitor {
 protected:
     std::string indent = "";
     
-    void inspect(Node &node) {
-        node.accept(*this);
-    }
-    
-    void inspect(const char *str) {
-        std::cout << str;
-    }
+    void inspect(Node &node) { node.accept(*this); }
+    void inspect(const char *str) { std::cout << str; }
     
     template<typename T>
     void inspect(Ptr<T> &ptr) {
@@ -37,10 +32,8 @@ protected:
         bool first = true;
         
         for (auto &child : vector) {
-            if (first)
-                first = false;
-            else
-                std::cout << delimiter;
+            if (first) first = false;
+            else std::cout << delimiter;
             
             inspect(child);
         }
@@ -52,8 +45,7 @@ protected:
     template<typename T>
     void separate_lines(Vector<T> &vector, bool do_indent = true) {
         std::string prev_indent = indent;
-        if (do_indent)
-            indent += "\t";
+        if (do_indent) indent += "\t";
         
         for (auto &child : vector) {
             std::cout << std::endl << indent;
@@ -77,10 +69,7 @@ public:
     virtual void visit(Identifier &node) { std::cout << node.id; }
     virtual void visit(NamedTypeSpecifier &node) { std::cout << node.id; }
     virtual void visit(ContinueStatement &node) {
-        if (node.keyword == lexer::Token::Keyword::CONTINUE)
-            std::cout << "continue;";
-        else
-            std::cout << "break;";
+        std::cout << (node.keyword == lexer::Token::Keyword::CONTINUE ? "continue;" : "break;");
     }
 
     virtual void visit(CompoundStatement &node) {
@@ -93,24 +82,18 @@ public:
             std::cout << std::endl;
             
             Statement *stmt;
-            if ((stmt = dynamic_cast<Statement *>(child.get()))) {
+            if ((stmt = dynamic_cast<Statement *>(child.get())))
                 join(stmt->labels, "\n", "\n");
-            }
             
             std::cout << indent;
             inspect(child);
         }
         
         indent = prev_indent;
-        
         std::cout << std::endl << indent << "}";
     }
     
-    virtual void visit(DeclaratorPointer &node) {
-        std::cout << "*";
-        if (!node.qualifiers.empty()) std::cout << " ";
-        join(node.qualifiers, " ", " ");
-    }
+    virtual void visit(DeclaratorPointer &) { std::cout << "*"; }
     
     virtual void visit(DeclaratorParameterList &node) {
         std::cout << "(";
@@ -171,9 +154,7 @@ public:
         inspect(node.declarator);
     }
 
-    virtual void visit(ConstantExpression &node) {
-        std::cout << node.text;
-    }
+    virtual void visit(ConstantExpression &node) { std::cout << node.text; }
     
     virtual void visit(CastExpression &node) {
         std::cout << "((";
@@ -208,9 +189,7 @@ public:
         std::cout << ")";
     }
 
-    virtual void visit(ExpressionList &node) {
-        join(node.children, ", ");
-    }
+    virtual void visit(ExpressionList &node) { join(node.children, ", "); }
 
     virtual void visit(CallExpression &node) {
         std::cout << "(";
@@ -276,35 +255,6 @@ public:
         std::cout << "(sizeof(";
         inspect(node.type);
         std::cout << "))";
-    }
-
-    virtual void visit(DesignatorWithIdentifier &node) {
-        std::cout << "." << node.id;
-    }
-
-    virtual void visit(DesignatorWithExpression &node) {
-        std::cout << "[";
-        inspect(node.expression);
-        std::cout << "]";
-    }
-
-    virtual void visit(Initializer &node) {
-        join(node.designators, ", ");
-        if (!node.designators.empty()) std::cout << " = ";
-        inspect(node.declarator.initializer);
-    }
-
-    virtual void visit(InitializerList &node) {
-        std::cout << "{ ";
-        join(node.initializers, ", ", " ");
-        std::cout << "}";
-    }
-
-    virtual void visit(InitializerExpression &node) {
-        std::cout << "(";
-        inspect(node.type);
-        std::cout << ") ";
-        inspect(node.initializers);
     }
 
     virtual void visit(IterationStatement &node) {

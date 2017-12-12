@@ -40,11 +40,6 @@ struct DeclaratorParameterList;
 struct DeclaratorPointer;
 struct Declarator;
 
-// Designators
-struct DesignatorWithIdentifier;
-struct DesignatorWithExpression;
-struct Initializer;
-
 // Expressions
 struct ConstantExpression;
 struct CastExpression;
@@ -56,8 +51,6 @@ struct CallExpression;
 struct SubscriptExpression;
 struct MemberExpression;
 struct PostExpression;
-struct InitializerList;
-struct InitializerExpression;
 struct SizeofExpressionUnary;
 struct SizeofExpressionTypeName;
 
@@ -96,11 +89,6 @@ struct Visitor {
     virtual void visit(DeclaratorPointer &) = 0;
     virtual void visit(Declarator &) = 0;
 
-    // Designators
-    virtual void visit(DesignatorWithIdentifier &) = 0;
-    virtual void visit(DesignatorWithExpression &) = 0;
-    virtual void visit(Initializer &) = 0;
-
     // Expressions
     virtual void visit(ConstantExpression &) = 0;
     virtual void visit(CastExpression &) = 0;
@@ -112,8 +100,6 @@ struct Visitor {
     virtual void visit(SubscriptExpression &) = 0;
     virtual void visit(MemberExpression &) = 0;
     virtual void visit(PostExpression &) = 0;
-    virtual void visit(InitializerList &) = 0;
-    virtual void visit(InitializerExpression &) = 0;
     virtual void visit(SizeofExpressionUnary &) = 0;
     virtual void visit(SizeofExpressionTypeName &) = 0;
 
@@ -189,7 +175,6 @@ struct DeclaratorParameterList : DeclaratorModifier {
 };
 
 struct DeclaratorPointer : DeclaratorModifier {
-    Vector<const char *> qualifiers;
     ACCEPT
 };
 
@@ -205,26 +190,6 @@ struct Declarator : Node {
 
 struct TypeName : Node {
     PtrVector<TypeSpecifier> specifiers;
-    Declarator declarator;
-    
-    ACCEPT
-};
-
-#pragma mark - Designators
-
-struct Designator : Node {};
-struct DesignatorWithIdentifier : Designator {
-    const char *id;
-    ACCEPT
-};
-
-struct DesignatorWithExpression : Designator {
-    Ptr<Expression> expression;
-    ACCEPT
-};
-
-struct Initializer : Node {
-    PtrVector<Designator> designators;
     Declarator declarator;
     
     ACCEPT
@@ -297,18 +262,6 @@ struct MemberExpression : Expression {
 struct PostExpression : Expression {
     Ptr<Expression> base;
     lexer::Token::Punctuator op;
-    
-    ACCEPT
-};
-
-struct InitializerList : Expression { // @todo really inherit from Expression?
-    Vector<Initializer> initializers;
-    ACCEPT
-};
-
-struct InitializerExpression : Expression {
-    TypeName type;
-    InitializerList initializers;
     
     ACCEPT
 };

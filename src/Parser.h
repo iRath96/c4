@@ -359,33 +359,43 @@ protected:
     
 #pragma mark - Declarations
     
-    bool read_declarator(ast::Declarator &node)
-    OPTION
-        node.pos = peek().pos;
-        OPTIONAL(read_pointer(node.modifiers))
-        NON_OPTIONAL(read_direct_declarator(node))
-    END_OPTION
-    
     bool read_declaration_specifiers(ast::PtrVector<ast::TypeSpecifier> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_type_specifier, node))
     OTHERWISE_FAIL("type specifier expected")
     
-    bool read_direct_declarator_prefix(ast::Declarator &node)
+    bool read_declarator_na(ast::Declarator &node) {
+        return read_declarator(node, false);
+    }
+    
+    bool read_declarator(ast::Declarator &node, bool isAbstract)
     OPTION
-        ALLOW_FAILURE(read_identifier(node.name))
+        node.pos = peek().pos;
+    
+        bool has_pointer;
+        OPTIONAL(has_pointer = read_pointer(node.modifiers))
+    
+        if (has_pointer && isAbstract)
+            OPTIONAL(read_direct_declarator(node, isAbstract))
+        else
+            NON_OPTIONAL(read_direct_declarator(node, isAbstract))
+    END_OPTION
+    
+    bool read_direct_declarator_prefix(ast::Declarator &node, bool isAbstract)
+    OPTION
+        ALLOW_FAILURE(!isAbstract && read_identifier(node.name))
     ELSE_OPTION
         ALLOW_FAILURE(read_punctuator(Token::Punctuator::RB_OPEN))
-        NON_OPTIONAL(read_declarator(node))
+        NON_OPTIONAL(read_declarator(node, isAbstract))
         NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
     END_OPTION
     
-    bool read_direct_declarator(ast::Declarator &node)
+    bool read_direct_declarator(ast::Declarator &node, bool isAbstract)
     OPTION
         int last_good_i;
     
         size_t insertionIndex = node.modifiers.size(); // @todo not efficient
-        NON_OPTIONAL(read_direct_declarator_prefix(node))
+        NON_OPTIONAL(read_direct_declarator_prefix(node, isAbstract))
     
         last_good_i = i;
         while (!eof()) {
@@ -425,54 +435,7 @@ protected:
     bool read_type_name(ast::TypeName &node)
     OPTION
         NON_OPTIONAL(read_specifier_qualifier_list(node.specifiers))
-        OPTIONAL(read_abstract_declarator(node.declarator))
-    END_OPTION
-    
-    bool read_abstract_declarator(ast::Declarator &node)
-    OPTION
-        node.pos = peek().pos;
-    
-        bool has_pointer;
-        OPTIONAL(has_pointer = read_pointer(node.modifiers))
-    
-        if (has_pointer)
-            OPTIONAL(read_direct_abstract_declarator(node))
-        else
-            NON_OPTIONAL(read_direct_abstract_declarator(node))
-    END_OPTION
-    
-    bool read_direct_abstract_declarator_prefix(ast::Declarator &node)
-    OPTION
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
-        NON_OPTIONAL(read_abstract_declarator(node))
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
-    END_OPTION
-    
-    bool read_direct_abstract_declarator(ast::Declarator &node)
-    OPTION
-        size_t insertionIndex = node.modifiers.size();
-        OPTIONAL(read_direct_abstract_declarator_prefix(node))
-        
-        while (!eof()) {
-            NON_UNIQUE
-            if (read_punctuator(Token::Punctuator::SB_OPEN)) {
-                // @todo
-                UNIQUE
-                NON_OPTIONAL(read_punctuator(Token::Punctuator::ASTERISK))
-                NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
-            } else if (read_punctuator(Token::Punctuator::RB_OPEN)) {
-                auto d = std::make_shared<ast::DeclaratorParameterList>();
-                
-                UNIQUE
-                OPTIONAL(read_parameter_type_list(d->parameters))
-                NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
-                
-                node.modifiers.insert(node.modifiers.begin() + insertionIndex, d);
-            } else
-                break;
-        }
-        
-        FAIL_IF_EMPTY
+        OPTIONAL(read_declarator(node.declarator, true))
     END_OPTION
     
     bool read_parameter_type_list(ast::Vector<ast::ParameterDeclaration> &node)
@@ -487,32 +450,22 @@ protected:
         NON_OPTIONAL(read_declaration_specifiers(node.specifiers))
         
         NON_UNIQUE
-        if (read_declarator(node.declarator)) {
+        if (read_declarator(node.declarator, false)) {
         } else {
             node.declarator = ast::Declarator(); // @fixme not elegant
-            if (read_abstract_declarator(node.declarator)) {
-            }
+            if (read_declarator(node.declarator, true)) {}
         }
     END_OPTION
     
     bool read_pointer_single(ast::Ptr<ast::DeclaratorModifier> &node)
     OPTION
-        auto p = std::make_shared<ast::DeclaratorPointer>();
-        
         NON_OPTIONAL(read_punctuator(Token::Punctuator::ASTERISK))
-        OPTIONAL(read_type_qualifier_list(p->qualifiers))
-    
-        node = p;
+        node = std::make_shared<ast::DeclaratorPointer>();
     END_OPTION
     
     bool read_pointer(ast::PtrVector<ast::DeclaratorModifier> &node)
     OPTION
         NON_OPTIONAL(read_list(&Parser::read_pointer_single, node))
-    END_OPTION
-    
-    bool read_type_qualifier_list(ast::Vector<const char *> &node)
-    OPTION
-        NON_OPTIONAL(read_list(&Parser::read_type_qualifier, node))
     END_OPTION
     
     bool read_specifier_qualifier_list(ast::PtrVector<ast::TypeSpecifier> &node)
@@ -522,14 +475,9 @@ protected:
     
 #pragma mark - Structs
     
-    bool read_struct_declarator(ast::Declarator &node)
-    OPTION
-        NON_OPTIONAL(read_declarator(node))
-    END_OPTION
-    
     bool read_struct_declarator_list(ast::Vector<ast::Declarator> &node)
     OPTION
-        NON_OPTIONAL(read_separated_list(&Parser::read_struct_declarator, Token::Punctuator::COMMA, node))
+        NON_OPTIONAL(read_separated_list(&Parser::read_declarator_na, Token::Punctuator::COMMA, node))
     END_OPTION
     
     bool read_struct_declaration(ast::Declaration &node)
@@ -551,23 +499,6 @@ protected:
         NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
     END_OPTION
     
-    bool read_type_qualifier(const char *&node)
-    OPTION
-        switch (peek().keyword) {
-            case Token::Keyword::CONST:
-            case Token::Keyword::RESTRICT:
-            case Token::Keyword::VOLATILE:
-            case Token::Keyword::_ATOMIC:
-                node = peek().text;
-                
-                shift();
-                break;
-            
-            default:
-                FAIL
-        }
-    END_OPTION
-    
     bool read_type_specifier(ast::Ptr<ast::TypeSpecifier> &node)
     OPTION
         ast::NamedTypeSpecifier type_name;
@@ -587,12 +518,10 @@ protected:
                     n->kind = token.keyword;
                     
                     NON_UNIQUE
-                    
                     bool has_identifier = read_identifier(n->name);
                     bool has_body = peek().punctuator == Token::Punctuator::CB_OPEN;
                     
                     UNIQUE
-                    
                     if (has_body) {
                         NON_OPTIONAL(read_struct_body(*n))
                     } else if (!has_identifier) {
@@ -603,80 +532,25 @@ protected:
                 }
                     
                 default:
-                    NON_OPTIONAL(false)
+                    FAIL
             }
         }
     END_OPTION
     
     bool read_initializer(ast::Declarator &node)
     OPTION
-        auto initializer_list = std::make_shared<ast::InitializerList>();
-    
-        ALLOW_FAILURE(read_punctuator(Token::Punctuator::CB_OPEN))
-        NON_OPTIONAL(read_initializer_list(*initializer_list))
-        OPTIONAL(read_punctuator(Token::Punctuator::COMMA))
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
-    
-        node.initializer = initializer_list;
-    ELSE_OPTION
         ast::Ptr<ast::Expression> assignment_expr;
-    
         ALLOW_FAILURE(read_assignment_expression(assignment_expr))
-    
         node.initializer = assignment_expr;
     OTHERWISE_FAIL("initializer expected")
     
-    bool read_designation_initializer_pair(ast::Initializer &node)
-    OPTION
-        ALLOW_FAILURE(read_designation(node.designators))
-        NON_OPTIONAL(read_initializer(node.declarator))
-    ELSE_OPTION
-        ALLOW_FAILURE(read_initializer(node.declarator))
-    END_OPTION
-    
-    bool read_initializer_list(ast::InitializerList &node)
-    OPTION
-        NON_OPTIONAL(read_separated_list(&Parser::read_designation_initializer_pair, Token::Punctuator::COMMA, node.initializers))
-    END_OPTION
-    
-    bool read_designation(ast::PtrVector<ast::Designator> &node)
-    OPTION
-        NON_OPTIONAL(read_designator_list(node))
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::ASSIGN))
-    END_OPTION
-    
-    bool read_designator_list(ast::PtrVector<ast::Designator> &node)
-    OPTION
-        NON_OPTIONAL(read_list(&Parser::read_designator, node))
-    END_OPTION
-    
-    bool read_designator(ast::Ptr<ast::Designator> &node)
-    OPTION
-        auto d = std::make_shared<ast::DesignatorWithExpression>();
-    
-        ALLOW_FAILURE(read_punctuator(Token::Punctuator::SB_OPEN))
-        NON_OPTIONAL(read_constant_expression(d->expression))
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::SB_CLOSE))
-    
-        node = d;
-    ELSE_OPTION
-        auto d = std::make_shared<ast::DesignatorWithIdentifier>();
-    
-        ALLOW_FAILURE(read_punctuator(Token::Punctuator::PERIOD))
-        NON_OPTIONAL(read_identifier(d->id))
-    
-        node = d;
-    END_OPTION
-    
     bool read_init_declarator(ast::Declarator &node)
     OPTION
-        NON_OPTIONAL(read_declarator(node))
+        NON_OPTIONAL(read_declarator(node, false))
     
         NON_UNIQUE
         if (read_punctuator(Token::Punctuator::ASSIGN)) {
             UNIQUE
-            
-            // also read initializer
             NON_OPTIONAL(read_initializer(node));
         }
     END_OPTION
@@ -711,7 +585,7 @@ protected:
         NON_OPTIONAL(read_declaration_specifiers(specifiers))
     
         NON_UNIQUE
-        has_declarator = read_declarator(declarator);
+        has_declarator = read_declarator(declarator, false);
         needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
         needs_initialization = has_declarator && peek().punctuator == Token::Punctuator::ASSIGN;
         is_declaration = needs_initialization || needs_declaration_list || peek().punctuator == Token::Punctuator::SEMICOLON;
@@ -745,7 +619,7 @@ protected:
             // function definition: ... declaration-list(opt) compound-statement
             
             if (!has_declarator) {
-                read_declarator(declarator);
+                read_declarator(declarator, false);
                 //error("declarator expected");
             }
             
@@ -943,28 +817,9 @@ protected:
         NON_OPTIONAL(read_separated_list(&Parser::read_assignment_expression, Token::Punctuator::COMMA, node))
     END_OPTION
     
-    bool read_postfix_expression_prefix(ast::Ptr<ast::Expression> &node)
-    OPTION
-        NON_OPTIONAL(read_primary_expression(node))
-    ELSE_OPTION
-        auto initializer = std::make_shared<ast::InitializerExpression>();
-
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
-    
-        NON_OPTIONAL(read_type_name(initializer->type))
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
-
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_OPEN))
-        NON_OPTIONAL(read_initializer_list(initializer->initializers))
-        OPTIONAL(read_punctuator(Token::Punctuator::COMMA))
-        NON_OPTIONAL(read_punctuator(Token::Punctuator::CB_CLOSE))
-    
-        node = initializer;
-    END_OPTION
-    
     bool read_postfix_expression(ast::Ptr<ast::Expression> &node)
     OPTION
-        NON_OPTIONAL(read_postfix_expression_prefix(node))
+        NON_OPTIONAL(read_primary_expression(node))
         
         while (!eof()) {
             TextPosition pos = peek().pos;
