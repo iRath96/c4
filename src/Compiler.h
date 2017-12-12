@@ -580,6 +580,7 @@ public:
             error("declaration does not declare anything", node);
         }
         
+        bool isExtVar = dynamic_cast<ExternalDeclarationVariable *>(&node);
         for (auto &decl : node.declarators) {
             Ptr<Type> dtype;
             scopes.execute<FunctionScope>([&]() {
@@ -588,7 +589,7 @@ public:
             });
             
             if (!dtype->isComplete()) {
-                if (dynamic_cast<ExternalDeclarationVariable *>(&node)) {
+                if (isExtVar) {
                     auto scope = scopes.find<FileScope>();
                     scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
                 } else
@@ -599,8 +600,11 @@ public:
             if (decl.isAbstract())
                 // @todo assert(false) here
                 error("abstract declarator in declaration", node);
-            else
-                scope->declareVariable(decl.name, dtype, decl.pos, decl.initializer.get());
+            else {
+                bool isDefinition = decl.initializer.get();
+                if (!isExtVar && !dtype->isFunction()) isDefinition = true;
+                scope->declareVariable(decl.name, dtype, decl.pos, isDefinition);
+            }
             
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);

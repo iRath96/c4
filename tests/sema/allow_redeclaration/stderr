@@ -1,0 +1,1 @@
+tests/sema/allow_redeclaration/input.c:5:5: error: redefinition of 'a'
