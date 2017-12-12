@@ -295,16 +295,6 @@ public:
     virtual bool isScalar() const { return false; }
     virtual bool isCompatible(const Type &other) const {
         return this == &other;
-        
-        /*auto c = dynamic_cast<const ComposedType *>(&other);
-        if (!c || c->kind != kind || c->members.size() != members.size())
-            return false;
-        
-        for (int i = 0; i < members.size(); ++i)
-            if (!members[i].second->isCompatible(*c->members[i].second))
-                return false;
-        
-        return true;*/
     }
     
     virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {

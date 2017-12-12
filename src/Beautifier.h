@@ -108,19 +108,14 @@ public:
     
     virtual void visit(DeclaratorPointer &node) {
         std::cout << "*";
-        
-        if (!node.qualifiers.empty())
-            std::cout << " ";
-        
+        if (!node.qualifiers.empty()) std::cout << " ";
         join(node.qualifiers, " ", " ");
     }
     
     virtual void visit(DeclaratorParameterList &node) {
         std::cout << "(";
-        if (node.parameters.empty())
-            std::cout << "void";
-        else
-            join(node.parameters, ", ");
+        if (node.parameters.empty()) std::cout << "void";
+        else join(node.parameters, ", ");
         std::cout << ")";
     }
     
@@ -146,16 +141,15 @@ public:
         }
     }
     
-    virtual void visit(Declaration &node) { // @todo not DRY with ExternalDeclarationVariable
+    virtual void visit(Declaration &node) {
         join(node.specifiers, " ", node.declarators.empty() ? "" : " ");
         join(node.declarators, ", ");
         std::cout << ";";
     }
 
     virtual void visit(ExternalDeclarationVariable &node) {
-        join(node.specifiers, " ", node.declarators.empty() ? "" : " ");
-        join(node.declarators, ", ");
-        std::cout << ";" << std::endl;
+        visit((Declaration &)node);
+        std::cout << std::endl;
     }
 
     virtual void visit(ExternalDeclarationFunction &node) {
@@ -296,9 +290,7 @@ public:
 
     virtual void visit(Initializer &node) {
         join(node.designators, ", ");
-        if (!node.designators.empty()) {
-            std::cout << " = ";
-        }
+        if (!node.designators.empty()) std::cout << " = ";
         inspect(node.declarator.initializer);
     }
 
@@ -355,10 +347,8 @@ public:
         indent = pi;
         
         if (suffix) {
-            if (inline_if(node, afterElse))
-                std::cout << " ";
-            else
-                std::cout << std::endl << indent;
+            if (inline_if(node, afterElse)) std::cout << " ";
+            else std::cout << std::endl << indent;
         }
     }
 
@@ -371,7 +361,6 @@ public:
         
         if (node.when_false.get()) {
             std::cout << "else";
-            
             inline_inspect(node.when_false.get(), false, true);
         }
     }
@@ -382,8 +371,7 @@ public:
 
     virtual void visit(ReturnStatement &node) {
         std::cout << "return";
-        if (!node.expressions.children.empty())
-            std::cout << " ";
+        if (!node.expressions.children.empty()) std::cout << " ";
         inspect(node.expressions);
         std::cout << ";";
     }

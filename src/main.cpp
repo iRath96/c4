@@ -15,7 +15,6 @@
 #include "Lexer.h"
 #include "Parser.h"
 
-#include "ASTInspector.h"
 #include "Beautifier.h"
 #include "Compiler.h"
 
@@ -99,20 +98,7 @@ void parse(const char *filename, bool printAST) {
         exit(1);
     }
     
-    if (debug_mode) {
-        ASTInspector inspector;
-        for (auto &decl : parser.declarations) {
-            decl->accept(inspector);
-        }
-        
-        Beautifier beautifier;
-        for (auto &decl : parser.declarations) {
-            decl->accept(beautifier);
-            std::cout << std::endl;
-        }
-    }
-    
-    if (printAST) {
+    if (printAST || debug_mode) {
         Beautifier beautifier;
         bool isFirst = true;
         for (auto &decl : parser.declarations) {

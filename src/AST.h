@@ -198,9 +198,7 @@ struct Declarator : Node {
     Ptr<Expression> initializer;
     
     const char *name = NULL;
-    bool isAbstract() const {
-        return !name;
-    }
+    bool isAbstract() const { return !name; }
     
     ACCEPT
 };
@@ -414,13 +412,8 @@ struct ComposedTypeSpecifier : TypeSpecifier {
     lexer::Token::Keyword kind; // STRUCT or UNION
     Vector<Declaration> declarations;
     
-    bool isQualified() const {
-        return !declarations.empty();
-    }
-    
-    bool isNamed() const {
-        return name;
-    }
+    bool isQualified() const { return !declarations.empty(); }
+    bool isNamed() const { return name; }
     
     ACCEPT
 };
