@@ -600,7 +600,7 @@ public:
                 // @todo assert(false) here
                 error("abstract declarator in declaration", node);
             else
-                scope->declareVariable(decl.name, dtype, decl.pos, !dtype->isFunction());
+                scope->declareVariable(decl.name, dtype, decl.pos, decl.initializer.get());
             
             if (decl.initializer.get()) {
                 auto itp = exprType(*decl.initializer);
