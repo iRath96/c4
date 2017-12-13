@@ -14,8 +14,8 @@
 namespace lexer {
 
 struct TextPosition {
-	int index = 0;
-	int line = 1;
+	int index  = 0;
+	int line   = 1;
 	int column = 1;
 };
 
@@ -23,17 +23,17 @@ struct Token {
 	enum class Precedence : uint8_t {
 		NONE = 15,
 
-		ASSIGNMENT	 = 13,
-		CONDITIONAL	= 12,
-		LOGICAL_OR	 = 11,
-		LOGICAL_AND	= 10,
-		INCLUSIVE_OR   = 9,
-		EXCLUSIVE_OR   = 8,
-		AND			= 7,
-		EQUALITY	   = 6,
-		RELATIONAL	 = 5,
-		SHIFT		  = 4,
-		ADDITIVE	   = 3,
+		ASSIGNMENT   = 13,
+		CONDITIONAL	 = 12,
+		LOGICAL_OR   = 11,
+		LOGICAL_AND  = 10,
+		INCLUSIVE_OR = 9,
+		EXCLUSIVE_OR = 8,
+		AND          = 7,
+		EQUALITY     = 6,
+		RELATIONAL   = 5,
+		SHIFT        = 4,
+		ADDITIVE     = 3,
 		MULTIPLICATIVE = 2,
 
 		UNARY = 1,
@@ -55,8 +55,8 @@ struct Token {
 		ID(QMARK, 16, Precedence::CONDITIONAL, "?")
 		ID(COLON, 17, Precedence::NONE, ":")
 
-		ID(PLUS_ASSIGN,	20, Precedence::ASSIGNMENT, "+=")
-		ID(MINUS_ASSIGN,   21, Precedence::ASSIGNMENT, "-=")
+		ID(PLUS_ASSIGN,  20, Precedence::ASSIGNMENT, "+=")
+		ID(MINUS_ASSIGN, 21, Precedence::ASSIGNMENT, "-=")
 		ID(MUL_ASSIGN,	 22, Precedence::ASSIGNMENT, "*=")
 		ID(DIV_ASSIGN,	 23, Precedence::ASSIGNMENT, "/=")
 		ID(MODULO_ASSIGN,  24, Precedence::ASSIGNMENT, "%=")
@@ -65,7 +65,7 @@ struct Token {
 		ID(BIT_XOR_ASSIGN, 27, Precedence::ASSIGNMENT, "^=")
 		ID(RSHIFT_ASSIGN,  28, Precedence::ASSIGNMENT, ">>=")
 		ID(LSHIFT_ASSIGN,  29, Precedence::ASSIGNMENT, "<<=")
-		ID(ASSIGN,		 30, Precedence::ASSIGNMENT, "=")
+		ID(ASSIGN, 30, Precedence::ASSIGNMENT, "=")
 
 		ID(LOG_OR,  40, Precedence::LOGICAL_OR,   "||")
 		ID(LOG_AND, 41, Precedence::LOGICAL_AND,  "&&")
@@ -88,21 +88,21 @@ struct Token {
 		ID(MINUS, 81, Precedence::ADDITIVE, "-")
 
 		ID(ASTERISK, 90, Precedence::MULTIPLICATIVE, "*")
-		ID(SLASH,	91, Precedence::MULTIPLICATIVE, "/")
+		ID(SLASH,    91, Precedence::MULTIPLICATIVE, "/")
 		ID(MODULO,   92, Precedence::MULTIPLICATIVE, "%")
 
 		ID(PLUSPLUS,   100, Precedence::UNARY, "++")
 		ID(MINUSMINUS, 101, Precedence::UNARY, "--")
-		ID(BIT_NOT,	102, Precedence::UNARY, "~")
-		ID(LOG_NOT,	103, Precedence::UNARY, "!")
+		ID(BIT_NOT,    102, Precedence::UNARY, "~")
+		ID(LOG_NOT,    103, Precedence::UNARY, "!")
 
 		ID(DOUBLE_HASH, 110, Precedence::NONE, "##")
-		ID(HASH,		111, Precedence::NONE, "#")
-		ID(ELIPSES,	 112, Precedence::NONE, "...")
-		ID(PERIOD,	  113, Precedence::NONE, ".")
-		ID(COMMA,	   114, Precedence::NONE, ",")
-		ID(SEMICOLON,   115, Precedence::NONE, ";")
-		ID(ARROW,	   116, Precedence::NONE, "->")
+		ID(HASH,      111, Precedence::NONE, "#")
+		ID(ELIPSES,   112, Precedence::NONE, "...")
+		ID(PERIOD,    113, Precedence::NONE, ".")
+		ID(COMMA,     114, Precedence::NONE, ",")
+		ID(SEMICOLON, 115, Precedence::NONE, ";")
+		ID(ARROW,     116, Precedence::NONE, "->")
 	};
 #undef ID
 
