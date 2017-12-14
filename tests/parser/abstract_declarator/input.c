@@ -1,1 +1,1 @@
-int a = (char (char x))0;
+char (*a)(char x) = (char (char x))0;
