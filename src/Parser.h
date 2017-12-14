@@ -327,7 +327,11 @@ protected:
 
 		bool has_pointer;
 		OPTIONAL(has_pointer = read_pointer(node.modifiers))
-		NON_OPTIONAL(read_direct_declarator(node, isAbstract) || (has_pointer && isAbstract))
+		if (has_pointer && isAbstract) {
+			OPTIONAL(read_direct_declarator(node, isAbstract))
+		} else {
+			NON_OPTIONAL(read_direct_declarator(node, isAbstract))
+		}
 	END_OPTION
 
 	bool read_direct_declarator_prefix(ast::Declarator &node, bool isAbstract)
