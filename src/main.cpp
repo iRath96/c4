@@ -79,7 +79,6 @@ void parse(const char *filename, bool printAST) {
 		exit(1);
 	}
 
-	/*
 	try {
 		Compiler comp; // @todo rename this to Analyzer or something
 		for (auto &decl : parser.declarations)
@@ -89,7 +88,6 @@ void parse(const char *filename, bool printAST) {
 		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
 		exit(1);
 	}
-	*/
 
 	if (printAST || debug_mode) {
 		Beautifier beautifier;

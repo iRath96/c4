@@ -327,11 +327,7 @@ protected:
 
 		bool has_pointer;
 		OPTIONAL(has_pointer = read_pointer(node.modifiers))
-
-		if (has_pointer && isAbstract)
-			OPTIONAL(read_direct_declarator(node, isAbstract))
-		else
-			NON_OPTIONAL(read_direct_declarator(node, isAbstract))
+		NON_OPTIONAL(read_direct_declarator(node, isAbstract) || (has_pointer && isAbstract))
 	END_OPTION
 
 	bool read_direct_declarator_prefix(ast::Declarator &node, bool isAbstract)
@@ -348,7 +344,7 @@ protected:
 		int last_good_i;
 
 		size_t insertionIndex = node.modifiers.size(); // @todo not efficient
-		NON_OPTIONAL(read_direct_declarator_prefix(node, isAbstract))
+		NON_OPTIONAL(read_direct_declarator_prefix(node, isAbstract) || isAbstract)
 
 		last_good_i = i;
 		while (!eof()) {
