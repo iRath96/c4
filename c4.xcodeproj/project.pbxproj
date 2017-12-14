@@ -27,7 +27,7 @@
 
 /* Begin PBXFileReference section */
 		FA2C09C61FD5A6BA00C891A5 /* Compiler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Compiler.cpp; sourceTree = "<group>"; };
-		FA6431861FAD924D00ABFB9D /* Parser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Parser.cpp; sourceTree = "<group>"; };
+		FA6431861FAD924D00ABFB9D /* Parser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Parser.cpp; sourceTree = "<group>"; usesTabs = 1; };
 		FA6431871FAD924D00ABFB9D /* Parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parser.h; sourceTree = "<group>"; };
 		FA74D4F01FA2576600D7CA2E /* c4 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = c4; sourceTree = BUILT_PRODUCTS_DIR; };
 		FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Lexer.cpp; sourceTree = "<group>"; };
