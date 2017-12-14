@@ -356,8 +356,7 @@ protected:
 			auto p_suffix = std::make_shared<ast::DeclaratorParameterList>();
 			if (!read_punctuator(Token::Punctuator::RB_OPEN)) break;
 
-			UNIQUE
-			OPTIONAL(read_parameter_type_list(p_suffix->parameters));
+			OPTIONAL(read_parameter_type_list(p_suffix->parameters))
 
 			if (p_suffix->parameters.size() == 1) {
 				auto p = p_suffix->parameters.front();
@@ -369,7 +368,9 @@ protected:
 				}
 			}
 
+			UNIQUE
 			if (!read_punctuator(Token::Punctuator::RB_CLOSE)) break;
+
 			node.modifiers.insert(node.modifiers.begin() + insertionIndex, p_suffix);
 			last_good_i = i;
 		}
