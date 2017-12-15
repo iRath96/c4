@@ -428,6 +428,8 @@ protected:
 
 	bool read_struct_declaration(ast::Declaration &node)
 	OPTION
+		node.pos = peek().pos;
+		
 		BEGIN_UNIQUE(read_specifier_qualifier_list(node.specifiers))
 		OPTIONAL(read_struct_declarator_list(node.declarators))
 		NON_OPTIONAL(read_punctuator(Token::Punctuator::SEMICOLON))

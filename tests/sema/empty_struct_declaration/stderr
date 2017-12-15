@@ -1,0 +1,1 @@
+tests/sema/empty_struct_declaration/input.c:2:3: error: declaration does not declare anything

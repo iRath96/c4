@@ -76,7 +76,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 			c = std::make_shared<ComposedType>();
 			auto &cc = dynamic_cast<ComposedType &>(*c);
 			cc.kind = comp->kind;
-			cc.pos = pos;
+			cc.pos = comp->pos;
 		}
 
 		auto &cc = dynamic_cast<ComposedType &>(*c);
@@ -94,13 +94,20 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 
 		for (auto &declaration : comp->declarations) {
 			Ptr<Type> type = Type::create(declaration.specifiers, declaration.pos, scopes);
-			for (auto &decl : declaration.declarators) {
-				Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
-				if (!dtype->isComplete())
-					throw CompilerError("field has incomplete type '" + dtype->describe() + "'", decl.pos);
+			if (declaration.declarators.empty()) {
+				auto subcc = dynamic_cast<ComposedType *>(type.get());
+				if (subcc && !subcc->hasTag()) {
+					cc.addAnonymousStructure(type, declaration.pos);
+				} else if (!subcc)
+					throw CompilerError("declaration does not declare anything", declaration.pos);
+			} else
+				for (auto &decl : declaration.declarators) {
+					Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
+					if (!dtype->isComplete())
+						throw CompilerError("field has incomplete type '" + dtype->describe() + "'", decl.pos);
 
-				cc.addMember(std::string(decl.name), dtype, decl.pos);
-			}
+					cc.addMember(std::string(decl.name), dtype, decl.pos);
+				}
 		}
 
 		typeQueue.erase(&cc);

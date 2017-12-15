@@ -1,0 +1,1 @@
+tests/sema/anonymous_redefined/input.c:5:5: error: member a redefined

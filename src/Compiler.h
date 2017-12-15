@@ -152,6 +152,12 @@ protected:
 	static std::set<Type *> typeQueue;
 
 public:
+	struct Member {
+		std::string name;
+		Ptr<Type> type;
+		size_t offset;
+	};
+
 	static Ptr<Type> ptrdiffType;
 
 	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
@@ -162,9 +168,12 @@ public:
 		throw CompilerError("called object type '" + describe() + "' is not a function or function pointer", pos);
 	}
 
-	virtual Ptr<Type> getMember(std::string, lexer::TextPosition pos) const {
+	virtual const Member &getMember(std::string, lexer::TextPosition pos) const {
 		throw CompilerError("member reference base type '" + describe() + "' is not a structure or union", pos);
 	}
+
+	virtual size_t getSize(lexer::TextPosition pos) const = 0;
+	virtual size_t getAlignment() const = 0;
 
 	Ptr<Type> reference(); // @todo should be const
 
@@ -224,6 +233,9 @@ public:
 	virtual std::string describe() const {
 		return size == INT ? "int" : "char";
 	}
+
+	virtual size_t getSize(lexer::TextPosition) const { return (size_t)size; }
+	virtual size_t getAlignment() const { return (size_t)size; }
 };
 
 class NullPointerType : public ArithmeticType {
@@ -236,44 +248,101 @@ public:
 
 	virtual std::string name() const { return "nullptr"; }
 	virtual bool isNullPointer() const { return true; }
+
+	virtual size_t getSize(lexer::TextPosition) const { return 4; } // @todo pointer size
+	virtual size_t getAlignment() const { return 4; }
 };
 
 class ComposedType : public Type {
 protected:
-	bool _isComplete = false;
+	bool isComplete_ = false;
+	size_t size_ = 0;
 
 public:
 	std::string name;
+	bool hasTag() const { return !name.empty(); }
 
 	lexer::TextPosition pos;
 	lexer::Token::Keyword kind;
 
-	std::vector<std::pair<std::string, Ptr<Type>>> members;
+	std::vector<Member> members; // @todo hashmap
 
 	virtual bool isScalar() const { return false; }
 	virtual bool isCompatible(const Type &other) const { return this == &other; }
 
-	virtual Ptr<Type> getMember(std::string name, lexer::TextPosition pos) const {
+	virtual const Member &getMember(std::string name, lexer::TextPosition pos) const {
 		if (!isComplete())
 			throw CompilerError("member access into incomplete type", pos);
 
 		for (auto &member : members) // @todo not efficient
-			if (member.first == name)
-				return member.second;
+			if (member.name == name)
+				return member;
 
 		throw CompilerError("no member named '" + name + "' in '" + describe() + "'", pos);
 	}
 
 	void addMember(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
 		for (auto &member : members)
-			if (member.first == name)
+			if (member.name == name)
 				throw CompilerError("member " + name + " redefined", pos);
 
-		members.push_back(std::make_pair(std::string(name), type));
+		bool isUnion = kind == lexer::Token::Keyword::UNION;
+
+		if (!isUnion) { // @todo not DRY
+			size_t padding = type->getAlignment();
+			if (size_ % padding) size_ += padding - (size_ % padding);
+		}
+
+		Member m;
+		m.name = name;
+		m.type = type;
+		m.offset = isUnion ? 0 : size_;
+		members.push_back(m);
+
+		if (isUnion) size_ = std::max(size_, type->getSize(pos));
+		else size_ += type->getSize(pos);
 	}
 
-	virtual bool isComplete() const { return _isComplete; }
-	void markAsComplete() { _isComplete = true; }
+	void addAnonymousStructure(Ptr<Type> type, lexer::TextPosition pos) {
+		bool isUnion = kind == lexer::Token::Keyword::UNION; // @todo use polymorphism!
+
+		auto &ct = dynamic_cast<ComposedType &>(*type);
+		for (auto &member : ct.members) {
+			// @todo correct error position
+			for (auto &m : members)
+				if (m.name == member.name)
+					throw CompilerError("member " + m.name + " redefined", pos);
+
+			Member m = member;
+			if (!isUnion) {
+				size_t padding = member.type->getAlignment();
+				if (size_ % padding) size_ += padding - (size_ % padding);
+				m.offset += size_;
+			}
+			members.push_back(m);
+		}
+
+		if (isUnion) size_ = std::max(size_, type->getSize(pos));
+		else size_ += type->getSize(pos); // @todo also not DRY
+	}
+
+	virtual bool isComplete() const { return isComplete_; }
+	void markAsComplete() {
+		isComplete_ = true;
+
+		// padding for arrays
+		size_t padding = getAlignment();
+		if (size_ % padding) size_ += padding - (size_ % padding);
+
+		//dumpLayout();
+	}
+
+	void dumpLayout() const {
+		std::cout << describe() << " (" << getSize(lexer::TextPosition()) << " B)" << std::endl;
+		for (auto &member : members)
+			std::cout << (void *)member.offset << ": " << member.name << " (" << member.type->describe() << ")" << std::endl;
+		std::cout << std::endl;
+	}
 
 	virtual std::string describe() const {
 		std::string result = kind == lexer::Token::Keyword::STRUCT ? "struct " : "union ";
@@ -283,6 +352,9 @@ public:
 		else
 			return result + name;
 	}
+
+	virtual size_t getSize(lexer::TextPosition) const { return size_; }
+	virtual size_t getAlignment() const { return 4; }
 };
 
 class FunctionType : public Type {
@@ -334,6 +406,12 @@ public:
 
 		return result + ")";
 	}
+
+	virtual size_t getSize(lexer::TextPosition pos) const {
+		throw CompilerError("sizeof function undefined", pos);
+	}
+
+	virtual size_t getAlignment() const { return 4; } // @todo: ?
 };
 
 class VoidType : public Type {
@@ -342,6 +420,9 @@ public:
 	virtual bool isCompatible(const Type &other) const { return other.isVoid(); }
 	virtual std::string describe() const { return "void"; }
 	virtual bool isVoid() const { return true; }
+
+	virtual size_t getSize(lexer::TextPosition) const { return 0; }
+	virtual size_t getAlignment() const { return 1; } // @todo: ?
 };
 
 class PointerType : public Type {
@@ -366,6 +447,9 @@ public:
 
 	virtual std::string describe() const { return base->describe() + "*"; }
 	virtual bool isVoidPointer() const { return base->isVoid(); }
+
+	virtual size_t getSize(lexer::TextPosition) const { return 4; }
+	virtual size_t getAlignment() const { return 4; }
 };
 
 class ExpressionStack {
@@ -777,7 +861,7 @@ public:
 			base.type = base.type->dereference(node.pos);
 		}
 
-		exprStack.push(TypePair(base.lvalue, base.type->getMember(node.id, node.pos)));
+		exprStack.push(TypePair(base.lvalue, base.type->getMember(node.id, node.pos).type));
 	}
 
 	virtual void visit(PostExpression &node) {

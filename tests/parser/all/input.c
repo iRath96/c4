@@ -26,7 +26,7 @@ int b;
 int c, d, e;
 int *(*array)(int, int, int);
 int do_something, hammertime, nobody_is_watching;
-struct { int right(int); } *are_nice;
+struct { int (*right)(int); } *are_nice;
 int **assignments;
 {
     a ? b : c ? d : e; // a ? b : (c ? d : e)
