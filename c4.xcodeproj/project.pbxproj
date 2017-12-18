@@ -11,6 +11,7 @@
 		FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA6431861FAD924D00ABFB9D /* Parser.cpp */; };
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
+		FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -36,6 +37,9 @@
 		FA87A23C1FB84DAD0023DB3F /* AST.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AST.h; sourceTree = "<group>"; };
 		FA87A23E1FB8E3A00023DB3F /* Beautifier.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Beautifier.h; sourceTree = "<group>"; };
 		FAED64FE1FD479C6001AC5D5 /* Analyzer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Analyzer.h; sourceTree = "<group>"; };
+		FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Compiler.cpp; sourceTree = "<group>"; };
+		FAEF05BC1FE7BDC40076EB37 /* Compiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Compiler.h; sourceTree = "<group>"; };
+		FAEF05BF1FE82B9F0076EB37 /* streams.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = streams.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,12 +56,10 @@
 		FA6431891FAD925400ABFB9D /* parser */ = {
 			isa = PBXGroup;
 			children = (
-				FA6431861FAD924D00ABFB9D /* Parser.cpp */,
-				FA6431871FAD924D00ABFB9D /* Parser.h */,
 				FA87A23C1FB84DAD0023DB3F /* AST.h */,
+				FA6431871FAD924D00ABFB9D /* Parser.h */,
+				FA6431861FAD924D00ABFB9D /* Parser.cpp */,
 				FA87A23E1FB8E3A00023DB3F /* Beautifier.h */,
-				FAED64FE1FD479C6001AC5D5 /* Analyzer.h */,
-				FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */,
 			);
 			name = parser;
 			sourceTree = "<group>";
@@ -81,9 +83,11 @@
 		FA74D4FB1FA2579300D7CA2E /* src */ = {
 			isa = PBXGroup;
 			children = (
+				FAEF05BA1FE7BDAD0076EB37 /* compiler */,
 				FA6431891FAD925400ABFB9D /* parser */,
 				FA74D4FC1FA2579300D7CA2E /* lexer */,
 				FA74D5001FA257CC00D7CA2E /* main.cpp */,
+				FAEF05BF1FE82B9F0076EB37 /* streams.h */,
 			);
 			path = src;
 			sourceTree = SOURCE_ROOT;
@@ -95,6 +99,17 @@
 				FA74D4FE1FA257A000D7CA2E /* Lexer.h */,
 			);
 			name = lexer;
+			sourceTree = "<group>";
+		};
+		FAEF05BA1FE7BDAD0076EB37 /* compiler */ = {
+			isa = PBXGroup;
+			children = (
+				FAED64FE1FD479C6001AC5D5 /* Analyzer.h */,
+				FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */,
+				FAEF05BC1FE7BDC40076EB37 /* Compiler.h */,
+				FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */,
+			);
+			name = compiler;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,6 +172,7 @@
 				FA2C09C71FD5A6BA00C891A5 /* Analyzer.cpp in Sources */,
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
 				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,
+				FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -119,6 +119,8 @@ public:
 		stack.pop_back();
 	}
 
+	bool empty() const { return stack.empty(); }
+
 	template<typename T>
 	ast::Ptr<T> find() { // @todo I doubt this is a good idea…
 		for (auto it = stack.rbegin(); it != stack.rend(); ++it)
@@ -467,12 +469,10 @@ public:
 		return top();
 	}
 
-	TypePair &top() {
-		return stack.top();
-	}
+	TypePair &top() { return stack.top(); }
 };
 
-class Analyzer : public Visitor {
+class Analyzer : public Visitor<void>, public Stream<ast::Ptr<ast::ExternalDeclaration>, void> {
 protected:
 	ScopeStack scopes;
 	ExpressionStack exprStack;
@@ -498,15 +498,29 @@ protected:
 
 	TypePair intType, charType, stringType, voidType, nullptrType;
 
-public:
-	Analyzer() {
+	void initTypes() {
 		intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::INT));
 		charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::CHAR));
 		stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
 		voidType = TypePair(false, std::make_shared<VoidType>());
 		nullptrType = TypePair(false, std::make_shared<NullPointerType>());
+	}
 
+public:
+	Analyzer(Source<ast::Ptr<ast::ExternalDeclaration>> *source) : Stream<ast::Ptr<ast::ExternalDeclaration>, void>(source) {
+		initTypes();
 		open();
+	}
+
+	virtual bool next(void *) {
+		ast::Ptr<ast::ExternalDeclaration> result;
+		if (this->source->next(&result)) {
+			inspect(*result);
+			return true;
+		} else {
+			if (!scopes.empty()) close();
+			return false;
+		}
 	}
 
 	void open() { scopes.push<FileScope>(); }

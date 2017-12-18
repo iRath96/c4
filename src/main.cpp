@@ -51,7 +51,8 @@ void tokenize(const char *filename) {
 	Lexer lexer = create_lexer(filename);
 	try {
 		while (true) {
-			Token t = lexer.next_token();
+			Token t;
+			lexer.next(&t);
 			if (t.kind == Token::Kind::END) break;
 
 			enable_output &&
@@ -64,9 +65,15 @@ void tokenize(const char *filename) {
 }
 
 void parse(const char *filename, bool printAST) {
-	Parser parser(create_lexer(filename));
+	Lexer lexer = create_lexer(filename);
+	Parser parser(&lexer);
+	Buffer<Parser::Output> buffer(&parser);
+
+	Analyzer analyzer(buffer.createChild());
+
 	try {
-		parser.parse();
+		if (do_sema) analyzer.drain();
+		else buffer.drain();
 	} catch (Lexer::Error e) {
 		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
 		exit(1);
@@ -78,29 +85,14 @@ void parse(const char *filename, bool printAST) {
 
 		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
 		exit(1);
-	}
-
-	if (do_sema) {
-		try {
-			Analyzer analyzer;
-			for (auto &decl : parser.declarations)
-				decl->accept(analyzer);
-			analyzer.close();
-		} catch (AnalyzerError e) {
-			fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
-			exit(1);
-		}
+	} catch (AnalyzerError e) {
+		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
+		exit(1);
 	}
 
 	if (printAST || debug_mode) {
-		Beautifier beautifier;
-		bool isFirst = true;
-		for (auto &decl : parser.declarations) {
-			if (isFirst) isFirst = false;
-			else std::cout << std::endl;
-
-			decl->accept(beautifier);
-		}
+		Beautifier beautifier(buffer.createChild());
+		beautifier.drain();
 	}
 }
 

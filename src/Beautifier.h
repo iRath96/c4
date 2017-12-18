@@ -6,9 +6,10 @@
 
 using namespace ast;
 
-class Beautifier : public Visitor {
+class Beautifier : public Visitor<void>, public Sink<ast::Ptr<ast::ExternalDeclaration>> {
 protected:
 	std::string indent = "";
+	bool isFirst = true;
 
 	void inspect(Node &node) { node.accept(*this); }
 	void inspect(const char *str) { std::cout << str; }
@@ -47,6 +48,20 @@ protected:
 	}
 
 public:
+	Beautifier(Source<ast::Ptr<ast::ExternalDeclaration>> *source) : Sink<ast::Ptr<ast::ExternalDeclaration>>(source) {}
+
+	virtual bool next(void *) {
+		ast::Ptr<ast::ExternalDeclaration> result;
+		if (this->source->next(&result)) {
+			if (isFirst) isFirst = false;
+			else std::cout << std::endl;
+
+			inspect(*result);
+			return true;
+		} else
+			return false;
+	}
+	
 	virtual void visit(CaseLabel &node) {
 		std::cout << "case ";
 		inspect(*node.expression);

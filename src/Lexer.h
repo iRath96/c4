@@ -11,6 +11,8 @@
 
 #include <memory>
 
+#include "streams.h"
+
 namespace lexer {
 
 struct TextPosition {
@@ -138,7 +140,7 @@ struct Token {
 	Punctuator punctuator = Punctuator::NOT_A_PUNCTUATOR;
 };
 
-class Lexer {
+class Lexer : public Source<Token> {
 public:
 	struct Input {
 		std::shared_ptr<char> data;
@@ -161,9 +163,7 @@ public:
 		replace_eol();
 	}
 
-	bool has_ended() { return eof(0); }
-
-	Token next_token();
+	virtual bool next(Token *);
 
 private:
 	Input input;
@@ -171,48 +171,8 @@ private:
 
 	Token::Punctuator last_punctuator;
 
-	void replace_eol() {
-		bool last_char_was_cr = false;
-
-		int skip = 0;
-		for (int i = 0; i < input.length; ++i) {
-			char c_in = input.data.get()[i + skip];
-			char c_out = c_in;
-
-			switch (c_in) {
-				case '\r':
-					c_out = '\n';
-					break;
-
-				case '\n':
-					if (last_char_was_cr) {
-						// don't replace CRLF with LFLF, replace it with one LF only
-						--input.length;
-						++skip;
-
-						if (i == input.length) return; // CRLF at end of file, we're done
-						c_out = input.data.get()[i + skip];
-					}
-			}
-
-			input.data.get()[i] = c_out;
-			last_char_was_cr = c_in == '\r';
-		}
-	}
-
-	void consume(int length) {
-		const char *buffer = input.data.get() + pos.index;
-		pos.index += length;
-
-		for (int i = 0; i < length; ++i) {
-			// update position
-			if (buffer[i] == '\n') {
-				++pos.line;
-				pos.column = 1;
-			} else
-				++pos.column;
-		}
-	}
+	void replace_eol();
+	void consume(int length);
 
 	__attribute__((always_inline)) inline char peek(int offset) const {
 		if (eof(offset)) return 0;
@@ -223,7 +183,7 @@ private:
 		return pos.index + offset >= input.length;
 	}
 
-	Token create_token(Token::Kind kind, int length);
+	bool create_token(Token::Kind kind, int length, Token *token);
 	void error(const std::string &message, int offset);
 
 	int read_whitespace();

@@ -35,7 +35,7 @@ bool is_alphanum[256] = {
 
 bool is_octal(char c) { return c >= '0' && c <= '7'; }
 
-Token Lexer::next_token() {
+bool Lexer::next(Token *token) {
 	using Kind = Token::Kind;
 
 	peek(0); // make sure eof flag is set appropriately
@@ -52,35 +52,35 @@ Token Lexer::next_token() {
 			consume(length);
 			continue;
 		} else if (c == '"')
-			return create_token(Kind::STRING_LITERAL, read_string());
+			return create_token(Kind::STRING_LITERAL, read_string(), token);
 		else if (c == '\'')
-			return create_token(Kind::CONSTANT, read_char());
+			return create_token(Kind::CONSTANT, read_char(), token);
 		else if (TEST_CHAR(is_alpha, c) || c == '_')
-			return create_token(Kind::IDENTIFIER, read_identifier());
+			return create_token(Kind::IDENTIFIER, read_identifier(), token);
 		else if (isdigit(c))
-			return create_token(Kind::CONSTANT, read_constant());
+			return create_token(Kind::CONSTANT, read_constant(), token);
 		else if ((length = read_punctuator()))
-			return create_token(Kind::PUNCTUATOR, length);
+			return create_token(Kind::PUNCTUATOR, length, token);
 
 		// no token was found
 		error("unrecognized character", 0);
 	}
 
-	return create_token(Kind::END, 0);
+	create_token(Kind::END, 0, token);
+	return false;
 }
 
-Token Lexer::create_token(Token::Kind kind, int length) {
-	Token token;
-	token.pos = pos;
-	token.kind = kind;
+bool Lexer::create_token(Token::Kind kind, int length, Token *token) {
+	token->pos = pos;
+	token->kind = kind;
 
 	const char *raw_text = input.data.get() + pos.index;
 
-	if (token.kind == Token::Kind::IDENTIFIER) {
+	if (token->kind == Token::Kind::IDENTIFIER) {
 #define K(x, y, z) if (length == z && !strncmp(raw_text, x, length)) {\
-	token.kind = Token::Kind::KEYWORD; \
-	token.text = x; \
-	token.keyword = Token::Keyword::y; \
+	token->kind = Token::Kind::KEYWORD; \
+	token->text = x; \
+	token->keyword = Token::Keyword::y; \
 } else
 		switch (raw_text[0]) {
 			case 'a': K("auto", AUTO, 4) {}; break;
@@ -108,17 +108,17 @@ Token Lexer::create_token(Token::Kind kind, int length) {
 				{}; break;
 		}
 #undef K
-	} else if (token.kind == Token::Kind::PUNCTUATOR) {
-		token.punctuator = last_punctuator;
+	} else if (token->kind == Token::Kind::PUNCTUATOR) {
+		token->punctuator = last_punctuator;
 	}
 
-	if (token.text.empty())
-		token.text = std::string(raw_text, length);
+	if (token->text.empty())
+		token->text = std::string(raw_text, length);
 
 	consume(length);
-	token.end_pos = pos;
+	token->end_pos = pos;
 
-	return token;
+	return true;
 }
 
 int Lexer::read_whitespace() {
@@ -306,6 +306,49 @@ void Lexer::error(const std::string &message, int offset) {
 	TextPosition start_pos = pos;
 	consume(offset);
 	throw Error(message, start_pos, pos);
+}
+
+void Lexer::replace_eol() {
+	bool last_char_was_cr = false;
+
+	int skip = 0;
+	for (int i = 0; i < input.length; ++i) {
+		char c_in = input.data.get()[i + skip];
+		char c_out = c_in;
+
+		switch (c_in) {
+			case '\r':
+				c_out = '\n';
+				break;
+
+			case '\n':
+				if (last_char_was_cr) {
+					// don't replace CRLF with LFLF, replace it with one LF only
+					--input.length;
+					++skip;
+
+					if (i == input.length) return; // CRLF at end of file, we're done
+					c_out = input.data.get()[i + skip];
+				}
+		}
+
+		input.data.get()[i] = c_out;
+		last_char_was_cr = c_in == '\r';
+	}
+}
+
+void Lexer::consume(int length) {
+	const char *buffer = input.data.get() + pos.index;
+	pos.index += length;
+
+	for (int i = 0; i < length; ++i) {
+		// update position
+		if (buffer[i] == '\n') {
+			++pos.line;
+			pos.column = 1;
+		} else
+			++pos.column;
+	}
 }
 
 }

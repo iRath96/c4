@@ -1,1 +1,1 @@
-tests/parser/empty/input.c:1:1: error: declaration expected
+tests/parser/empty/input.c:1:1: error: type specifier expected

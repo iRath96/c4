@@ -18,62 +18,63 @@ using PtrVector = Vector<Ptr<T>>;
 
 #pragma mark - Visitor
 
+template<typename T>
 struct Visitor {
 	// Nodes
-	virtual void visit(struct Identifier &) = 0;
-	virtual void visit(struct TypeName &) = 0;
+	virtual T visit(struct Identifier &) = 0;
+	virtual T visit(struct TypeName &) = 0;
 
 	// Labels
-	virtual void visit(struct CaseLabel &) = 0;
-	virtual void visit(struct DefaultLabel &) = 0;
-	virtual void visit(struct IdentifierLabel &) = 0;
+	virtual T visit(struct CaseLabel &) = 0;
+	virtual T visit(struct DefaultLabel &) = 0;
+	virtual T visit(struct IdentifierLabel &) = 0;
 
 	// Declarators
-	virtual void visit(struct DeclaratorParameterList &) = 0;
-	virtual void visit(struct DeclaratorPointer &) = 0;
-	virtual void visit(struct Declarator &) = 0;
+	virtual T visit(struct DeclaratorParameterList &) = 0;
+	virtual T visit(struct DeclaratorPointer &) = 0;
+	virtual T visit(struct Declarator &) = 0;
 
 	// Expressions
-	virtual void visit(struct ConstantExpression &) = 0;
-	virtual void visit(struct CastExpression &) = 0;
-	virtual void visit(struct UnaryExpression &) = 0;
-	virtual void visit(struct BinaryExpression &) = 0;
-	virtual void visit(struct ConditionalExpression &) = 0;
-	virtual void visit(struct ExpressionList &) = 0;
-	virtual void visit(struct CallExpression &) = 0;
-	virtual void visit(struct SubscriptExpression &) = 0;
-	virtual void visit(struct MemberExpression &) = 0;
-	virtual void visit(struct PostExpression &) = 0;
-	virtual void visit(struct SizeofExpressionUnary &) = 0;
-	virtual void visit(struct SizeofExpressionTypeName &) = 0;
+	virtual T visit(struct ConstantExpression &) = 0;
+	virtual T visit(struct CastExpression &) = 0;
+	virtual T visit(struct UnaryExpression &) = 0;
+	virtual T visit(struct BinaryExpression &) = 0;
+	virtual T visit(struct ConditionalExpression &) = 0;
+	virtual T visit(struct ExpressionList &) = 0;
+	virtual T visit(struct CallExpression &) = 0;
+	virtual T visit(struct SubscriptExpression &) = 0;
+	virtual T visit(struct MemberExpression &) = 0;
+	virtual T visit(struct PostExpression &) = 0;
+	virtual T visit(struct SizeofExpressionUnary &) = 0;
+	virtual T visit(struct SizeofExpressionTypeName &) = 0;
 
 	// Statements
-	virtual void visit(struct CompoundStatement &) = 0;
-	virtual void visit(struct IterationStatement &) = 0;
-	virtual void visit(struct ExpressionStatement &) = 0;
-	virtual void visit(struct SelectionStatement &) = 0;
-	virtual void visit(struct GotoStatement &) = 0;
-	virtual void visit(struct ContinueStatement &) = 0;
-	virtual void visit(struct ReturnStatement &) = 0;
+	virtual T visit(struct CompoundStatement &) = 0;
+	virtual T visit(struct IterationStatement &) = 0;
+	virtual T visit(struct ExpressionStatement &) = 0;
+	virtual T visit(struct SelectionStatement &) = 0;
+	virtual T visit(struct GotoStatement &) = 0;
+	virtual T visit(struct ContinueStatement &) = 0;
+	virtual T visit(struct ReturnStatement &) = 0;
 
 	// Declarations
-	virtual void visit(struct Declaration &) = 0;
-	virtual void visit(struct ParameterDeclaration &) = 0;
-	virtual void visit(struct ExternalDeclarationVariable &) = 0;
-	virtual void visit(struct ExternalDeclarationFunction &) = 0;
+	virtual T visit(struct Declaration &) = 0;
+	virtual T visit(struct ParameterDeclaration &) = 0;
+	virtual T visit(struct ExternalDeclarationVariable &) = 0;
+	virtual T visit(struct ExternalDeclarationFunction &) = 0;
 
 	// Types
-	virtual void visit(struct NamedTypeSpecifier &) = 0;
-	virtual void visit(struct ComposedTypeSpecifier &) = 0;
+	virtual T visit(struct NamedTypeSpecifier &) = 0;
+	virtual T visit(struct ComposedTypeSpecifier &) = 0;
 };
 
 #pragma mark - Base classes
 
-#define ACCEPT virtual void accept(Visitor &v) { v.visit(*this); }
+#define ACCEPT virtual void accept(Visitor<void> &v) { v.visit(*this); }
 
 struct Node {
 	lexer::TextPosition pos;
-	virtual void accept(Visitor &) = 0;
+	virtual void accept(Visitor<void> &) = 0;
 };
 
 struct Label : Node {};
