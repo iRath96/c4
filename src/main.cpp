@@ -8,10 +8,11 @@
 #include "Parser.h"
 
 #include "Beautifier.h"
-#include "Compiler.h"
+#include "Analyzer.h"
 
 bool debug_mode = false;
 bool enable_output = true;
+bool do_sema = true;
 
 const char *token_kind_name(Token::Kind kind) {
 	using Kind = Token::Kind;
@@ -79,14 +80,16 @@ void parse(const char *filename, bool printAST) {
 		exit(1);
 	}
 
-	try {
-		Compiler comp; // @todo rename this to Analyzer or something
-		for (auto &decl : parser.declarations)
-			decl->accept(comp);
-		comp.close();
-	} catch (CompilerError e) {
-		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
-		exit(1);
+	if (do_sema) {
+		try {
+			Analyzer analyzer;
+			for (auto &decl : parser.declarations)
+				decl->accept(analyzer);
+			analyzer.close();
+		} catch (AnalyzerError e) {
+			fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
+			exit(1);
+		}
 	}
 
 	if (printAST || debug_mode) {
@@ -107,6 +110,8 @@ int main(int argc, const char *argv[]) {
 			tokenize(argv[++i]);
 		else if (!strcmp(argv[i], "--debug"))
 			debug_mode = true;
+		else if (!strcmp(argv[i], "--no-sema"))
+			do_sema = false;
 		else if (!strcmp(argv[i], "--dry"))
 			enable_output = false;
 		else if (!strcmp(argv[i], "--parse"))

@@ -1,5 +1,5 @@
-#ifndef Compiler_h
-#define Compiler_h
+#ifndef Analyzer_h
+#define Analyzer_h
 
 #include "AST.h"
 
@@ -12,12 +12,12 @@
 
 using namespace ast;
 
-class CompilerError {
+class AnalyzerError {
 public:
 	std::string message;
 	lexer::TextPosition pos;
 
-	CompilerError(const std::string &message, lexer::TextPosition pos)
+	AnalyzerError(const std::string &message, lexer::TextPosition pos)
 	: message(message), pos(pos) {}
 };
 
@@ -65,7 +65,7 @@ public:
 
 	void resolveLabel(std::string id, lexer::TextPosition pos) {
 		if (resolvedLabels.find(id) != resolvedLabels.end())
-			throw CompilerError("redefinition of label '" + id + "'", pos);
+			throw AnalyzerError("redefinition of label '" + id + "'", pos);
 
 		resolvedLabels.insert(id);
 		unresolvedLabels.erase(id);
@@ -82,7 +82,7 @@ public:
 		if (unresolvedLabels.empty()) return;
 
 		auto lab = *unresolvedLabels.begin();
-		throw CompilerError("use of undeclared label '" + lab.first + "'", lab.second);
+		throw AnalyzerError("use of undeclared label '" + lab.first + "'", lab.second);
 	}
 };
 
@@ -161,15 +161,15 @@ public:
 	static Ptr<Type> ptrdiffType;
 
 	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
-		throw CompilerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos);
+		throw AnalyzerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos);
 	}
 
 	virtual Ptr<Type> call(ast::PtrVector<Type>, lexer::TextPosition pos) const {
-		throw CompilerError("called object type '" + describe() + "' is not a function or function pointer", pos);
+		throw AnalyzerError("called object type '" + describe() + "' is not a function or function pointer", pos);
 	}
 
 	virtual const Member &getMember(std::string, lexer::TextPosition pos) const {
-		throw CompilerError("member reference base type '" + describe() + "' is not a structure or union", pos);
+		throw AnalyzerError("member reference base type '" + describe() + "' is not a structure or union", pos);
 	}
 
 	virtual size_t getSize(lexer::TextPosition pos) const = 0;
@@ -243,7 +243,7 @@ public:
 	virtual bool isCompatible(const Type &other) const;
 
 	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
-		throw CompilerError("cannot dereference null pointer", pos);
+		throw AnalyzerError("cannot dereference null pointer", pos);
 	}
 
 	virtual std::string name() const { return "nullptr"; }
@@ -272,19 +272,19 @@ public:
 
 	virtual const Member &getMember(std::string name, lexer::TextPosition pos) const {
 		if (!isComplete())
-			throw CompilerError("member access into incomplete type", pos);
+			throw AnalyzerError("member access into incomplete type", pos);
 
 		for (auto &member : members) // @todo not efficient
 			if (member.name == name)
 				return member;
 
-		throw CompilerError("no member named '" + name + "' in '" + describe() + "'", pos);
+		throw AnalyzerError("no member named '" + name + "' in '" + describe() + "'", pos);
 	}
 
 	void addMember(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
 		for (auto &member : members)
 			if (member.name == name)
-				throw CompilerError("member " + name + " redefined", pos);
+				throw AnalyzerError("member " + name + " redefined", pos);
 
 		bool isUnion = kind == lexer::Token::Keyword::UNION;
 
@@ -311,7 +311,7 @@ public:
 			// @todo correct error position
 			for (auto &m : members)
 				if (m.name == member.name)
-					throw CompilerError("member " + m.name + " redefined", pos);
+					throw AnalyzerError("member " + m.name + " redefined", pos);
 
 			Member m = member;
 			if (!isUnion) {
@@ -370,7 +370,7 @@ public:
 	virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
 		if (argTypes.size() != parameters.size()) {
 			std::string q = argTypes.size() > parameters.size() ? "many" : "few";
-			throw CompilerError(
+			throw AnalyzerError(
 				"too " + q + " arguments to function call, expected " +
 				std::to_string(parameters.size()) + ", have " +
 				std::to_string(argTypes.size())
@@ -379,12 +379,12 @@ public:
 
 		for (size_t i = 0; i < parameters.size(); ++i) {
 			if (!parameters[i]->isComplete())
-				throw CompilerError(
+				throw AnalyzerError(
 					"argument type '" + parameters[i]->describe() + "' is incomplete"
 				, pos);
 
 			if (!Type::canCompare(*parameters[i], *argTypes[i], true))
-				throw CompilerError(
+				throw AnalyzerError(
 					"passing '" + argTypes[i]->describe() + "' to parameter of " +
 					"incompatible type '" + parameters[i]->describe() + "'"
 				, pos);
@@ -408,7 +408,7 @@ public:
 	}
 
 	virtual size_t getSize(lexer::TextPosition pos) const {
-		throw CompilerError("sizeof function undefined", pos);
+		throw AnalyzerError("sizeof function undefined", pos);
 	}
 
 	virtual size_t getAlignment() const { return 4; } // @todo: ?
@@ -437,7 +437,7 @@ public:
 
 	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
 		if (!base->isComplete())
-			throw CompilerError("incomplete type '" + base->describe() + "' where a complete type is required", pos);
+			throw AnalyzerError("incomplete type '" + base->describe() + "' where a complete type is required", pos);
 		return base;
 	}
 
@@ -472,7 +472,7 @@ public:
 	}
 };
 
-class Compiler : public Visitor {
+class Analyzer : public Visitor {
 protected:
 	ScopeStack scopes;
 	ExpressionStack exprStack;
@@ -488,7 +488,7 @@ protected:
 	}
 
 	[[noreturn]] void error(std::string message, Node &node) {
-		throw CompilerError(message, node.pos);
+		throw AnalyzerError(message, node.pos);
 	}
 
 	TypePair exprType(Expression &expr) { // @todo assert stack size
@@ -499,7 +499,7 @@ protected:
 	TypePair intType, charType, stringType, voidType, nullptrType;
 
 public:
-	Compiler() {
+	Analyzer() {
 		intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::INT));
 		charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::CHAR));
 		stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
@@ -925,7 +925,7 @@ public:
 		auto givenType = exprType(node.expressions);
 
 		if (!Type::canCompare(*expectedType, *givenType.type, true))
-			throw CompilerError(
+			throw AnalyzerError(
 				"returning '" + givenType.type->describe() + "' from a function with incompatible " +
 				"result type '" + expectedType->describe() + "'",
 				node.pos
@@ -933,4 +933,4 @@ public:
 	}
 };
 
-#endif /* Compiler_h */
+#endif /* Analyzer_h */

@@ -1,12 +1,12 @@
 #include <stdio.h>
-#include "Compiler.h"
+#include "Analyzer.h"
 
 void FileScope::close() {
 	BlockScope::close();
 
 	for (auto &ut : unresolvedTentative)
 		if (!ut.first->isComplete())
-			throw CompilerError(
+			throw AnalyzerError(
 				"tentative definition has type '" + ut.first->describe()  + "' that is never completed"
 			, ut.second);
 }
@@ -16,7 +16,7 @@ void BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPo
 		for (auto &d : definitions)
 			if (d.first == name) {
 				// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-				throw CompilerError("redefinition of '" + name + "'", pos);
+				throw AnalyzerError("redefinition of '" + name + "'", pos);
 			}
 
 		definitions.insert(std::make_pair(name, true));
@@ -25,7 +25,7 @@ void BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPo
 	for (auto &v : variables)
 		if (v.first == name && !v.second->isCompatible(*type)) {
 			// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-			throw CompilerError("conflicting types for '" + name + "'", pos);
+			throw AnalyzerError("conflicting types for '" + name + "'", pos);
 		}
 
 	variables.insert(std::make_pair(name, type));
@@ -54,7 +54,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 	using Keyword = lexer::Token::Keyword;
 
 	if (specifiers.size() != 1)
-		throw CompilerError("must have exactly one type specifier", pos);
+		throw AnalyzerError("must have exactly one type specifier", pos);
 
 	auto &spec = *specifiers.begin();
 	if (auto nt = dynamic_cast<NamedTypeSpecifier *>(spec.get())) {
@@ -64,7 +64,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 		case Keyword::VOID: return std::make_shared<VoidType>();
 
 		default:
-			throw CompilerError("unknown type", spec->pos);
+			throw AnalyzerError("unknown type", spec->pos);
 		}
 	} else if (auto comp = dynamic_cast<ComposedTypeSpecifier *>(spec.get())) {
 		Ptr<Type> c;
@@ -84,7 +84,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 
 		bool isNested = typeQueue.find(&cc) != typeQueue.end();
 		if (cc.isComplete() || isNested)
-			throw CompilerError(
+			throw AnalyzerError(
 				std::string(isNested ? "nested " : "") +
 				"redefinition of '" + std::string(comp->name) + "'",
 				comp->pos
@@ -99,12 +99,12 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 				if (subcc && !subcc->hasTag()) {
 					cc.addAnonymousStructure(type, declaration.pos);
 				} else if (!subcc)
-					throw CompilerError("declaration does not declare anything", declaration.pos);
+					throw AnalyzerError("declaration does not declare anything", declaration.pos);
 			} else
 				for (auto &decl : declaration.declarators) {
 					Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
 					if (!dtype->isComplete())
-						throw CompilerError("field has incomplete type '" + dtype->describe() + "'", decl.pos);
+						throw AnalyzerError("field has incomplete type '" + dtype->describe() + "'", decl.pos);
 
 					cc.addMember(std::string(decl.name), dtype, decl.pos);
 				}
@@ -116,7 +116,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 		return c;
 	} else
 		// unknown AST type
-		throw CompilerError("unimplemented", spec->pos);
+		throw AnalyzerError("unimplemented", spec->pos);
 }
 
 Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos, ScopeStack &scopes) {
@@ -140,7 +140,7 @@ Ptr<Type> Type::applyDeclarator(Declarator decl, ScopeStack &scopes) {
 			result = p;
 		} else
 			// unknown modifier
-			throw CompilerError("unknown modifier", mod->pos);
+			throw AnalyzerError("unknown modifier", mod->pos);
 	}
 
 	return result;
@@ -163,7 +163,7 @@ Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
 	if (arA && ptrB) return b;
 	if (ptrA && arB) return a;
 
-	throw CompilerError("cannot add incompatible types", pos);
+	throw AnalyzerError("cannot add incompatible types", pos);
 }
 
 Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
@@ -183,11 +183,11 @@ Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
 
 	if (ptrA && ptrB) {
 		if (!ptrA->base->isCompatible(*ptrB->base))
-			throw CompilerError("subtracting incompatible pointer types", pos);
+			throw AnalyzerError("subtracting incompatible pointer types", pos);
 		return Type::ptrdiffType;
 	}
 
-	throw CompilerError("cannot subtract incompatible types", pos);
+	throw AnalyzerError("cannot subtract incompatible types", pos);
 }
 
 bool Type::canCompare(const Type &a, const Type &b, bool broad) {
