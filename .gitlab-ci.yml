@@ -8,5 +8,6 @@ test:
     - make
     - gem install diffy
     - ruby test.rb
+    - ruby fuzzy/main.rb
   only:
     - branches
