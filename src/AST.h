@@ -72,7 +72,15 @@ struct Visitor {
 
 #define ACCEPT virtual void accept(Visitor<void> &v) { v.visit(*this); }
 
+struct Annotation {
+	virtual ~Annotation() {}
+};
+
 struct Node {
+	Ptr<Annotation> annotation;
+	void annotate(Annotation *a) { annotation.reset(a); }
+	void annotate(Ptr<Annotation> a) { annotation = a; }
+
 	lexer::TextPosition pos;
 	virtual void accept(Visitor<void> &) = 0;
 };

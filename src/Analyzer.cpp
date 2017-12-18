@@ -23,12 +23,15 @@ void BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPo
 	}
 
 	for (auto &v : variables)
-		if (v.first == name && !v.second->isCompatible(*type)) {
+		if (v.first == name && !v.second->type->isCompatible(*type)) {
 			// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
 			throw AnalyzerError("conflicting types for '" + name + "'", pos);
 		}
 
-	variables.insert(std::make_pair(name, type));
+	auto dr = std::make_shared<DeclarationRef>();
+	dr->type = type;
+	dr->pos = pos;
+	variables.insert(std::make_pair(name, dr));
 }
 
 Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {

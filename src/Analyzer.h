@@ -28,9 +28,11 @@ public:
 };
 
 class Type;
+struct DeclarationRef;
+
 class BlockScope : public Scope {
 public:
-	std::map<std::string, Ptr<Type>> variables;
+	std::map<std::string, Ptr<DeclarationRef>> variables;
 	std::map<std::string, bool> definitions; // @todo could be more elegant
 
 	std::map<std::string, Ptr<Type>> composedTypes;
@@ -42,7 +44,7 @@ public:
 	Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
 
 	void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined);
-	bool resolveVariable(std::string name, Ptr<Type> &result) {
+	bool resolveVariable(std::string name, Ptr<DeclarationRef> &result) {
 		auto it = variables.find(name);
 		if (it == variables.end()) return false;
 		result = it->second;
@@ -130,7 +132,7 @@ public:
 		return nullptr;
 	}
 
-	bool resolveVariable(std::string name, Ptr<Type> &result) {
+	bool resolveVariable(std::string name, Ptr<DeclarationRef> &result) {
 		for (auto it = stack.rbegin(); it != stack.rend(); ++it)
 			if (auto bs = dynamic_cast<BlockScope *>(it->get()))
 				if (bs->resolveVariable(name, result))
@@ -201,13 +203,17 @@ public:
 	virtual std::string describe() const = 0;
 };
 
-class TypePair {
-public:
+struct TypePair : Annotation {
 	bool lvalue;
 	Ptr<Type> type;
 
 	TypePair() {}
 	TypePair(bool lvalue, Ptr<Type> type) : lvalue(lvalue), type(type) {}
+};
+
+struct DeclarationRef : TypePair {
+	DeclarationRef() { lvalue = true; }
+	lexer::TextPosition pos;
 };
 
 class ArithmeticType : public Type {
@@ -472,10 +478,9 @@ public:
 	TypePair &top() { return stack.top(); }
 };
 
-class Analyzer : public Visitor<void>, public Stream<ast::Ptr<ast::ExternalDeclaration>, void> {
+class Analyzer : public Visitor<void>, public Stream<ast::Ptr<ast::ExternalDeclaration>, ast::Ptr<ast::ExternalDeclaration>> {
 protected:
 	ScopeStack scopes;
-	ExpressionStack exprStack;
 
 	void inspect(Node &node) {
 		//std::cout << node.pos.line << ":" << node.pos.column << std::endl;
@@ -491,30 +496,31 @@ protected:
 		throw AnalyzerError(message, node.pos);
 	}
 
-	TypePair exprType(Expression &expr) { // @todo assert stack size
+	TypePair &exprType(Expression &expr) { // @todo assert stack size
 		inspect(expr);
-		return exprStack.pop();
+		return *(TypePair *)expr.annotation.get();
 	}
 
-	TypePair intType, charType, stringType, voidType, nullptrType;
+	Ptr<Annotation> intType, charType, stringType, voidType, nullptrType;
 
 	void initTypes() {
-		intType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::INT));
-		charType = TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::CHAR));
-		stringType = TypePair(false, std::make_shared<PointerType>(charType.type));
-		voidType = TypePair(false, std::make_shared<VoidType>());
-		nullptrType = TypePair(false, std::make_shared<NullPointerType>());
+		auto ct = new TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::CHAR));
+		intType.reset(new TypePair(false, std::make_shared<ArithmeticType>(ArithmeticType::INT)));
+		charType.reset(ct);
+		stringType.reset(new TypePair(false, std::make_shared<PointerType>(ct->type)));
+		voidType.reset(new TypePair(false, std::make_shared<VoidType>()));
+		nullptrType.reset(new TypePair(false, std::make_shared<NullPointerType>()));
 	}
 
 public:
-	Analyzer(Source<ast::Ptr<ast::ExternalDeclaration>> *source) : Stream<ast::Ptr<ast::ExternalDeclaration>, void>(source) {
+	Analyzer(Source<ast::Ptr<ast::ExternalDeclaration>> *source)
+	: Stream<ast::Ptr<ast::ExternalDeclaration>, ast::Ptr<ast::ExternalDeclaration>>(source) {
 		initTypes();
 		open();
 	}
 
-	virtual bool next(void *) {
-		ast::Ptr<ast::ExternalDeclaration> result;
-		if (this->source->next(&result)) {
+	virtual bool next(ast::Ptr<ast::ExternalDeclaration> *result) {
+		if (this->source->next(result)) {
 			inspect(*result);
 			return true;
 		} else {
@@ -694,18 +700,18 @@ public:
 
 	virtual void visit(ConstantExpression &node) {
 		if (node.isIdentifier) {
-			Ptr<Type> type;
-			if (!scopes.resolveVariable(node.text, type))
+			Ptr<DeclarationRef> dr;
+			if (!scopes.resolveVariable(node.text, dr))
 				error("use of undeclared identifier '" + std::string(node.text) + "'", node);
 
-			exprStack.push(TypePair(true, type));
+			node.annotate(dr);
 			return;
 		}
 
 		switch (node.text[0]) {
-		case '\'': exprStack.push(charType); break;
-		case '\"': exprStack.push(stringType); break;
-		default: exprStack.push(node.text == "0" ? nullptrType : intType); break;
+		case '\'': node.annotate(charType); break;
+		case '\"': node.annotate(stringType); break;
+		default: node.annotate(node.text == "0" ? nullptrType : intType); break;
 		}
 	}
 
@@ -716,11 +722,11 @@ public:
 		Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos, scopes);
 
 		if (type->isVoid())
-			exprStack.push(TypePair(false, type));
+			node.annotate(new TypePair(false, type));
 		else if (!tp.type->isScalar())
 			error("operand of type '" + tp.type->describe() + "' where arithmetic or pointer type is required", node);
 		else
-			exprStack.push(TypePair(tp.lvalue, type));
+			node.annotate(new TypePair(tp.lvalue, type));
 	}
 
 	virtual void visit(UnaryExpression &node) {
@@ -730,18 +736,18 @@ public:
 
 		switch (node.op) {
 		case Punctuator::ASTERISK:
-			exprStack.push(TypePair(true, tp.type->dereference(node.pos)));
+			node.annotate(new TypePair(true, tp.type->dereference(node.pos)));
 			break;
 
 		case Punctuator::BIT_AND:
 			if (!tp.lvalue)
 				error("cannot take the address of an rvalue of type '" + tp.type->describe() + "'", node);
-			exprStack.push(TypePair(false, tp.type->reference()));
+			node.annotate(new TypePair(false, tp.type->reference()));
 			break;
 
 		default:
 			// @todo
-			exprStack.push(tp);
+			node.annotate(new TypePair(tp.lvalue, tp.type));
 			break;
 		}
 	}
@@ -755,8 +761,8 @@ public:
 		auto rhs = exprType(*node.rhs);
 
 		switch (node.op) {
-		case Op::PLUS: exprStack.push(TypePair(false, Type::add(lhs.type, rhs.type, node.pos))); break;
-		case Op::MINUS: exprStack.push(TypePair(false, Type::subtract(lhs.type, rhs.type, node.pos))); break;
+		case Op::PLUS: node.annotate(new TypePair(false, Type::add(lhs.type, rhs.type, node.pos))); break;
+		case Op::MINUS: node.annotate(new TypePair(false, Type::subtract(lhs.type, rhs.type, node.pos))); break;
 		default:
 			switch (Token::precedence(node.op)) {
 			case Prec::MULTIPLICATIVE: // integer for %, arithmetic otherwise
@@ -771,7 +777,7 @@ public:
 						"' and '" + rhs.type->describe() + "')",
 						node
 					);
-				exprStack.push(TypePair(false, lhs.type)); // @todo?
+				node.annotate(new TypePair(false, lhs.type)); // @todo?
 				break;
 			}
 
@@ -783,7 +789,7 @@ public:
 						"' and '" + rhs.type->describe() + "')",
 						node
 					);
-				exprStack.push(intType);
+				node.annotate(intType);
 				break;
 
 			case Prec::ASSIGNMENT:
@@ -794,7 +800,7 @@ public:
 						"' from incompatible type '" + rhs.type->describe() + "'",
 						*node.rhs
 					);
-				exprStack.push(TypePair(false, lhs.type));
+				node.annotate(new TypePair(false, lhs.type));
 				break;
 
 			case Prec::EQUALITY: {
@@ -804,7 +810,7 @@ public:
 						rhs.type->describe() + "')",
 						node
 					);
-				exprStack.push(intType);
+				node.annotate(intType);
 				break;
 			}
 
@@ -815,7 +821,7 @@ public:
 						rhs.type->describe() + "')",
 						node
 					);
-				exprStack.push(intType);
+				node.annotate(intType);
 				break;
 
 			default:
@@ -832,18 +838,21 @@ public:
 				"' where arithmetic or pointer type is required", *node.condition
 			);
 
-		auto lhs = exprType(*node.when_true);
-		auto rhs = exprType(*node.when_false);
+		auto &lhs = exprType(*node.when_true);
+		auto &rhs = exprType(*node.when_false);
 
 		// @todo compare lhs and rhs type
 
-		exprStack.push(lhs);
+		node.annotate(new TypePair(lhs.lvalue, lhs.type));
 	}
 
 	virtual void visit(ExpressionList &node) {
-		TypePair lastType = voidType;
-		for (auto &child : node.children) lastType = exprType(*child);
-		exprStack.push(lastType);
+		auto lastType = voidType;
+		for (auto &child : node.children) {
+			inspect(*child);
+			lastType = child->annotation;
+		}
+		node.annotate(lastType);
 	}
 
 	virtual void visit(CallExpression &node) {
@@ -855,7 +864,7 @@ public:
 			argumentTypes.push_back(tp.type);
 		}
 
-		exprStack.push(TypePair(false, tp.type->call(argumentTypes, node.pos)));
+		node.annotate(new TypePair(false, tp.type->call(argumentTypes, node.pos)));
 	}
 
 	virtual void visit(SubscriptExpression &node) {
@@ -864,7 +873,7 @@ public:
 
 		auto result = Type::add(base.type, subscript.type, node.pos);
 
-		exprStack.push(TypePair(true, result->dereference(node.pos)));
+		node.annotate(new TypePair(true, result->dereference(node.pos)));
 	}
 
 	virtual void visit(MemberExpression &node) {
@@ -875,14 +884,13 @@ public:
 			base.type = base.type->dereference(node.pos);
 		}
 
-		exprStack.push(TypePair(base.lvalue, base.type->getMember(node.id, node.pos).type));
+		node.annotate(new TypePair(base.lvalue, base.type->getMember(node.id, node.pos).type));
 	}
 
 	virtual void visit(PostExpression &node) {
 		auto t = exprType(*node.base);
 		// @todo test if this makes sense
-		t.lvalue = false;
-		exprStack.push(t);
+		node.annotate(new TypePair(false, t.type));
 	}
 
 	virtual void visit(ExpressionStatement &node) {
@@ -890,13 +898,13 @@ public:
 		exprType(node.expressions);
 	}
 
-	virtual void visit(SizeofExpressionTypeName &) {
-		exprStack.push(intType);
+	virtual void visit(SizeofExpressionTypeName &node) {
+		node.annotate(intType);
 	}
 
 	virtual void visit(SizeofExpressionUnary &node) {
 		exprType(*node.expression);
-		exprStack.push(intType);
+		node.annotate(intType);
 	}
 
 	virtual void visit(ComposedTypeSpecifier &) {}

@@ -7,12 +7,14 @@
 #include "Lexer.h"
 #include "Parser.h"
 
-#include "Beautifier.h"
 #include "Analyzer.h"
+#include "Beautifier.h"
+#include "Compiler.h"
 
 bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;
+bool do_compile = true;
 
 const char *token_kind_name(Token::Kind kind) {
 	using Kind = Token::Kind;
@@ -70,9 +72,11 @@ void parse(const char *filename, bool printAST) {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
+	Compiler compiler(&analyzer);
 
 	try {
-		if (do_sema) analyzer.drain();
+		if (do_compile) compiler.drain();
+		else if (do_sema) analyzer.drain();
 		else buffer.drain();
 	} catch (Lexer::Error e) {
 		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
