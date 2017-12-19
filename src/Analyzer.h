@@ -43,7 +43,7 @@ public:
 
 	Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
 
-	void declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined);
+	Ptr<DeclarationRef> declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined);
 	bool resolveVariable(std::string name, Ptr<DeclarationRef> &result) {
 		auto it = variables.find(name);
 		if (it == variables.end()) return false;
@@ -213,6 +213,8 @@ struct TypePair : Annotation {
 
 struct DeclarationRef : TypePair {
 	DeclarationRef() { lvalue = true; }
+
+	bool isDefined = false;
 	lexer::TextPosition pos;
 };
 
@@ -369,6 +371,7 @@ class FunctionType : public Type {
 public:
 	Ptr<Type> returnType;
 	std::vector<Ptr<Type>> parameters;
+	bool isVariadic = false;
 
 	virtual bool isScalar() const { return true; } // will evaluate to address
 	virtual bool isFunction() const { return true; }
@@ -376,8 +379,8 @@ public:
 	virtual bool isCompatible(const Type &other) const;
 
 	virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
-		if (argTypes.size() != parameters.size()) {
-			std::string q = argTypes.size() > parameters.size() ? "many" : "few";
+		if (isVariadic ? (argTypes.size() < parameters.size()) : (argTypes.size() != parameters.size())) {
+			std::string q = argTypes.size() > parameters.size() ? "many" : "few"; // @todo message for variadic
 			throw AnalyzerError(
 				"too " + q + " arguments to function call, expected " +
 				std::to_string(parameters.size()) + ", have " +
@@ -628,7 +631,7 @@ public:
 			else {
 				bool isDefinition = decl.initializer.get();
 				if (!isExtVar && !dtype->isFunction()) isDefinition = true;
-				scope->declareVariable(decl.name, dtype, decl.pos, isDefinition);
+				decl.annotate(scope->declareVariable(decl.name, dtype, decl.pos, isDefinition));
 			}
 
 			if (decl.initializer.get()) {
@@ -666,7 +669,7 @@ public:
 			if (!fn->returnType->isComplete())
 				error("incomplete result type in function definition", node);
 
-			scope->declareVariable(decl.name, t, node.pos, true);
+			decl.annotate(scope->declareVariable(decl.name, t, node.pos, true));
 
 			auto scope = scopes.find<FunctionScope>(); // @todo as callback param?
 			scope->returnType = fn->returnType;
@@ -693,27 +696,21 @@ public:
 		if (node.declarator.isAbstract()) return;
 
 		auto scope = scopes.find<FunctionScope>();
-		scope->declareVariable(node.declarator.name, type, node.declarator.pos, true);
+		node.annotate(scope->declareVariable(node.declarator.name, type, node.declarator.pos, true));
 	}
 
 #pragma mark - Expressions
 
-	virtual void visit(ConstantExpression &node) {
-		if (node.isIdentifier) {
-			Ptr<DeclarationRef> dr;
-			if (!scopes.resolveVariable(node.text, dr))
-				error("use of undeclared identifier '" + std::string(node.text) + "'", node);
+	virtual void visit(IdentifierExpression &node) {
+		Ptr<DeclarationRef> dr;
+		if (!scopes.resolveVariable(node.text, dr))
+			error("use of undeclared identifier '" + std::string(node.text) + "'", node);
 
-			node.annotate(dr);
-			return;
-		}
-
-		switch (node.text[0]) {
-		case '\'': node.annotate(charType); break;
-		case '\"': node.annotate(stringType); break;
-		default: node.annotate(node.text == "0" ? nullptrType : intType); break;
-		}
+		node.annotate(dr);
 	}
+
+	virtual void visit(Constant &node) { node.annotate(node.isChar ? charType : (node.value ? intType : nullptrType)); }
+	virtual void visit(StringLiteral &node) { node.annotate(stringType); }
 
 	virtual void visit(CastExpression &node) {
 		auto tp = exprType(*node.expression);

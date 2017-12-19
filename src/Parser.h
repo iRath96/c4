@@ -229,26 +229,44 @@ protected:
 		}
 	OTHERWISE_FAIL("unary operator expected")
 
-	bool read_token(Token::Kind kind, std::string &text)
-	OPTION
-		NON_OPTIONAL(peek().kind == kind)
-		text = peek().text;
-		shift();
-	END_OPTION
-
 	bool read_identifier(std::string &text)
 	OPTION
-		NON_OPTIONAL(read_token(Token::Kind::IDENTIFIER, text))
+		NON_OPTIONAL(peek().kind == Token::Kind::IDENTIFIER)
+		text = peek().text;
+		shift();
 	OTHERWISE_FAIL("identifier expected")
 
-	bool read_constant(std::string &text)
+	// @todo not elegant
+	bool read_identifier_expression(Ptr<Expression> &node)
 	OPTION
-		NON_OPTIONAL(read_token(Token::Kind::CONSTANT, text))
+		auto c = std::make_shared<IdentifierExpression>();
+		NON_OPTIONAL(peek().kind == Token::Kind::IDENTIFIER)
+		c->pos = peek().pos;
+		c->text = peek().text;
+		shift();
+		node = c;
+	OTHERWISE_FAIL("identifier expected")
+
+	bool read_constant(Ptr<Expression> &node)
+	OPTION
+		auto c = std::make_shared<Constant>();
+		NON_OPTIONAL(peek().kind == Token::Kind::CONSTANT)
+		c->pos = peek().pos;
+		c->text = peek().text;
+		c->value = peek().intValue;
+		shift();
+		node = c;
 	OTHERWISE_FAIL("constant expected")
 
-	bool read_string_literal(std::string &text)
+	bool read_string_literal(Ptr<Expression> &node)
 	OPTION
-		NON_OPTIONAL(read_token(Token::Kind::STRING_LITERAL, text))
+		auto c = std::make_shared<StringLiteral>();
+		NON_OPTIONAL(peek().kind == Token::Kind::STRING_LITERAL)
+		c->pos = peek().pos;
+		c->text = peek().text;
+		c->value = peek().stringValue;
+		shift();
+		node = c;
 	OTHERWISE_FAIL("string literal expected")
 
 #pragma mark - Other stuff
@@ -285,7 +303,7 @@ protected:
 	}
 
 	template<typename T>
-	bool read_separated_list(bool (Parser::*method)(T &node), Token::Punctuator separator, std::vector<T> &result) {
+	bool read_separated_list(bool (Parser::*method)(T &node), Token::Punctuator separator, std::vector<T> &result, bool strict = true) {
 		int initial_i = i;
 		int last_good_i = i;
 		bool _initial_ef = error_flag;
@@ -299,7 +317,7 @@ protected:
 
 			error_flag = false;
 			if (!read_punctuator(separator)) break;
-			error_flag = true;
+			error_flag = strict;
 		}
 
 		error_flag = _initial_ef;
@@ -354,6 +372,10 @@ protected:
 			if (!read_punctuator(Token::Punctuator::RB_OPEN)) break;
 
 			OPTIONAL(read_parameter_type_list(p_suffix->parameters))
+			if (read_punctuator(Token::Punctuator::COMMA)) {
+				NON_OPTIONAL(read_punctuator(Token::Punctuator::ELIPSES))
+				p_suffix->isVariadic = true;
+			}
 
 			if (p_suffix->parameters.size() == 1) {
 				auto p = p_suffix->parameters.front();
@@ -383,7 +405,7 @@ protected:
 
 	bool read_parameter_type_list(Vector<ParameterDeclaration> &node)
 	OPTION
-		NON_OPTIONAL(read_separated_list(&Parser::read_parameter_declaration, Token::Punctuator::COMMA, node))
+		NON_OPTIONAL(read_separated_list(&Parser::read_parameter_declaration, Token::Punctuator::COMMA, node, false))
 	END_OPTION
 
 	bool read_parameter_declaration(ParameterDeclaration &node)
@@ -741,12 +763,7 @@ protected:
 
 	bool read_primary_expression(Ptr<Expression> &node)
 	OPTION
-		auto constant = std::make_shared<ConstantExpression>();
-		constant->pos = peek().pos;
-		constant->isIdentifier = read_identifier(constant->text);
-
-		NON_OPTIONAL(constant->isIdentifier || read_constant(constant->text) || read_string_literal(constant->text))
-		node = constant;
+		NON_OPTIONAL(read_identifier_expression(node) || read_constant(node) || read_string_literal(node))
 	ELSE_OPTION
 		auto list = std::make_shared<ExpressionList>();
 		NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))

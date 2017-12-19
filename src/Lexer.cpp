@@ -52,13 +52,14 @@ bool Lexer::next(Token *token) {
 			consume(length);
 			continue;
 		} else if (c == '"')
-			return create_token(Kind::STRING_LITERAL, read_string(), token);
-		else if (c == '\'')
-			return create_token(Kind::CONSTANT, read_char(), token);
-		else if (TEST_CHAR(is_alpha, c) || c == '_')
+			return create_token(Kind::STRING_LITERAL, read_string(token->stringValue), token);
+		else if (c == '\'') {
+			token->isChar = true;
+			return create_token(Kind::CONSTANT, read_char(token->intValue), token);
+		} else if (TEST_CHAR(is_alpha, c) || c == '_')
 			return create_token(Kind::IDENTIFIER, read_identifier(), token);
 		else if (isdigit(c))
-			return create_token(Kind::CONSTANT, read_constant(), token);
+			return create_token(Kind::CONSTANT, read_constant(token->intValue), token);
 		else if ((length = read_punctuator()))
 			return create_token(Kind::PUNCTUATOR, length, token);
 
@@ -127,21 +128,35 @@ int Lexer::read_whitespace() {
 	return i;
 }
 
-int Lexer::read_string() {
+int Lexer::read_string(std::string &str) {
 	if (peek(0) != '"') return 0; // not a string
 
 	int i = 1;
 	while (!eof(i)) {
-		char c = peek(i);
+		int output, c = peek(i);
 		if (c == '"') return i + 1;
-		i = read_escape_seq(i);
+		i = read_escape_seq(i, output);
+		str += (char)output; // @todo inefficient
 	}
 
 	error("EOF encountered while reading string", i);
 	return 0;
 }
 
-int Lexer::read_escape_seq(int i) {
+char xval(char chr) {
+	switch (chr) {
+	case 'a': case 'A': return 10;
+	case 'b': case 'B': return 11;
+	case 'c': case 'C': return 12;
+	case 'd': case 'D': return 13;
+	case 'e': case 'E': return 14;
+	case 'f': case 'F': return 15;
+	}
+	
+	return chr - '0';
+}
+
+int Lexer::read_escape_seq(int i, int &output) {
 	if (eof(i)) return i; // can't read anything
 
 	if (peek(i) == '\n') {
@@ -150,24 +165,43 @@ int Lexer::read_escape_seq(int i) {
 		return 0;
 	}
 
-	if (peek(i++) != '\\') return i; // ordinary character of length 1
+	output = peek(i++);
+	if (output != '\\') return i; // ordinary character of length 1
 
-	char c = peek(i++);
-	if (c == '\'' || c == '"' || c == '?' || c == '\\' ||
-		c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'v')
-		return i;
+	output = peek(i++);
+	switch (output) {
+	case '\\': case '"': case '\'': return i;
+	case '?': output = '\?'; return i;
+	case 'a': output = '\a'; return i;
+	case 'b': output = '\b'; return i;
+	case 'f': output = '\f'; return i;
+	case 'n': output = '\n'; return i;
+	case 'r': output = '\r'; return i;
+	case 't': output = '\t'; return i;
+	case 'v': output = '\v'; return i;
+	}
 
-	if (is_octal(c)) {
+	if (is_octal(output)) {
+		output -= '0';
+
 		int max_i = i + 2; // two more octal digits are allowed
 
 		// octal escape sequence
-		while (i < max_i && is_octal(peek(i))) ++i;
+		while (i < max_i && is_octal(peek(i))) {
+			output = output * 8 + (peek(i) - '0');
+			++i;
+		}
+
 		return i;
 	}
 
-	if (c == 'x') {
+	if (output == 'x') {
+		output = 0;
+
 		if (!isxdigit(peek(i))) error("hexadecimal escape sequence expected", i);
-		while (isxdigit(peek(++i)));
+		while (isxdigit(peek(++i)))
+			output = output * 16 + xval(peek(i));
+
 		return i;
 	}
 
@@ -175,14 +209,14 @@ int Lexer::read_escape_seq(int i) {
 	return 0;
 }
 
-int Lexer::read_char() {
+int Lexer::read_char(int &output) {
 	if (peek(0) != '\'')
 		// not a character
 		return 0;
 
 	if (peek(1) == '\'') error("empty character constant", 1);
 
-	int i = read_escape_seq(1);
+	int i = read_escape_seq(1, output);
 
 	if (eof(i)) error("EOF encountered while reading character constant", i);
 	if (peek(i) != '\'') error("character constant too long", i);
@@ -294,11 +328,16 @@ int Lexer::read_identifier() {
 	return i;
 }
 
-int Lexer::read_constant() {
+int Lexer::read_constant(int &output) {
+	output = 0;
 	if (peek(0) == '0') return 1; // octal constants are now allowed
 
 	int i = 0;
-	while (isdigit(peek(i))) ++i;
+	while (isdigit(peek(i))) {
+		output = output * 10 + (peek(i) - '0');
+		++i;
+	}
+
 	return i;
 }
 

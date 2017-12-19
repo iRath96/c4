@@ -138,6 +138,11 @@ struct Token {
 	Kind kind;
 	Keyword keyword = Keyword::NOT_A_KEYWORD;
 	Punctuator punctuator = Punctuator::NOT_A_PUNCTUATOR;
+
+	// @todo not optimal
+	std::string stringValue;
+	int intValue;
+	bool isChar = false;
 };
 
 class Lexer : public Source<Token> {
@@ -192,11 +197,11 @@ private:
 	int read_punctuator();
 	int read_identifier();
 
-	int read_escape_seq(int);
-	int read_string();
-	int read_char();
+	int read_escape_seq(int, int &);
+	int read_string(std::string &);
+	int read_char(int &);
 
-	int read_constant();
+	int read_constant(int &);
 };
 
 }

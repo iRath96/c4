@@ -99,7 +99,7 @@ public:
 
 	virtual void visit(DeclaratorPointer &) { std::cout << "*"; }
 
-	virtual void visit(DeclaratorParameterList &node) {
+	virtual void visit(DeclaratorParameterList &node) { // @todo variadic
 		std::cout << "(";
 		if (node.parameters.empty()) std::cout << "void";
 		else join(node.parameters, ", ");
@@ -158,7 +158,9 @@ public:
 		inspect(node.declarator);
 	}
 
-	virtual void visit(ConstantExpression &node) { std::cout << node.text; }
+	virtual void visit(IdentifierExpression &node) { std::cout << node.text; }
+	virtual void visit(Constant &node) { std::cout << node.text; }
+	virtual void visit(StringLiteral &node) { std::cout << node.text; }
 
 	virtual void visit(CastExpression &node) {
 		std::cout << "((";

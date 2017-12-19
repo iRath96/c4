@@ -11,27 +11,34 @@ void FileScope::close() {
 			, ut.second);
 }
 
-void BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
-	if (isDefined) {
-		for (auto &d : definitions)
-			if (d.first == name) {
+Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
+	for (auto &v : variables) {
+		if (v.first != name) continue;
+
+		if (isDefined) {
+			if (v.second->isDefined) {
 				// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
 				throw AnalyzerError("redefinition of '" + name + "'", pos);
+			} else {
+				v.second->isDefined = true;
 			}
+		}
 
-		definitions.insert(std::make_pair(name, true));
-	}
-
-	for (auto &v : variables)
-		if (v.first == name && !v.second->type->isCompatible(*type)) {
+		if (!v.second->type->isCompatible(*type)) {
 			// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
 			throw AnalyzerError("conflicting types for '" + name + "'", pos);
 		}
 
+		return v.second;
+	}
+
 	auto dr = std::make_shared<DeclarationRef>();
 	dr->type = type;
 	dr->pos = pos;
+	dr->isDefined = isDefined;
 	variables.insert(std::make_pair(name, dr));
+
+	return dr;
 }
 
 Ptr<Type> BlockScope::resolveComposedType(ComposedTypeSpecifier *ct) {
@@ -140,6 +147,7 @@ Ptr<Type> Type::applyDeclarator(Declarator decl, ScopeStack &scopes) {
 				p->parameters.push_back(create(param.specifiers, param.declarator, param.pos, scopes));
 
 			p->returnType = result;
+			p->isVariadic = plist->isVariadic;
 			result = p;
 		} else
 			// unknown modifier

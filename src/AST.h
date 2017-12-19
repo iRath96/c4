@@ -35,7 +35,10 @@ struct Visitor {
 	virtual T visit(struct Declarator &) = 0;
 
 	// Expressions
-	virtual T visit(struct ConstantExpression &) = 0;
+	virtual T visit(struct IdentifierExpression &) = 0;
+	virtual T visit(struct Constant &) = 0;
+	virtual T visit(struct StringLiteral &) = 0;
+	
 	virtual T visit(struct CastExpression &) = 0;
 	virtual T visit(struct UnaryExpression &) = 0;
 	virtual T visit(struct BinaryExpression &) = 0;
@@ -124,6 +127,7 @@ struct DeclaratorModifier : Node {};
 
 struct DeclaratorParameterList : DeclaratorModifier {
 	ast::Vector<ast::ParameterDeclaration> parameters;
+	bool isVariadic = false;
 	ACCEPT
 };
 
@@ -149,9 +153,21 @@ struct TypeName : Node {
 
 #pragma mark - Expressions
 
-struct ConstantExpression : Expression {
+struct IdentifierExpression : Expression {
 	std::string text;
-	bool isIdentifier;
+	ACCEPT
+};
+
+struct Constant : Expression {
+	std::string text;
+	int value;
+	bool isChar;
+	ACCEPT
+};
+
+struct StringLiteral : Expression {
+	std::string text;
+	std::string value;
 	ACCEPT
 };
 
