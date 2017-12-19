@@ -40,6 +40,8 @@ bool Lexer::next(Token *token) {
 
 	peek(0); // make sure eof flag is set appropriately
 
+	if (eof(0) && !acquire()) return false;
+
 	while (!eof(0)) {
 		int length = 0;
 		char c = peek(0);
@@ -75,46 +77,41 @@ bool Lexer::create_token(Token::Kind kind, int length, Token *token) {
 	token->pos = pos;
 	token->kind = kind;
 
-	const char *raw_text = input.data.get() + pos.index;
+	std::string raw_text = buffer.substr(pos.index, length);
 
 	if (token->kind == Token::Kind::IDENTIFIER) {
-#define K(x, y, z) if (length == z && !strncmp(raw_text, x, length)) {\
+#define K(x, y) if (raw_text == x) { \
 	token->kind = Token::Kind::KEYWORD; \
 	token->text = x; \
 	token->keyword = Token::Keyword::y; \
 } else
-		switch (raw_text[0]) {
-			case 'a': K("auto", AUTO, 4) {}; break;
-			case 'b': K("break", BREAK, 5) {}; break;
-			case 'c': K("case", CASE, 4) K("char", CHAR, 4) K("const", CONST, 5) K("continue", CONTINUE, 8) {}; break;
-			case 'd': K("default", DEFAULT, 7) K("do", DO, 2) K("double", DOUBLE, 6) {}; break;
-			case 'e': K("else", ELSE, 4) K("enum", ENUM, 4) K("extern", EXTERN, 6) {}; break;
-			case 'f': K("float", FLOAT, 5) K("for", FOR, 3) {}; break;
-			case 'g': K("goto", GOTO, 4) {}; break;
-			case 'i': K("if", IF, 2) K("inline", INLINE, 6) K("int", INT, 3) {}; break;
-			case 'l': K("long", LONG, 4) {}; break;
-			case 'r': K("register", REGISTER, 8) K("restrict", RESTRICT, 8) K("return", RETURN, 6) {}; break;
-			case 's':
-				K("short", SHORT, 5) K("signed", SIGNED, 6) K("sizeof", SIZEOF, 6)
-				K("static", STATIC, 6) K("struct", STRUCT, 6) K("switch", SWITCH, 6) {}; break;
-			case 't': K("typedef", TYPEDEF, 7) {}; break;
-			case 'u': K("union", UNION, 5) K("unsigned", UNSIGNED, 8) {}; break;
-			case 'v': K("void", VOID, 4) K("volatile", VOLATILE, 8) {}; break;
-			case 'w': K("while", WHILE, 5) {}; break;
-			case '_':
-				K("_Alignas", _ALIGNAS, 8) K("_Alignof", _ALIGNOF, 8) K("_Atomic", _ATOMIC, 7)
-				K("_Bool", _BOOL, 5) K("_Complex", _COMPLEX, 8) K("_Generic", _GENERIC, 8)
-				K("_Imaginary", _IMAGINARY, 10) K("_Noreturn", _NORETURN, 9) K("_Static_assert", _STATIC_ASSERT, 14)
-				K("_Thread_local", _THREAD_LOCAL, 13)
-				{}; break;
-		}
+		K("auto", AUTO)
+		K("break", BREAK)
+		K("case", CASE) K("char", CHAR) K("const", CONST) K("continue", CONTINUE)
+		K("default", DEFAULT) K("do", DO) K("double", DOUBLE)
+		K("else", ELSE) K("enum", ENUM) K("extern", EXTERN)
+		K("float", FLOAT) K("for", FOR)
+		K("goto", GOTO)
+		K("if", IF) K("inline", INLINE) K("int", INT)
+		K("long", LONG)
+		K("register", REGISTER) K("restrict", RESTRICT) K("return", RETURN)
+		K("short", SHORT) K("signed", SIGNED) K("sizeof", SIZEOF)
+		K("static", STATIC) K("struct", STRUCT) K("switch", SWITCH)
+		K("typedef", TYPEDEF)
+		K("union", UNION) K("unsigned", UNSIGNED)
+		K("void", VOID) K("volatile", VOLATILE)
+		K("while", WHILE)
+		K("_Alignas", _ALIGNAS) K("_Alignof", _ALIGNOF) K("_Atomic", _ATOMIC)
+		K("_Bool", _BOOL) K("_Complex", _COMPLEX) K("_Generic", _GENERIC)
+		K("_Imaginary", _IMAGINARY) K("_Noreturn", _NORETURN) K("_Static_assert", _STATIC_ASSERT)
+		K("_Thread_local", _THREAD_LOCAL) {}
 #undef K
 	} else if (token->kind == Token::Kind::PUNCTUATOR) {
 		token->punctuator = last_punctuator;
 	}
 
 	if (token->text.empty())
-		token->text = std::string(raw_text, length);
+		token->text = raw_text;
 
 	consume(length);
 	token->end_pos = pos;
@@ -347,12 +344,12 @@ void Lexer::error(const std::string &message, int offset) {
 	throw Error(message, start_pos, pos);
 }
 
-void Lexer::replace_eol() {
-	bool last_char_was_cr = false;
+void Lexer::replace_eol(std::string &input) {
+	size_t length = input.length();
 
 	int skip = 0;
-	for (int i = 0; i < input.length; ++i) {
-		char c_in = input.data.get()[i + skip];
+	for (int i = 0; i < length; ++i) {
+		char c_in = input[i + skip];
 		char c_out = c_in;
 
 		switch (c_in) {
@@ -363,24 +360,24 @@ void Lexer::replace_eol() {
 			case '\n':
 				if (last_char_was_cr) {
 					// don't replace CRLF with LFLF, replace it with one LF only
-					--input.length;
+					--length;
 					++skip;
 
-					if (i == input.length) return; // CRLF at end of file, we're done
-					c_out = input.data.get()[i + skip];
+					if (i == length) return; // CRLF at end of file, we're done
+					c_out = input[i + skip];
 				}
 		}
 
-		input.data.get()[i] = c_out;
+		input[i] = c_out;
 		last_char_was_cr = c_in == '\r';
 	}
 }
 
 void Lexer::consume(int length) {
-	const char *buffer = input.data.get() + pos.index;
+	int i = pos.index, j = pos.index + length;
 	pos.index += length;
 
-	for (int i = 0; i < length; ++i) {
+	for (; i < j; ++i) {
 		// update position
 		if (buffer[i] == '\n') {
 			++pos.line;

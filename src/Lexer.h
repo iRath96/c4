@@ -145,13 +145,8 @@ struct Token {
 	bool isChar = false;
 };
 
-class Lexer : public Source<Token> {
+class Lexer : public Stream<std::string, Token> {
 public:
-	struct Input {
-		std::shared_ptr<char> data;
-		int length;
-	};
-
 	class Error {
 	public:
 		std::string message;
@@ -161,31 +156,36 @@ public:
 		: message(message), start_pos(start_pos), end_pos(end_pos) {}
 	};
 
-	Lexer(char *data, int length) {
-		input.data = std::shared_ptr<char>(data);
-		input.length = length;
-
-		replace_eol();
-	}
+	Lexer(Source<std::string> *source) : Stream<std::string, Token>(source) {}
 
 	virtual bool next(Token *);
 
-private:
-	Input input;
+protected:
+	std::string buffer;
 	TextPosition pos;
 
 	Token::Punctuator last_punctuator;
 
-	void replace_eol();
+	bool acquire() {
+		std::string data;
+		if (!this->source->next(&data)) return false;
+
+		replace_eol(data);
+		buffer += data;
+		return true;
+	}
+
+	bool last_char_was_cr = false;
+	void replace_eol(std::string &);
 	void consume(int length);
 
 	__attribute__((always_inline)) inline char peek(int offset) const {
 		if (eof(offset)) return 0;
-		return input.data.get()[pos.index + offset];
+		return buffer[pos.index + offset];
 	}
 
 	__attribute__((always_inline)) inline bool eof(int offset) const {
-		return pos.index + offset >= input.length;
+		return pos.index + offset >= buffer.length();
 	}
 
 	bool create_token(Token::Kind kind, int length, Token *token);

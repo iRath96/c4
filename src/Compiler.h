@@ -23,7 +23,7 @@
 
 using namespace ast;
 
-class Compiler : public Visitor<void>, public Stream<Ptr<ExternalDeclaration>, Ptr<ExternalDeclaration>> {
+class Compiler : public Visitor<void>, public Stream<Ptr<ExternalDeclaration>, void> {
 protected:
 	void inspect(Node &node) {
 		node.accept(*this);
@@ -94,14 +94,15 @@ public:
 	std::string outPath;
 
 	Compiler(std::string outPath, Source<Ptr<ast::ExternalDeclaration>> *source)
-	: Stream<Ptr<ExternalDeclaration>, Ptr<ExternalDeclaration>>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
+	: Stream<Ptr<ExternalDeclaration>, void>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
 
-	virtual bool next(ast::Ptr<ast::ExternalDeclaration> *result) {
-		if (this->source->next(result)) {
-			inspect(*result);
+	virtual bool next(void *) {
+		ast::Ptr<ast::ExternalDeclaration> result;
+		if (this->source->next(&result)) {
+			inspect(result);
+			mod.print(llvm::errs(), nullptr);
 			return true;
 		} else {
-			//mod.print(llvm::errs(), nullptr);
 			llvm::verifyModule(mod);
 
 			std::error_code EC;
@@ -253,13 +254,21 @@ public:
 	virtual void visit(UnaryExpression &node) {
 		using P = lexer::Token::Punctuator;
 		switch (node.op) {
-			case P::BIT_AND: {
-				value = getValue(*node.operand, false);
-			}; break;
-			case P::ASTERISK: {
-				value = getValue(*node.operand);
-				if (shouldLoad) value = builder.CreateLoad(value, "deref");
-			}; break;
+		// pointer operations
+		case P::BIT_AND: {
+			value = getValue(*node.operand, false);
+		}; break;
+		case P::ASTERISK: {
+			value = getValue(*node.operand);
+			if (shouldLoad) value = builder.CreateLoad(value, "deref");
+		}; break;
+
+		// pre inc-/decrement
+		case P::PLUSPLUS: {
+			value = getValue(*node.operand, false);
+			auto v = builder.CreateLoad(value, "load");
+			value = builder.CreateStore(builder.CreateAdd(v, matchType(builder.getInt8(1), v->getType())), value);
+		}; break;
 		}
 	}
 

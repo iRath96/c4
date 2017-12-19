@@ -30,27 +30,53 @@ const char *token_kind_name(Token::Kind kind) {
 	return "unknown";
 }
 
-Lexer create_lexer(const char *filename) {
-	FILE *f = fopen(filename, "rb");
-	if (!f) {
-		std::cout << "Could not open " << filename << " for reading." << std::endl;
-		exit(1);
+class FileSource : public Source<std::string> {
+protected:
+	std::string filename;
+	bool hasFinished = false;
+
+public:
+	FileSource(std::string filename) : filename(filename) {}
+
+	virtual bool next(std::string *output) {
+		if (hasFinished) return false;
+
+		FILE *f = fopen(filename.c_str(), "rb"); // @todo use fstream
+		if (!f) {
+			std::cout << "Could not open " << filename << " for reading." << std::endl;
+			exit(1);
+		}
+
+		fseek(f, 0, SEEK_END);
+		int length = (int)ftell(f);
+
+		char *buffer = (char *)malloc(length);
+		fseek(f, 0, SEEK_SET);
+		fread(buffer, length, 1, f);
+		fclose(f);
+
+		*output = std::string(buffer, length);
+
+		hasFinished = true;
+		return true;
 	}
+};
 
-	fseek(f, 0, SEEK_END);
+class REPLSource : public Source<std::string> {
+public:
+	REPLSource() {}
 
-	int length = (int)ftell(f);
-
-	char *buffer = (char *)malloc(length);
-	fseek(f, 0, SEEK_SET);
-	fread(buffer, length, 1, f);
-	fclose(f);
-
-	return Lexer(buffer, length);
-}
+	virtual bool next(std::string *output) {
+		std::cout << "> " << std::flush;
+		std::getline(std::cin, *output);
+		return !output->empty();
+	}
+};
 
 void tokenize(const char *filename) {
-	Lexer lexer = create_lexer(filename);
+	FileSource source(filename);
+	Lexer lexer(&source);
+
 	try {
 		while (true) {
 			Token t;
@@ -67,7 +93,8 @@ void tokenize(const char *filename) {
 }
 
 void parse(const char *filename, bool printAST) {
-	Lexer lexer = create_lexer(filename);
+	FileSource source(filename);
+	Lexer lexer(&source);
 	Parser parser(&lexer);
 	Buffer<Parser::Output> buffer(&parser);
 
@@ -100,6 +127,35 @@ void parse(const char *filename, bool printAST) {
 	}
 }
 
+void repl() {
+	REPLSource source;
+	Lexer lexer(&source);
+	Parser parser(&lexer);
+	Buffer<Parser::Output> buffer(&parser);
+
+	Analyzer analyzer(buffer.createChild());
+	Compiler compiler("/Users/alex/Desktop/repl.ll", &analyzer);
+
+	while (true) {
+		try { // @todo not DRY
+			compiler.next(nullptr);
+		} catch (Lexer::Error e) {
+			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.end_pos.line, e.end_pos.column, e.message.c_str());
+		} catch (ParserError e) {
+			if (debug_mode) {
+				parser.print_debug_tree();
+				parser.print_context();
+			}
+
+			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
+		} catch (AnalyzerError e) {
+			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
+		}
+
+		parser.reset();
+	}
+}
+
 int main(int argc, const char *argv[]) {
 	for (int i = 1; i < argc; ++i) {
 		if (!strcmp(argv[i], "--tokenize"))
@@ -114,6 +170,8 @@ int main(int argc, const char *argv[]) {
 			parse(argv[++i], false);
 		else if (!strcmp(argv[i], "--print-ast"))
 			parse(argv[++i], true);
+		else if (!strcmp(argv[i], "--repl"))
+			repl();
 		else if (!strcmp(argv[i], "--compile")) {
 			do_compile = true;
 			parse(argv[++i], false);

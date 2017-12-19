@@ -146,6 +146,10 @@ class Parser : public Stream<Token, Ptr<ExternalDeclaration>> {
 public:
 	Parser(Source<Token> *source) : Stream<Token, Ptr<ExternalDeclaration>>(source) {}
 
+	void reset() {
+		i = (int)token_queue.size();
+	}
+
 	virtual bool next(Ptr<ExternalDeclaration> *result) {
 		if (this->i && peek().kind == Token::Kind::END) return false;
 		read_external_declaration(*result);
