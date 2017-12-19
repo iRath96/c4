@@ -481,7 +481,7 @@ public:
 	TypePair &top() { return stack.top(); }
 };
 
-class Analyzer : public Visitor<void>, public Stream<ast::Ptr<ast::ExternalDeclaration>, ast::Ptr<ast::ExternalDeclaration>> {
+class Analyzer : public Visitor, public Stream<ast::Ptr<ast::External>, ast::Ptr<ast::External>> {
 protected:
 	ScopeStack scopes;
 
@@ -516,13 +516,13 @@ protected:
 	}
 
 public:
-	Analyzer(Source<ast::Ptr<ast::ExternalDeclaration>> *source)
-	: Stream<ast::Ptr<ast::ExternalDeclaration>, ast::Ptr<ast::ExternalDeclaration>>(source) {
+	Analyzer(Source<ast::Ptr<ast::External>> *source)
+	: Stream<ast::Ptr<ast::External>, ast::Ptr<ast::External>>(source) {
 		initTypes();
 		open();
 	}
 
-	virtual bool next(ast::Ptr<ast::ExternalDeclaration> *result) {
+	virtual bool next(ast::Ptr<ast::External> *result) {
 		if (this->source->next(result)) {
 			inspect(*result);
 			return true;
@@ -531,6 +531,9 @@ public:
 			return false;
 		}
 	}
+
+protected:
+	friend struct Node;
 
 	void open() { scopes.push<FileScope>(); }
 	void close() { scopes.pop(); }
@@ -593,7 +596,8 @@ public:
 		Type::create(node.specifiers, node.declarator, node.pos, scopes);
 	}
 
-	virtual void visit(Declaration &node) {
+	virtual void visit(Declaration &node) { visit(node, false); }
+	void visit(Declaration &node, bool isGlobal) {
 		auto scope = scopes.find<BlockScope>();
 		auto specifiers = node.specifiers;
 
@@ -608,7 +612,6 @@ public:
 			error("declaration does not declare anything", node);
 		}
 
-		bool isExtVar = dynamic_cast<ExternalDeclarationVariable *>(&node);
 		for (auto &decl : node.declarators) {
 			Ptr<Type> dtype;
 			scopes.execute<FunctionScope>([&]() {
@@ -617,7 +620,7 @@ public:
 			});
 
 			if (!dtype->isComplete()) {
-				if (isExtVar) {
+				if (isGlobal) {
 					auto scope = scopes.find<FileScope>();
 					scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
 				} else
@@ -630,7 +633,7 @@ public:
 				error("abstract declarator in declaration", node);
 			else {
 				bool isDefinition = decl.initializer.get();
-				if (!isExtVar && !dtype->isFunction()) isDefinition = true;
+				if (!isGlobal && !dtype->isFunction()) isDefinition = true;
 				decl.annotate(scope->declareVariable(decl.name, dtype, decl.pos, isDefinition));
 			}
 
@@ -646,16 +649,16 @@ public:
 		}
 	}
 
-	virtual void visit(ExternalDeclarationVariable &node) {
-		visit((Declaration &)node);
+	virtual void visit(GlobalVariable &node) {
+		visit(node.declaration, true);
 	}
 
-	virtual void visit(ExternalDeclarationFunction &node) {
-		auto &decl = node.declarators.front();
+	virtual void visit(Function &node) {
+		auto &decl = node.declaration.declarators.front();
 		if (decl.modifiers.empty())
 			error("expected ';' after top level declarator", node);
 
-		auto t = Type::create(node.specifiers, node.pos, scopes);
+		auto t = Type::create(node.declaration.specifiers, node.pos, scopes);
 
 		auto scope = scopes.find<BlockScope>();
 		scopes.execute<FunctionScope>([&]() {

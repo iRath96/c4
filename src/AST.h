@@ -18,62 +18,62 @@ using PtrVector = Vector<Ptr<T>>;
 
 #pragma mark - Visitor
 
-template<typename T>
 struct Visitor {
 	// Nodes
-	virtual T visit(struct Identifier &) = 0;
-	virtual T visit(struct TypeName &) = 0;
+	virtual void visit(struct Identifier &) {}
+	virtual void visit(struct TypeName &) {}
 
 	// Labels
-	virtual T visit(struct CaseLabel &) = 0;
-	virtual T visit(struct DefaultLabel &) = 0;
-	virtual T visit(struct IdentifierLabel &) = 0;
+	virtual void visit(struct CaseLabel &) {}
+	virtual void visit(struct DefaultLabel &) {}
+	virtual void visit(struct IdentifierLabel &) {}
 
 	// Declarators
-	virtual T visit(struct DeclaratorParameterList &) = 0;
-	virtual T visit(struct DeclaratorPointer &) = 0;
-	virtual T visit(struct Declarator &) = 0;
+	virtual void visit(struct DeclaratorParameterList &) {}
+	virtual void visit(struct DeclaratorPointer &) {}
+	virtual void visit(struct Declarator &) {}
 
 	// Expressions
-	virtual T visit(struct IdentifierExpression &) = 0;
-	virtual T visit(struct Constant &) = 0;
-	virtual T visit(struct StringLiteral &) = 0;
+	virtual void visit(struct IdentifierExpression &) {}
+	virtual void visit(struct Constant &) {}
+	virtual void visit(struct StringLiteral &) {}
 	
-	virtual T visit(struct CastExpression &) = 0;
-	virtual T visit(struct UnaryExpression &) = 0;
-	virtual T visit(struct BinaryExpression &) = 0;
-	virtual T visit(struct ConditionalExpression &) = 0;
-	virtual T visit(struct ExpressionList &) = 0;
-	virtual T visit(struct CallExpression &) = 0;
-	virtual T visit(struct SubscriptExpression &) = 0;
-	virtual T visit(struct MemberExpression &) = 0;
-	virtual T visit(struct PostExpression &) = 0;
-	virtual T visit(struct SizeofExpressionUnary &) = 0;
-	virtual T visit(struct SizeofExpressionTypeName &) = 0;
+	virtual void visit(struct CastExpression &) {}
+	virtual void visit(struct UnaryExpression &) {}
+	virtual void visit(struct BinaryExpression &) {}
+	virtual void visit(struct ConditionalExpression &) {}
+	virtual void visit(struct ExpressionList &) {}
+	virtual void visit(struct CallExpression &) {}
+	virtual void visit(struct SubscriptExpression &) {}
+	virtual void visit(struct MemberExpression &) {}
+	virtual void visit(struct PostExpression &) {}
+	virtual void visit(struct SizeofExpressionUnary &) {}
+	virtual void visit(struct SizeofExpressionTypeName &) {}
 
 	// Statements
-	virtual T visit(struct CompoundStatement &) = 0;
-	virtual T visit(struct IterationStatement &) = 0;
-	virtual T visit(struct ExpressionStatement &) = 0;
-	virtual T visit(struct SelectionStatement &) = 0;
-	virtual T visit(struct GotoStatement &) = 0;
-	virtual T visit(struct ContinueStatement &) = 0;
-	virtual T visit(struct ReturnStatement &) = 0;
+	virtual void visit(struct CompoundStatement &) {}
+	virtual void visit(struct IterationStatement &) {}
+	virtual void visit(struct ExpressionStatement &) {}
+	virtual void visit(struct SelectionStatement &) {}
+	virtual void visit(struct GotoStatement &) {}
+	virtual void visit(struct ContinueStatement &) {}
+	virtual void visit(struct ReturnStatement &) {}
 
 	// Declarations
-	virtual T visit(struct Declaration &) = 0;
-	virtual T visit(struct ParameterDeclaration &) = 0;
-	virtual T visit(struct ExternalDeclarationVariable &) = 0;
-	virtual T visit(struct ExternalDeclarationFunction &) = 0;
+	virtual void visit(struct Declaration &) {}
+	virtual void visit(struct ParameterDeclaration &) {}
+	virtual void visit(struct GlobalVariable &) {}
+	virtual void visit(struct Function &) {}
+	virtual void visit(struct REPLExpression &) {}
 
 	// Types
-	virtual T visit(struct NamedTypeSpecifier &) = 0;
-	virtual T visit(struct ComposedTypeSpecifier &) = 0;
+	virtual void visit(struct NamedTypeSpecifier &) {}
+	virtual void visit(struct ComposedTypeSpecifier &) {}
 };
 
 #pragma mark - Base classes
 
-#define ACCEPT virtual void accept(Visitor<void> &v) { v.visit(*this); }
+#define ACCEPT virtual void accept(Visitor &v) { v.visit(*this); }
 
 struct Annotation {
 	virtual ~Annotation() {}
@@ -85,7 +85,7 @@ struct Node {
 	void annotate(Ptr<Annotation> a) { annotation = a; }
 
 	lexer::TextPosition pos;
-	virtual void accept(Visitor<void> &) = 0;
+	virtual void accept(Visitor &) = 0;
 };
 
 struct Label : Node {};
@@ -294,15 +294,23 @@ struct ParameterDeclaration : Node {
 	ACCEPT
 };
 
-struct ExternalDeclaration : Declaration {};
+struct External : Node {};
+struct ExternalDeclaration : External {
+	Declaration declaration; // @todo not elegant
+};
 
-struct ExternalDeclarationVariable : ExternalDeclaration {
+struct GlobalVariable : ExternalDeclaration {
 	ACCEPT
 };
 
-struct ExternalDeclarationFunction : ExternalDeclaration {
+struct Function : ExternalDeclaration {
 	Vector<Declaration> declarations;
 	CompoundStatement body;
+	ACCEPT
+};
+
+struct REPLExpression : External {
+	Ptr<Expression> expr;
 	ACCEPT
 };
 

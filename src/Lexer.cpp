@@ -38,10 +38,7 @@ bool is_octal(char c) { return c >= '0' && c <= '7'; }
 bool Lexer::next(Token *token) {
 	using Kind = Token::Kind;
 
-	peek(0); // make sure eof flag is set appropriately
-
-	if (eof(0) && !acquire()) return false;
-
+	if (eof(0)) acquire();
 	while (!eof(0)) {
 		int length = 0;
 		char c = peek(0);
@@ -363,7 +360,7 @@ void Lexer::replace_eol(std::string &input) {
 					--length;
 					++skip;
 
-					if (i == length) return; // CRLF at end of file, we're done
+					if (i == length) goto end; // CRLF at end of file, we're done
 					c_out = input[i + skip];
 				}
 		}
@@ -371,6 +368,9 @@ void Lexer::replace_eol(std::string &input) {
 		input[i] = c_out;
 		last_char_was_cr = c_in == '\r';
 	}
+
+end:
+	input = input.substr(0, length);
 }
 
 void Lexer::consume(int length) {

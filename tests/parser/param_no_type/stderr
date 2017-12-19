@@ -1,1 +1,1 @@
-tests/parser/param_no_type/input.c:1:17: error: type specifier expected
+tests/parser/param_no_type/input.c:1:17: error: ... expected

@@ -6,7 +6,7 @@
 
 using namespace ast;
 
-class Beautifier : public Visitor<void>, public Sink<ast::Ptr<ast::ExternalDeclaration>> {
+class Beautifier : public Visitor, public Sink<ast::Ptr<ast::External>> {
 protected:
 	std::string indent = "";
 	bool isFirst = true;
@@ -48,10 +48,10 @@ protected:
 	}
 
 public:
-	Beautifier(Source<ast::Ptr<ast::ExternalDeclaration>> *source) : Sink<ast::Ptr<ast::ExternalDeclaration>>(source) {}
+	Beautifier(Source<ast::Ptr<ast::External>> *source) : Sink<ast::Ptr<ast::External>>(source) {}
 
 	virtual bool next(void *) {
-		ast::Ptr<ast::ExternalDeclaration> result;
+		ast::Ptr<ast::External> result;
 		if (this->source->next(&result)) {
 			if (isFirst) isFirst = false;
 			else std::cout << std::endl;
@@ -61,7 +61,8 @@ public:
 		} else
 			return false;
 	}
-	
+
+protected:
 	virtual void visit(CaseLabel &node) {
 		std::cout << "case ";
 		inspect(*node.expression);
@@ -134,14 +135,14 @@ public:
 		std::cout << ";";
 	}
 
-	virtual void visit(ExternalDeclarationVariable &node) {
-		visit((Declaration &)node);
+	virtual void visit(GlobalVariable &node) {
+		visit(node.declaration);
 		std::cout << std::endl;
 	}
 
-	virtual void visit(ExternalDeclarationFunction &node) {
-		join(node.specifiers, " ", " ");
-		join(node.declarators, ", ");
+	virtual void visit(Function &node) {
+		join(node.declaration.specifiers, " ", " ");
+		join(node.declaration.declarators, ", ");
 
 		separate_lines(node.declarations, true);
 

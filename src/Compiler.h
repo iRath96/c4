@@ -23,7 +23,7 @@
 
 using namespace ast;
 
-class Compiler : public Visitor<void>, public Stream<Ptr<ExternalDeclaration>, void> {
+class Compiler : public Visitor, public Stream<Ptr<External>, void> {
 protected:
 	void inspect(Node &node) {
 		node.accept(*this);
@@ -93,11 +93,11 @@ protected:
 public:
 	std::string outPath;
 
-	Compiler(std::string outPath, Source<Ptr<ast::ExternalDeclaration>> *source)
-	: Stream<Ptr<ExternalDeclaration>, void>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
+	Compiler(std::string outPath, Source<Ptr<ast::External>> *source)
+	: Stream<Ptr<External>, void>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
 
 	virtual bool next(void *) {
-		ast::Ptr<ast::ExternalDeclaration> result;
+		ast::Ptr<ast::External> result;
 		if (this->source->next(&result)) {
 			inspect(result);
 			mod.print(llvm::errs(), nullptr);
@@ -113,42 +113,16 @@ public:
 		}
 	}
 
-	virtual void visit(CaseLabel &node) {
-	}
-
-	virtual void visit(DefaultLabel &node) {
-	}
-
-	virtual void visit(IdentifierLabel &node) {
-	}
-
-	void visit(Statement &node) {
-	}
-
-	virtual void visit(GotoStatement &node) {
-	}
-
-	virtual void visit(ContinueStatement &node) {
-	}
-
-	virtual void visit(Identifier &) {}
-
-	virtual void visitBlockItems(CompoundStatement &node) {
-	}
+protected:
+	friend struct Node;
 
 	virtual void visit(CompoundStatement &node) {
 		// @todo labels
 		for (auto &item : node.items) inspect(item);
 	}
 
-	virtual void visit(DeclaratorPointer &) {}
-	virtual void visit(DeclaratorParameterList &) {}
-	virtual void visit(Declarator &) {}
-
-	virtual void visit(TypeName &node) {
-	}
-
-	virtual void visit(Declaration &node) {
+	void visit(Declaration &node) { visit(node, false); }
+	void visit(Declaration &node, bool isGlobal) {
 		for (const auto &decl : node.declarators) {
 			auto dr = (DeclarationRef *)decl.annotation.get();
 			if (values.find(dr) == values.end()) {
@@ -159,7 +133,7 @@ public:
 					);
 
 					values[dr] = func;
-				} else if (dynamic_cast<ExternalDeclarationVariable *>(&node)) {
+				} else if (isGlobal) {
 					auto type = createType(dr->type.get());
 
 					auto var = new llvm::GlobalVariable(
@@ -187,16 +161,14 @@ public:
 		}
 	}
 
-	virtual void visit(ParameterDeclaration &node) {}
-
-	virtual void visit(ExternalDeclarationVariable &node) {
-		visit((Declaration &)node);
+	virtual void visit(GlobalVariable &node) {
+		visit(node.declaration, true);
 	}
 
-	virtual void visit(ExternalDeclarationFunction &node) {
-		visit((Declaration &)node);
+	virtual void visit(Function &node) {
+		visit(node.declaration, true);
 
-		auto &decl = node.declarators.front();
+		auto &decl = node.declaration.declarators.front();
 		auto dr = (DeclarationRef *)decl.annotation.get();
 
 		func = (llvm::Function *)values[dr];
@@ -249,6 +221,7 @@ public:
 	virtual void visit(StringLiteral &node) { value = builder.CreateGlobalStringPtr(node.value); }
 
 	virtual void visit(CastExpression &node) {
+		// @todo
 	}
 
 	virtual void visit(UnaryExpression &node) {
@@ -388,9 +361,11 @@ public:
 	}
 
 	virtual void visit(MemberExpression &node) {
+		// @todo
 	}
 
 	virtual void visit(PostExpression &node) {
+		// @todo
 	}
 
 	virtual void visit(ExpressionStatement &node) {

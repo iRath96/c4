@@ -37,9 +37,12 @@ $tests.each do |test|
   when "sema" then "--parse"
   when "ast" then "--print-ast"
   end
+  
+  arguments = [ $BIN, argument, "#{test}/input.c" ]
+  #puts arguments * " "
 
   test_start_time = Time.now
-  stdout, stderr, status = Open3.capture3($BIN, argument, "#{test}/input.c")
+  stdout, stderr, status = Open3.capture3(*arguments)
   test_runtime = Time.now - test_start_time
 
   expected_stdout = File.read("#{test}/stdout")

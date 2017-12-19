@@ -70,11 +70,15 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--parse"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--compile"
-            isEnabled = "YES">
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--repl"
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--tokenize"

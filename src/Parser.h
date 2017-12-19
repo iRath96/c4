@@ -140,19 +140,23 @@ public:
 using namespace lexer;
 using namespace ast;
 
-class Parser : public Stream<Token, Ptr<ExternalDeclaration>> {
+class Parser : public Stream<Token, Ptr<External>> {
 	DebugTree dbg_tree_root;
 	DebugTree *dbg_tree_current = &dbg_tree_root;
 public:
-	Parser(Source<Token> *source) : Stream<Token, Ptr<ExternalDeclaration>>(source) {}
+	Parser(Source<Token> *source) : Stream<Token, Ptr<External>>(source) {}
 
 	void reset() {
 		i = (int)token_queue.size();
 	}
 
-	virtual bool next(Ptr<ExternalDeclaration> *result) {
+	virtual bool next(Ptr<External> *result) {
 		if (this->i && peek().kind == Token::Kind::END) return false;
-		read_external_declaration(*result);
+
+		Ptr<ExternalDeclaration> decl;
+		read_external_declaration(decl);
+		*result = decl;
+
 		return true;
 	}
 
@@ -377,6 +381,7 @@ protected:
 
 			OPTIONAL(read_parameter_type_list(p_suffix->parameters))
 			if (read_punctuator(Token::Punctuator::COMMA)) {
+				UNIQUE
 				NON_OPTIONAL(read_punctuator(Token::Punctuator::ELIPSES))
 				p_suffix->isVariadic = true;
 			}
@@ -565,10 +570,10 @@ protected:
 		if (is_declaration) {
 			// declaration: ... (',' init-declarator-list(opt))(opt) ;
 
-			auto n = new ExternalDeclarationVariable();
+			auto n = new GlobalVariable();
 			node.reset(n);
 
-			node->specifiers = std::move(specifiers);
+			n->declaration.specifiers = std::move(specifiers);
 
 			if (needs_initialization) {
 				shift(); // consume assign
@@ -578,11 +583,11 @@ protected:
 			}
 
 			if (has_declarator)
-				node->declarators.push_back(std::move(declarator));
+				n->declaration.declarators.push_back(std::move(declarator));
 
 			if (needs_declaration_list) {
 				shift(); // jump over comma
-				read_init_declarator_list(node->declarators);
+				read_init_declarator_list(n->declaration.declarators);
 			}
 
 			NON_OPTIONAL(read_punctuator(Token::Punctuator::SEMICOLON))
@@ -592,11 +597,11 @@ protected:
 			if (!has_declarator)
 				read_declarator(declarator, false);
 
-			auto n = new ExternalDeclarationFunction();
+			auto n = new Function();
 			node.reset(n);
 
-			node->specifiers = std::move(specifiers);
-			node->declarators.push_back(std::move(declarator));
+			n->declaration.specifiers = std::move(specifiers);
+			n->declaration.declarators.push_back(std::move(declarator));
 
 			OPTIONAL(read_declaration_list(n->declarations))
 			NON_OPTIONAL(read_compound_statement(n->body))

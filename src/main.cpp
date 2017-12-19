@@ -80,8 +80,7 @@ void tokenize(const char *filename) {
 	try {
 		while (true) {
 			Token t;
-			lexer.next(&t);
-			if (t.kind == Token::Kind::END) break;
+			if (!lexer.next(&t)) break;
 
 			enable_output &&
 			printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_kind_name(t.kind), t.text.c_str());
@@ -148,11 +147,10 @@ void repl() {
 			}
 
 			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
+			parser.reset();
 		} catch (AnalyzerError e) {
 			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
 		}
-
-		parser.reset();
 	}
 }
 
