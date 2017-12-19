@@ -73,7 +73,7 @@
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "--print-ast"
+            argument = "--compile"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument

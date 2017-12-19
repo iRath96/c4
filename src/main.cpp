@@ -14,7 +14,7 @@
 bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;
-bool do_compile = true;
+bool do_compile = false;
 
 const char *token_kind_name(Token::Kind kind) {
 	using Kind = Token::Kind;
@@ -114,7 +114,11 @@ int main(int argc, const char *argv[]) {
 			parse(argv[++i], false);
 		else if (!strcmp(argv[i], "--print-ast"))
 			parse(argv[++i], true);
-		else {
+		else if (!strcmp(argv[i], "--compile")) {
+			do_compile = true;
+			parse(argv[++i], false);
+		} else {
+			parse(argv[i], false);
 			printf("Unrecognized argument: %s\n", argv[i]);
 			exit(1);
 		}
