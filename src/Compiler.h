@@ -18,6 +18,8 @@
 #include "llvm/Support/Signals.h"          /* Nice stacktrace output */
 #include "llvm/Support/SystemUtils.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace ast;
 
@@ -55,7 +57,7 @@ protected:
 			default: result = builder.getInt32Ty(); break;
 			}
 		} else if (auto pt = dynamic_cast<const PointerType *>(type)) {
-			result = llvm::PointerType::get(createType(pt->base.get()), 0);
+			result = pt->isVoidPointer() ? builder.getInt8PtrTy() : llvm::PointerType::get(createType(pt->base.get()), 0);
 		} else if (auto fn = dynamic_cast<const FunctionType *>(type)) {
 			std::vector<llvm::Type *> argTypes;
 			for (const auto &param : fn->parameters) argTypes.push_back(createType(param.get()));
@@ -83,19 +85,29 @@ protected:
 		return value;
 	}
 
-public:
-	Compiler(Source<Ptr<ast::ExternalDeclaration>> *source)
-	: Stream<Ptr<ExternalDeclaration>, Ptr<ExternalDeclaration>>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx) {
-
+	llvm::Value *matchType(llvm::Value *value, llvm::Type *type) {
+		if (type == value->getType()) return value;
+		return builder.CreateIntCast(value, type, true, "cast");
 	}
+
+public:
+	std::string outPath;
+
+	Compiler(std::string outPath, Source<Ptr<ast::ExternalDeclaration>> *source)
+	: Stream<Ptr<ExternalDeclaration>, Ptr<ExternalDeclaration>>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
 
 	virtual bool next(ast::Ptr<ast::ExternalDeclaration> *result) {
 		if (this->source->next(result)) {
 			inspect(*result);
 			return true;
 		} else {
-			mod.print(llvm::errs(), nullptr);
+			//mod.print(llvm::errs(), nullptr);
 			llvm::verifyModule(mod);
+
+			std::error_code EC;
+			llvm::raw_fd_ostream stream(outPath, EC, llvm::sys::fs::OpenFlags::F_Text);
+			mod.print(stream, nullptr);
+
 			return false;
 		}
 	}
@@ -138,33 +150,38 @@ public:
 	virtual void visit(Declaration &node) {
 		for (const auto &decl : node.declarators) {
 			auto dr = (DeclarationRef *)decl.annotation.get();
-			if (values.find(dr) != values.end()) continue;
+			if (values.find(dr) == values.end()) {
+				if (auto fn = dynamic_cast<FunctionType *>(dr->type.get())) {
+					auto type = (llvm::FunctionType *)createType(dr->type.get());
+					auto func = llvm::Function::Create(
+						type, llvm::GlobalValue::ExternalLinkage, decl.name, &mod
+					);
 
-			if (auto fn = dynamic_cast<FunctionType *>(dr->type.get())) {
-				auto type = (llvm::FunctionType *)createType(dr->type.get());
-				auto func = llvm::Function::Create(
-					type, llvm::GlobalValue::ExternalLinkage, decl.name, &mod
-				);
+					values[dr] = func;
+				} else if (dynamic_cast<ExternalDeclarationVariable *>(&node)) {
+					auto type = createType(dr->type.get());
 
-				values[dr] = func;
-			} else if (dynamic_cast<ExternalDeclarationVariable *>(&node)) {
-				auto type = createType(dr->type.get());
+					auto var = new llvm::GlobalVariable(
+						mod, type, false,
+						llvm::GlobalValue::CommonLinkage,
+						llvm::Constant::getNullValue(type),
+						decl.name
+					);
 
-				auto var = new llvm::GlobalVariable(
-					mod, type, false,
-					llvm::GlobalValue::CommonLinkage,
-					llvm::Constant::getNullValue(type),
-					decl.name
-				);
+					values[dr] = var;
+				} else {
+					auto type = createType(dr->type.get());
 
-				values[dr] = var; // @todo ensure no redefinition happens
-			} else {
-				auto type = createType(dr->type.get());
+					allocaBuilder.SetInsertPoint(allocaBuilder.GetInsertBlock(), allocaBuilder.GetInsertBlock()->begin());
+					auto value = allocaBuilder.CreateAlloca(type, nullptr, decl.name);
 
-				allocaBuilder.SetInsertPoint(allocaBuilder.GetInsertBlock(), allocaBuilder.GetInsertBlock()->begin());
-				auto value = allocaBuilder.CreateAlloca(type, nullptr, decl.name);
+					values[dr] = value;
+				}
+			}
 
-				values[dr] = value; // @todo ensure no redefinition happens
+			if (decl.initializer.get()) {
+				auto type = values[dr]->getType()->getPointerElementType();
+				builder.CreateStore(matchType(getValue(*decl.initializer), type), values[dr]);
 			}
 		}
 	}
@@ -246,14 +263,60 @@ public:
 		}
 	}
 
+	void createLogicalAnd(BinaryExpression &node) {
+		auto lhs = getValue(*node.lhs);
+
+		auto pre = builder.GetInsertBlock();
+		auto c = llvm::BasicBlock::Create(ctx, "and-continue", func, 0);
+		auto end = llvm::BasicBlock::Create(ctx, "and-end", func, 0);
+
+		builder.CreateCondBr(lhs, c, end);
+		builder.SetInsertPoint(c);
+		auto rhs = getValue(*node.rhs);
+		builder.CreateBr(end);
+
+		builder.SetInsertPoint(end);
+
+		auto phi = builder.CreatePHI(lhs->getType(), 2);
+		phi->addIncoming(lhs, pre);
+		phi->addIncoming(rhs, c);
+		value = phi;
+	}
+
+	void createLogicalOr(BinaryExpression &node) {
+		auto lhs = getValue(*node.lhs);
+
+		auto pre = builder.GetInsertBlock();
+		auto c = llvm::BasicBlock::Create(ctx, "or-continue", func, 0);
+		auto end = llvm::BasicBlock::Create(ctx, "or-end", func, 0);
+
+		builder.CreateCondBr(lhs, end, c);
+		builder.SetInsertPoint(c);
+		auto rhs = getValue(*node.rhs);
+		builder.CreateBr(end);
+
+		builder.SetInsertPoint(end);
+
+		auto phi = builder.CreatePHI(lhs->getType(), 2);
+		phi->addIncoming(lhs, pre);
+		phi->addIncoming(rhs, c);
+		value = phi;
+	}
+
 	virtual void visit(BinaryExpression &node) {
 		using Op = lexer::Token::Punctuator;
 		using Prec = lexer::Token::Precedence;
 
 		auto prec = lexer::Token::precedence(node.op);
 
+		if (prec == Prec::LOGICAL_AND) return createLogicalAnd(node);
+		if (prec == Prec::LOGICAL_OR) return createLogicalOr(node);
+
 		auto lhs = getValue(*node.lhs, prec != Prec::ASSIGNMENT);
 		auto rhs = getValue(*node.rhs);
+		auto type = lhs->getType(); // @todo createType from annotation
+
+		if (prec == Prec::ASSIGNMENT) type = type->getPointerElementType();
 
 /*
 		auto lhsType = ((TypePair *)node.lhs->annotation.get())->type;
@@ -261,22 +324,37 @@ public:
 */
 
 		switch (node.op) {
+		// assignments @todo
 		case Op::ASSIGN: {
-			builder.CreateStore(rhs, lhs);
+			builder.CreateStore(matchType(rhs, type), lhs);
 			value = lhs;
 		}; break;
+
+		// relational
 		case Op::CMP_LTE: value = builder.CreateICmpSLE(lhs, rhs, "cmp"); break;
 		case Op::AB_OPEN: value = builder.CreateICmpSLT(lhs, rhs, "cmp"); break;
 		case Op::CMP_GTE: value = builder.CreateICmpSGE(lhs, rhs, "cmp"); break;
 		case Op::AB_CLOSE: value = builder.CreateICmpSGT(lhs, rhs, "cmp"); break;
 		case Op::CMP_EQ: value = builder.CreateICmpEQ(lhs, rhs, "cmp"); break;
 		case Op::CMP_NEQ: value = builder.CreateICmpNE(lhs, rhs, "cmp"); break;
+
+		// arithmetic
 		case Op::PLUS: {
 			bool lptr = lhs->getType()->isPointerTy();
 			bool rptr = rhs->getType()->isPointerTy();
 			if (lptr || rptr) value = builder.CreateGEP(lptr ? lhs : rhs, lptr ? rhs : lhs, "gep");
 			else value = builder.CreateAdd(lhs, rhs, "add");
 		}; break;
+		case Op::MINUS: {
+			bool lptr = lhs->getType()->isPointerTy();
+			if (lptr) value = builder.CreateGEP(lhs, builder.CreateNeg(rhs, "inv"), "gep");
+			else value = builder.CreateSub(lhs, rhs);
+		}; break;
+
+		// multiplicative
+		case Op::ASTERISK: value = builder.CreateMul(lhs, rhs); break;
+		case Op::SLASH: value = builder.CreateSDiv(lhs, rhs); break;
+		case Op::MODULO: value = builder.CreateSRem(lhs, rhs); break;
 		}
 	}
 
@@ -290,10 +368,14 @@ public:
 	virtual void visit(CallExpression &node) {
 		std::vector<llvm::Value *> args;
 		for (const auto &arg : node.arguments) args.push_back(getValue(*arg));
-		builder.CreateCall(getValue(*node.function, false), args, "result");
+		value = builder.CreateCall(getValue(*node.function, false), args, "result");
 	}
 
 	virtual void visit(SubscriptExpression &node) {
+		auto lhs = getValue(*node.base), rhs = getValue(node.subscript);
+		bool lptr = lhs->getType()->isPointerTy();
+		value = builder.CreateGEP(lptr ? lhs : rhs, lptr ? rhs : lhs, "gep");
+		if (shouldLoad) value = builder.CreateLoad(value, "subs");
 	}
 
 	virtual void visit(MemberExpression &node) {
@@ -307,9 +389,13 @@ public:
 	}
 
 	virtual void visit(SizeofExpressionTypeName &node) {
+		auto &type = ((TypePair *)node.annotation.get())->type;
+		value = builder.getInt32((uint32_t)type->getSize(lexer::TextPosition())); // @todo
 	}
 
 	virtual void visit(SizeofExpressionUnary &node) {
+		auto &type = ((TypePair *)node.annotation.get())->type;
+		value = builder.getInt32((uint32_t)type->getSize(lexer::TextPosition()));
 	}
 
 	virtual void visit(ComposedTypeSpecifier &) {}

@@ -72,7 +72,7 @@ void parse(const char *filename, bool printAST) {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler(&analyzer);
+	Compiler compiler("/Users/alex/Desktop/test.ll", &analyzer);
 
 	try {
 		if (do_compile) compiler.drain();
