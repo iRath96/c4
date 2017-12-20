@@ -72,7 +72,7 @@ $tests.each do |test|
   result = [ stdout, stderr, status.exitstatus ]
 
   unless argument # compile
-    llc_output = `llc -filetype=obj input.ll; gcc -fPIC input.o -o test`
+    llc_output = `llc -relocation-model=pic -filetype=obj input.ll; gcc -fPIC input.o -o test`
 
     program_stdout = `./test`
     expectation << expected_program_stdout
