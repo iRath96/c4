@@ -14,7 +14,9 @@
 bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;
-bool do_compile = false;
+enum {
+	TOKENIZE, PARSE, PRINT_AST, COMPILE
+} mode = COMPILE;
 
 const char *token_kind_name(Token::Kind kind) {
 	using Kind = Token::Kind;
@@ -64,45 +66,41 @@ public:
 
 class REPLSource : public Source<std::string> {
 public:
+	Parser *parser;
+	
 	REPLSource() {}
 
 	virtual bool next(std::string *output) {
-		std::cout << "> " << std::flush;
+		std::cout << ((parser && parser->depth > 1) ? "... " : ">>> ") << std::flush;
 		std::getline(std::cin, *output);
 		return !output->empty();
 	}
 };
 
-void tokenize(const char *filename) {
-	FileSource source(filename);
-	Lexer lexer(&source);
+void parse(const char *filename) {
+	std::string name(filename);
+	size_t i = name.rfind('/') + 1, j = name.rfind('.');
+	name = name.substr(i, j - i);
 
-	try {
-		while (true) {
-			Token t;
-			if (!lexer.next(&t)) break;
-
-			enable_output &&
-			printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_kind_name(t.kind), t.text.c_str());
-		}
-	} catch (Lexer::Error e) {
-		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
-		exit(1);
-	}
-}
-
-void parse(const char *filename, bool printAST) {
 	FileSource source(filename);
 	Lexer lexer(&source);
 	Parser parser(&lexer);
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler("/Users/alex/Desktop/test.ll", &analyzer);
+	Compiler compiler(name + ".ll", &analyzer);
 
 	try {
-		if (do_compile) compiler.drain();
-		else if (do_sema) analyzer.drain();
+		if (mode == COMPILE) compiler.drain();
+		else if (mode == TOKENIZE) {
+			while (true) {
+				Token t;
+				if (!lexer.next(&t)) break;
+
+				enable_output &&
+				printf("%s:%d:%d: %s %s\n", filename, t.pos.line, t.pos.column, token_kind_name(t.kind), t.text.c_str());
+			}
+		} else if (do_sema) analyzer.drain();
 		else buffer.drain();
 	} catch (Lexer::Error e) {
 		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
@@ -120,7 +118,7 @@ void parse(const char *filename, bool printAST) {
 		exit(1);
 	}
 
-	if (printAST || debug_mode) {
+	if (mode == PRINT_AST || debug_mode) {
 		Beautifier beautifier(buffer.createChild());
 		beautifier.drain();
 	}
@@ -134,6 +132,8 @@ void repl() {
 
 	Analyzer analyzer(buffer.createChild());
 	Compiler compiler("/Users/alex/Desktop/repl.ll", &analyzer);
+
+	source.parser = &parser;
 
 	while (true) {
 		try { // @todo not DRY
@@ -156,27 +156,14 @@ void repl() {
 
 int main(int argc, const char *argv[]) {
 	for (int i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "--tokenize"))
-			tokenize(argv[++i]);
-		else if (!strcmp(argv[i], "--debug"))
-			debug_mode = true;
-		else if (!strcmp(argv[i], "--no-sema"))
-			do_sema = false;
-		else if (!strcmp(argv[i], "--dry"))
-			enable_output = false;
-		else if (!strcmp(argv[i], "--parse"))
-			parse(argv[++i], false);
-		else if (!strcmp(argv[i], "--print-ast"))
-			parse(argv[++i], true);
-		else if (!strcmp(argv[i], "--repl"))
-			repl();
-		else if (!strcmp(argv[i], "--compile")) {
-			do_compile = true;
-			parse(argv[++i], false);
-		} else {
-			parse(argv[i], false);
-			printf("Unrecognized argument: %s\n", argv[i]);
-			exit(1);
-		}
+		if (!strcmp(argv[i], "--tokenize")) mode = TOKENIZE;
+		else if (!strcmp(argv[i], "--debug")) debug_mode = true;
+		else if (!strcmp(argv[i], "--no-sema")) do_sema = false;
+		else if (!strcmp(argv[i], "--dry")) enable_output = false;
+		else if (!strcmp(argv[i], "--parse")) mode = PARSE;
+		else if (!strcmp(argv[i], "--print-ast")) mode = PRINT_AST;
+		else if (!strcmp(argv[i], "--repl")) repl();
+		else if (!strcmp(argv[i], "--compile")) mode = COMPILE;
+		else parse(argv[i]);
 	}
 }

@@ -45,6 +45,7 @@ public:
 };
 
 #define _DEBUG_RETURN(x) { \
+	--depth; \
 	if (debug_mode) \
 		dbg_tree_current = dbg_tree_current->perform_return(x, i); \
 	return x; \
@@ -71,6 +72,7 @@ public:
 		/* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
 		dbg_tree_current = dbg_tree_current->create_child(__PRETTY_FUNCTION__, i); \
 	} \
+	++depth; \
 	int _initial_i = i; \
 	bool _initial_ef = error_flag; \
 	_OPTION_PREFIX;
@@ -150,9 +152,11 @@ public:
 		i = (int)token_queue.size();
 	}
 
+	int depth;
 	virtual bool next(Ptr<External> *result) {
 		if (this->i && peek().kind == Token::Kind::END) return false;
 
+		depth = 0;
 		Ptr<ExternalDeclaration> decl;
 		read_external_declaration(decl);
 		*result = decl;

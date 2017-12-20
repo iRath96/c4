@@ -100,7 +100,7 @@ public:
 		ast::Ptr<ast::External> result;
 		if (this->source->next(&result)) {
 			inspect(result);
-			mod.print(llvm::errs(), nullptr);
+			//mod.print(llvm::errs(), nullptr);
 			return true;
 		} else {
 			llvm::verifyModule(mod);
