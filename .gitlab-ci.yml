@@ -6,7 +6,7 @@ test:
   stage: test
   script:
     - make
-    - # I really should fork the container, but I'm lazy...
+    - "# I really should fork the container, but I'm lazy..."
     - apt-get update
     - apt-get install -y ruby
     - gem install diffy
