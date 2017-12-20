@@ -64,8 +64,12 @@ protected:
 			result = llvm::FunctionType::get(createType(fn->returnType.get()), argTypes, fn->isVariadic);
 		} else if (auto v = dynamic_cast<const VoidType *>(type)) {
 			result = builder.getVoidTy();
-		} else if (auto ct = dynamic_cast<const ComposedType *>(type)) { // @todo unions (and anonymous!)
+		} else if (auto ct = dynamic_cast<const ComposedType *>(type)) {
+			if (ct->kind == lexer::Token::Keyword::UNION)
+				throw new AnalyzerError("unions are not yet supported", ct->pos);
+			
 			auto str = llvm::StructType::create(ctx, ct->name);
+			types[type] = str; // set it directly to break recursion
 
 			std::vector<llvm::Type *> members;
 			for (const auto &mem : ct->members) members.push_back(createType(mem.type.get()));
@@ -87,14 +91,16 @@ protected:
 
 	llvm::Value *matchType(llvm::Value *value, llvm::Type *type) {
 		if (type == value->getType()) return value;
+		if (value->getType()->isPointerTy())
+			return builder.CreatePointerCast(value, type);
 		return builder.CreateIntCast(value, type, true, "cast");
 	}
 
 public:
 	std::string outPath;
 
-	Compiler(std::string outPath, Source<Ptr<ast::External>> *source)
-	: Stream<Ptr<External>, void>(source), mod("main.c", ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
+	Compiler(std::string outPath, std::string name, Source<Ptr<ast::External>> *source)
+	: Stream<Ptr<External>, void>(source), mod(name, ctx), builder(ctx), allocaBuilder(ctx), outPath(outPath) {}
 
 	virtual bool next(void *) {
 		ast::Ptr<ast::External> result;
@@ -238,10 +244,28 @@ protected:
 
 		// pre inc-/decrement
 		case P::PLUSPLUS: {
-			value = getValue(*node.operand, false);
-			auto v = builder.CreateLoad(value, "load");
-			value = builder.CreateStore(builder.CreateAdd(v, matchType(builder.getInt8(1), v->getType())), value);
+			auto var = getValue(*node.operand, false);
+			value = builder.CreateLoad(value, "load");
+			value = builder.CreateAdd(value, matchType(builder.getInt8(1), value->getType()), "pre-inc");
+			builder.CreateStore(value, var);
 		}; break;
+		case P::MINUSMINUS: {
+			auto var = getValue(*node.operand, false);
+			value = builder.CreateLoad(value, "load");
+			value = builder.CreateSub(value, matchType(builder.getInt8(1), value->getType()), "pre-dec");
+			builder.CreateStore(value, var);
+		}; break;
+
+		// others
+		case P::MINUS: value = builder.CreateNeg(getValue(*node.operand)); break;
+		case P::PLUS: value = getValue(*node.operand); break;
+		case P::BIT_NOT: value = builder.CreateNot(getValue(*node.operand)); break;
+		case P::LOG_NOT:
+			value = getValue(*node.operand);
+			value = builder.CreateICmpEQ(value, matchType(builder.getInt32(0), value->getType()));
+			break;
+
+		default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
 		}
 	}
 
@@ -312,13 +336,13 @@ protected:
 			value = lhs;
 		}; break;
 
-		// relational
-		case Op::CMP_LTE: value = builder.CreateICmpSLE(lhs, rhs, "cmp"); break;
-		case Op::AB_OPEN: value = builder.CreateICmpSLT(lhs, rhs, "cmp"); break;
-		case Op::CMP_GTE: value = builder.CreateICmpSGE(lhs, rhs, "cmp"); break;
-		case Op::AB_CLOSE: value = builder.CreateICmpSGT(lhs, rhs, "cmp"); break;
-		case Op::CMP_EQ: value = builder.CreateICmpEQ(lhs, rhs, "cmp"); break;
-		case Op::CMP_NEQ: value = builder.CreateICmpNE(lhs, rhs, "cmp"); break;
+		// relational, @todo not DRY
+		case Op::CMP_LTE: value = builder.CreateICmpSLE(lhs, matchType(rhs, type), "cmp"); break;
+		case Op::AB_OPEN: value = builder.CreateICmpSLT(lhs, matchType(rhs, type), "cmp"); break;
+		case Op::CMP_GTE: value = builder.CreateICmpSGE(lhs, matchType(rhs, type), "cmp"); break;
+		case Op::AB_CLOSE: value = builder.CreateICmpSGT(lhs, matchType(rhs, type), "cmp"); break;
+		case Op::CMP_EQ: value = builder.CreateICmpEQ(lhs, matchType(rhs, type), "cmp"); break;
+		case Op::CMP_NEQ: value = builder.CreateICmpNE(lhs, matchType(rhs, type), "cmp"); break;
 
 		// arithmetic
 		case Op::PLUS: {
@@ -337,6 +361,7 @@ protected:
 		case Op::ASTERISK: value = builder.CreateMul(lhs, rhs); break;
 		case Op::SLASH: value = builder.CreateSDiv(lhs, rhs); break;
 		case Op::MODULO: value = builder.CreateSRem(lhs, rhs); break;
+		default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
 		}
 	}
 
@@ -348,9 +373,20 @@ protected:
 	}
 
 	virtual void visit(CallExpression &node) {
+		auto fn = getValue(*node.function, false);
+		auto fnPtrType = (llvm::PointerType *)fn->getType();
+		auto fnType = (llvm::FunctionType *)fnPtrType->getElementType();
 		std::vector<llvm::Value *> args;
-		for (const auto &arg : node.arguments) args.push_back(getValue(*arg));
-		value = builder.CreateCall(getValue(*node.function, false), args, "result");
+
+		int i = 0;
+		for (const auto &arg : node.arguments) {
+			value = getValue(*arg);
+			if (i < fnType->getNumParams()) // function might be variadic
+				value = matchType(value, fnType->getParamType(i++));
+			args.push_back(value);
+		}
+		
+		value = builder.CreateCall(fn, args);
 	}
 
 	virtual void visit(SubscriptExpression &node) {
@@ -361,11 +397,39 @@ protected:
 	}
 
 	virtual void visit(MemberExpression &node) {
-		// @todo
+		auto ct = ((TypePair *)node.base->annotation.get())->type;
+		if (node.dereference) ct = ct->dereference(node.pos); // @todo integrate into getMember
+		auto member = ct->getMember(node.id, node.pos);
+
+		std::vector<llvm::Value *> indices;
+		indices.push_back(builder.getInt32(0));
+		indices.push_back(builder.getInt32(member.index));
+
+		value = getValue(*node.base, node.dereference);
+		value = builder.CreateInBoundsGEP(value, indices);
+
+		if (shouldLoad) value = builder.CreateLoad(value);
 	}
 
 	virtual void visit(PostExpression &node) {
-		// @todo
+		using P = lexer::Token::Punctuator;
+
+		switch (node.op) {
+		// post inc-/decrement
+		case P::PLUSPLUS: { // @todo not DRY
+			auto var = getValue(*node.base, false);
+			value = builder.CreateLoad(value, "load");
+			auto v = builder.CreateAdd(value, matchType(builder.getInt8(1), value->getType()), "post-inc");
+			builder.CreateStore(v, var);
+		}; break;
+		case P::MINUSMINUS: {
+			auto var = getValue(*node.base, false);
+			value = builder.CreateLoad(value, "load");
+			auto v = builder.CreateSub(value, matchType(builder.getInt8(1), value->getType()), "post-dec");
+			builder.CreateStore(v, var);
+		}; break;
+		default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
+		}
 	}
 
 	virtual void visit(ExpressionStatement &node) {
@@ -385,6 +449,10 @@ protected:
 	virtual void visit(ComposedTypeSpecifier &) {}
 	virtual void visit(NamedTypeSpecifier &) {}
 
+	llvm::Value *testZero(llvm::Value *v) {
+		return builder.CreateICmpNE(v, matchType(builder.getInt32(0), v->getType()), "cond");
+	}
+
 	virtual void visit(IterationStatement &node) {
 		auto header = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
 		auto body = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
@@ -392,7 +460,7 @@ protected:
 
 		builder.CreateBr(header);
 		builder.SetInsertPoint(header);
-		builder.CreateCondBr(getValue(node.condition), body, end);
+		builder.CreateCondBr(testZero(getValue(node.condition)), body, end);
 		builder.SetInsertPoint(body);
 		inspect(node.body);
 		builder.CreateBr(header);
@@ -407,7 +475,7 @@ protected:
 
 		builder.CreateBr(header);
 		builder.SetInsertPoint(header);
-		builder.CreateCondBr(getValue(node.condition), ifTrue, ifFalse);
+		builder.CreateCondBr(testZero(getValue(node.condition)), ifTrue, ifFalse); // @todo @important makeCF
 
 		builder.SetInsertPoint(ifTrue);
 		inspect(node.when_true);
@@ -423,7 +491,7 @@ protected:
 	}
 
 	virtual void visit(ReturnStatement &node) {
-		builder.CreateRet(getValue(node.expressions));
+		builder.CreateRet(matchType(getValue(node.expressions), func->getReturnType()));
 
 		auto deadBlock = llvm::BasicBlock::Create(ctx, "dead-block", func, 0);
 		builder.SetInsertPoint(deadBlock);

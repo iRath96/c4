@@ -80,7 +80,8 @@ public:
 void parse(const char *filename) {
 	std::string name(filename);
 	size_t i = name.rfind('/') + 1, j = name.rfind('.');
-	name = name.substr(i, j - i);
+	std::string llPath = name.substr(i, j - i) + ".ll";
+	name = name.substr(i);
 
 	FileSource source(filename);
 	Lexer lexer(&source);
@@ -88,7 +89,7 @@ void parse(const char *filename) {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler(name + ".ll", &analyzer);
+	Compiler compiler(llPath, name, &analyzer);
 
 	try {
 		if (mode == COMPILE) compiler.drain();
@@ -131,7 +132,7 @@ void repl() {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler("/Users/alex/Desktop/repl.ll", &analyzer);
+	Compiler compiler("/Users/alex/Desktop/repl.ll", "repl", &analyzer);
 
 	source.parser = &parser;
 

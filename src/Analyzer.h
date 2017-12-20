@@ -157,6 +157,7 @@ protected:
 
 public:
 	struct Member {
+		int index;
 		std::string name;
 		Ptr<Type> type;
 		size_t offset;
@@ -304,6 +305,7 @@ public:
 		}
 
 		Member m;
+		m.index = (int)members.size();
 		m.name = name;
 		m.type = type;
 		m.offset = isUnion ? 0 : size_;
@@ -324,6 +326,7 @@ public:
 					throw AnalyzerError("member " + m.name + " redefined", pos);
 
 			Member m = member;
+			m.index = (int)members.size();
 			if (!isUnion) {
 				size_t padding = member.type->getAlignment();
 				if (size_ % padding) size_ += padding - (size_ % padding);
