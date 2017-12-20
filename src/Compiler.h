@@ -224,10 +224,8 @@ protected:
 		else value = builder.getInt32(node.value);
 	}
 
-	virtual void visit(StringLiteral &node) { value = builder.CreateGlobalStringPtr(node.value); }
-
-	virtual void visit(CastExpression &node) {
-		// @todo
+	virtual void visit(StringLiteral &node) {
+		value = builder.CreateGlobalStringPtr(node.value);
 	}
 
 	virtual void visit(UnaryExpression &node) {
