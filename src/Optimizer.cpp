@@ -62,7 +62,7 @@ struct OptimizerPass : public FunctionPass {
 	std::map<BasicBlock *, BlockDomain> blocks;
 	std::map<Value *, ValueDomain> values;
 
-	void dump();
+	void dumpAnalysis();
 	bool trackValue(Value *v);
 
 	bool iterate(llvm::Function &func) {
@@ -152,51 +152,7 @@ struct OptimizerPass : public FunctionPass {
 		}
 	}
 
-	bool runOnFunction(llvm::Function &func) override {
-		blocks.clear();
-		values.clear();
-
-		auto &entry = blocks[&func.getEntryBlock()];
-		entry.reachable = true;
-		entry.isEntry = true;
-
-		for (auto &block : func.getBasicBlockList()) {
-			auto term = block.getTerminator();
-
-			Edge edge;
-			edge.origin = &block;
-			edge.condV = 1;
-
-			if (auto br = dyn_cast<BranchInst>(term)) {
-				if (br->isConditional())
-					edge.cond = br->getCondition();
-			}
-
-			for (auto succ : term->successors()) {
-				blocks[succ].edges.push_back(edge);
-				edge.condV = 0;
-			}
-		}
-
-		int it = 0;
-		while (iterate(func)) {
-			if (++it > 1000) {
-				std::cerr << "aborting optimization" << std::endl;
-				return false;
-			}
-
-			if (debug_mode) {
-				std::cout << "\n\niterated..." << std::endl;
-				dump();
-			}
-		}
-
-		// @todo combine the following
-		fixPHINodes(func);
-		fixConstants(func);
-		fixBranches(func);
-
-		// remove unreachable code
+	void removeUnreachableCode() {
 		for (auto &b : blocks) {
 			auto &block = b.first;
 			auto &bd = b.second;
@@ -219,6 +175,53 @@ struct OptimizerPass : public FunctionPass {
 			block->replaceAllUsesWith(replacement);
 			block->eraseFromParent();
 		}
+	}
+
+	bool runOnFunction(llvm::Function &func) override {
+		blocks.clear();
+		values.clear();
+
+		auto &entry = blocks[&func.getEntryBlock()];
+		entry.reachable = true;
+		entry.isEntry = true;
+
+		for (auto &block : func.getBasicBlockList()) {
+			auto term = block.getTerminator();
+
+			Edge edge;
+			edge.origin = &block;
+			edge.condV = 1;
+
+			if (auto br = dyn_cast<BranchInst>(term))
+				if (br->isConditional()) edge.cond = br->getCondition();
+
+			for (auto succ : term->successors()) {
+				blocks[succ].edges.push_back(edge);
+				edge.condV = 0;
+			}
+		}
+
+		int it = 0;
+		while (iterate(func)) {
+			if (++it > 1000) {
+				std::cerr << "aborting optimization" << std::endl;
+				return false;
+			}
+
+			/*
+			if (debug_mode) {
+				std::cout << "\n\niterated..." << std::endl;
+				dumpAnalysis();
+			}
+			*/
+		}
+
+		// @todo combine the following
+		fixPHINodes(func);
+		fixConstants(func);
+		fixBranches(func);
+
+		removeUnreachableCode();
 
 		return true;
 	}
@@ -230,7 +233,7 @@ std::ostream &operator<<(std::ostream &os, OptimizerPass::ValueDomain const &vd)
     return os << "[" << vd.min << ";" << vd.max << "]";
 }
 
-void OptimizerPass::dump() {
+void OptimizerPass::dumpAnalysis() {
 	for (auto &bd : blocks) {
 		std::cout << "block: " << std::string(bd.first->getName()) << (bd.second.reachable ? " (1)" : " (0)") << std::endl;
 		/*for (auto &edge : bd.second.edges) {
@@ -328,11 +331,11 @@ bool OptimizerPass::trackValue(Value *v) {
 	if (prevVd == vd) return false;
 
 	if (!prevVd.isBottom && !vd.isBottom && !prevVd.isTop()) {
-		if (debug_mode) std::cout << "widening (caused by " << prevVd << " -> " << vd << ")" << std::endl;
+		if (debug_mode) std::cout << "widening" << std::endl;
 		vd = ValueDomain::top();
 	}
 
-	if (debug_mode) std::cout << "change: value " << std::string(v->getName()) << std::endl;
+	if (debug_mode) std::cout << "change: value " << std::string(v->getName()) << " (" << prevVd << " -> " << vd << ")" << std::endl;
 	return true;
 }
 
