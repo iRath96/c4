@@ -212,7 +212,7 @@ struct OptimizerPass : public FunctionPass {
 			if (!branch || branch->isConditional()) continue; // might be a return
 
 			auto replacement = branch->getSuccessor(0);
-			if (bd.isEntry && !blocks[replacement].edges.empty())
+			if (bd.isEntry && blocks[replacement].edges.size() > 1)
 				// cannot replace entry with block that has predecessors
 				continue;
 
