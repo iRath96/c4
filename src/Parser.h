@@ -146,7 +146,10 @@ class Parser : public Stream<Token, Ptr<External>> {
 	DebugTree dbg_tree_root;
 	DebugTree *dbg_tree_current = &dbg_tree_root;
 public:
-	Parser(Source<Token> *source) : Stream<Token, Ptr<External>>(source) {}
+	bool allowTLS; // allow top level statements
+
+	Parser(Source<Token> *source, bool tls = false)
+	: Stream<Token, Ptr<External>>(source), allowTLS(tls) {}
 
 	void reset() {
 		i = (int)token_queue.size();
@@ -157,9 +160,21 @@ public:
 		if (this->i && peek().kind == Token::Kind::END) return false;
 
 		depth = 0;
-		Ptr<ExternalDeclaration> decl;
-		read_external_declaration(decl);
-		*result = decl;
+		if (allowTLS) {
+			try { // @todo not DRY
+				Ptr<ExternalDeclaration> decl;
+				read_external_declaration(decl);
+				*result = decl;
+			} catch (ParserError e) {
+				auto repl = std::make_shared<REPLStatement>();
+				read_statement(repl->statement);
+				*result = repl;
+			}
+		} else {
+			Ptr<ExternalDeclaration> decl;
+			read_external_declaration(decl);
+			*result = decl;
+		}
 
 		return true;
 	}

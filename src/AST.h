@@ -64,7 +64,7 @@ struct Visitor {
 	virtual void visit(struct ParameterDeclaration &) {}
 	virtual void visit(struct GlobalVariable &) {}
 	virtual void visit(struct Function &) {}
-	virtual void visit(struct REPLExpression &) {}
+	virtual void visit(struct REPLStatement &) {}
 
 	// Types
 	virtual void visit(struct NamedTypeSpecifier &) {}
@@ -309,8 +309,8 @@ struct Function : ExternalDeclaration {
 	ACCEPT
 };
 
-struct REPLExpression : External {
-	Ptr<Expression> expr;
+struct REPLStatement : External {
+	Ptr<Statement> statement;
 	ACCEPT
 };
 

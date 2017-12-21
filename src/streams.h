@@ -1,6 +1,9 @@
 #ifndef streams_h
 #define streams_h
 
+#include <stdint.h>
+#include <vector>
+
 template<typename P>
 class Source {
 public:

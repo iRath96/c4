@@ -494,7 +494,7 @@ protected:
 	}
 
 	template<typename T>
-	void inspect(ast::Ptr<T> &node) {
+	void inspect(Ptr<T> &node) {
 		if (node.get()) node->accept(*this);
 	}
 
@@ -536,10 +536,12 @@ public:
 	}
 
 protected:
-	friend struct Node;
-
 	void open() { scopes.push<FileScope>(); }
 	void close() { scopes.pop(); }
+
+	virtual void visit(REPLStatement &node) {
+		inspect(node.statement);
+	}
 
 	virtual void visit(CaseLabel &node) {
 		if (!scopes.find<SwitchScope>().get()) error("'case' statement not in switch statement", node);

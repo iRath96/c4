@@ -10,6 +10,9 @@
 #include "Analyzer.h"
 #include "Beautifier.h"
 #include "Compiler.h"
+#include "FileSink.h"
+#include "JITEngine.h"
+
 
 bool debug_mode = false;
 bool enable_output = true;
@@ -89,10 +92,11 @@ void parse(const char *filename) {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler(llPath, name, &analyzer);
+	Compiler compiler(&analyzer, name);
+	FileSink compilerOutput(&compiler, llPath);
 
 	try {
-		if (mode == COMPILE) compiler.drain();
+		if (mode == COMPILE) compilerOutput.drain();
 		else if (mode == TOKENIZE) {
 			while (true) {
 				Token t;
@@ -128,18 +132,19 @@ void parse(const char *filename) {
 void repl() {
 	REPLSource source;
 	Lexer lexer(&source);
-	Parser parser(&lexer);
+	Parser parser(&lexer, true);
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler("/Users/alex/Desktop/repl.ll", "repl", &analyzer);
+	Compiler compiler(&analyzer, "repl");
+	JITEngine jit(&compiler);
 
 	source.parser = &parser;
 
 	while (true) {
 		try { // @todo not DRY
-			compiler.next(nullptr);
-		} catch (Lexer::Error e) {
+			jit.next(nullptr);
+		} catch (Lexer::Error e) { // @todo style mismatch with ParserError/AnalyzerError
 			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.end_pos.line, e.end_pos.column, e.message.c_str());
 		} catch (ParserError e) {
 			if (debug_mode) {

@@ -12,6 +12,8 @@
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
 		FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */; };
+		FAEF05C31FEBC2600076EB37 /* JITEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */; };
+		FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -40,6 +42,10 @@
 		FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Compiler.cpp; sourceTree = "<group>"; };
 		FAEF05BC1FE7BDC40076EB37 /* Compiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Compiler.h; sourceTree = "<group>"; };
 		FAEF05BF1FE82B9F0076EB37 /* streams.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = streams.h; sourceTree = "<group>"; };
+		FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = JITEngine.cpp; sourceTree = "<group>"; };
+		FAEF05C21FEBC2600076EB37 /* JITEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JITEngine.h; sourceTree = "<group>"; };
+		FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FileSink.cpp; sourceTree = "<group>"; };
+		FAEF05C51FEBC35A0076EB37 /* FileSink.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FileSink.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +114,10 @@
 				FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */,
 				FAEF05BC1FE7BDC40076EB37 /* Compiler.h */,
 				FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */,
+				FAEF05C21FEBC2600076EB37 /* JITEngine.h */,
+				FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */,
+				FAEF05C51FEBC35A0076EB37 /* FileSink.h */,
+				FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */,
 			);
 			name = compiler;
 			sourceTree = "<group>";
@@ -170,9 +180,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA2C09C71FD5A6BA00C891A5 /* Analyzer.cpp in Sources */,
+				FAEF05C31FEBC2600076EB37 /* JITEngine.cpp in Sources */,
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
 				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,
 				FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */,
+				FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -422,6 +434,7 @@
 					"-lcurses",
 					"-lz",
 					"-lm",
+					"-lffi",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -566,6 +579,7 @@
 					"-lcurses",
 					"-lz",
 					"-lm",
+					"-lffi",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
