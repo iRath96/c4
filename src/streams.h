@@ -1,7 +1,7 @@
 #ifndef streams_h
 #define streams_h
 
-#include <stdint.h>
+#include <stddef.h>
 #include <vector>
 
 template<typename P>

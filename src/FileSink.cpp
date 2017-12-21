@@ -1,6 +1,8 @@
 #include "FileSink.h"
 #include "Compiler.h"
 
+#include <stddef.h>
+
 #include "llvm/Support/SystemUtils.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
