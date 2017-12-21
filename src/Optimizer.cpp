@@ -8,6 +8,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
+extern bool debug_mode;
 
 struct OptimizerPass : public FunctionPass {
 	static char ID;
@@ -83,7 +84,10 @@ struct OptimizerPass : public FunctionPass {
 				}
 			}
 
-			hasChanged = hasChanged || !(prevBd == bd);
+			if (!(prevBd == bd)) {
+				if (debug_mode) std::cout << "change: block " << std::string(b.first->getName()) << std::endl;
+				hasChanged = true;
+			}
 		}
 
 		// update domains for all variables
@@ -181,8 +185,10 @@ struct OptimizerPass : public FunctionPass {
 				return false;
 			}
 
-			//std::cout << "\n\niterated..." << std::endl;
-			//dump();
+			if (debug_mode) {
+				std::cout << "\n\niterated..." << std::endl;
+				dump();
+			}
 		}
 
 		// @todo combine the following
@@ -205,7 +211,12 @@ struct OptimizerPass : public FunctionPass {
 			auto branch = dyn_cast<BranchInst>(&block->getInstList().front());
 			if (!branch || branch->isConditional()) continue; // might be a return
 
-			block->replaceAllUsesWith(branch->getSuccessor(0));
+			auto replacement = branch->getSuccessor(0);
+			if (bd.isEntry && !blocks[replacement].edges.empty())
+				// cannot replace entry with block that has predecessors
+				continue;
+
+			block->replaceAllUsesWith(replacement);
 			block->eraseFromParent();
 		}
 
@@ -249,9 +260,9 @@ bool OptimizerPass::trackValue(Value *v) {
 		vd.isBottom = false;
 		vd.min = intVal;
 		vd.max = intVal;
-	}
-
-	if (auto add = dyn_cast<BinaryOperator>(v)) {
+	} else if (dyn_cast<GetElementPtrInst>(v) || dyn_cast<LoadInst>(v)) {
+		vd = ValueDomain::top();
+	} else if (auto add = dyn_cast<BinaryOperator>(v)) {
 		auto &lhs = values[add->getOperand(0)];
 		auto &rhs = values[add->getOperand(1)];
 
@@ -266,19 +277,16 @@ bool OptimizerPass::trackValue(Value *v) {
 				break;
 
 			default:
-				std::cerr << "unsupported binary operation" << std::endl;
+				if (debug_mode) std::cerr << "unsupported binary operation" << std::endl;
+				vd = ValueDomain::top();
 			}
 		}
-	}
-
-	if (auto phi = dyn_cast<PHINode>(v)) {
+	} else if (auto phi = dyn_cast<PHINode>(v)) {
 		vd.isBottom = true;
 		for (int i = 0; i < phi->getNumIncomingValues(); ++i)
 			if (blocks[phi->getIncomingBlock(i)].reachable)
 				vd = ValueDomain::join(vd, values[phi->getIncomingValue(i)]);
-	}
-
-	if (auto cmp = dyn_cast<ICmpInst>(v)) {
+	} else if (auto cmp = dyn_cast<ICmpInst>(v)) {
 		auto &lhs = values[cmp->getOperand(0)];
 		auto &rhs = values[cmp->getOperand(1)];
 
@@ -312,15 +320,19 @@ bool OptimizerPass::trackValue(Value *v) {
 		vd.isBottom = false;
 		vd.min = vFalse ? 0 : 1;
 		vd.max = vTrue ? 1 : 0;
+	} else {
+		if (debug_mode) std::cerr << "unsupported instruction" << std::endl;
+		vd = ValueDomain::top();
 	}
 
 	if (prevVd == vd) return false;
 
-	if (!prevVd.isBottom && !vd.isBottom) {
-		//std::cout << "widening (caused by " << prevVd << " -> " << vd << ")" << std::endl;
+	if (!prevVd.isBottom && !vd.isBottom && !prevVd.isTop()) {
+		if (debug_mode) std::cout << "widening (caused by " << prevVd << " -> " << vd << ")" << std::endl;
 		vd = ValueDomain::top();
 	}
 
+	if (debug_mode) std::cout << "change: value " << std::string(v->getName()) << std::endl;
 	return true;
 }
 
