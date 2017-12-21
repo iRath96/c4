@@ -38,7 +38,7 @@ bool JITEngine::next(void *) {
 	CompilerResult cres;
 	if (this->source->next(&cres)) {
 		for (auto &global : cres.values) {
-			global->print(llvm::errs(), nullptr);
+			global->print(llvm::errs(), true);
 			std::cout << std::endl;
 
 			//auto ptr = engine->getPointerToGlobal(global);
