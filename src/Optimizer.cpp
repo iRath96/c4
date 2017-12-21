@@ -20,7 +20,7 @@ struct OptimizerPass : public FunctionPass {
 	};
 
 	struct ValueDomain {
-		bool isBottom = false;
+		bool isBottom = true;
 		int min = INT_MIN, max = INT_MAX;
 
 		static ValueDomain join(ValueDomain &a, ValueDomain &b) {
@@ -28,13 +28,21 @@ struct OptimizerPass : public FunctionPass {
 			if (b.isBottom) return a;
 
 			ValueDomain result;
+			result.isBottom = false;
 			result.min = std::min(a.min, b.min);
 			result.max = std::max(a.max, b.max);
 			return result;
 		}
 
+		static ValueDomain top() {
+			ValueDomain result;
+			result.isBottom = false;
+			return result;
+		}
+
 		bool contains(int v) const { return !isBottom && v >= min && v <= max; }
 		bool isConstant() const { return !isBottom && min == max; }
+		bool isTop() const { return !isBottom && min == INT_MIN && max == INT_MAX; }
 
 		bool operator==(const ValueDomain &other) const {
 			return other.isBottom == isBottom && other.min == min && other.max == max;
@@ -53,95 +61,8 @@ struct OptimizerPass : public FunctionPass {
 	std::map<BasicBlock *, BlockDomain> blocks;
 	std::map<Value *, ValueDomain> values;
 
-	void dump() {
-		for (auto &bd : blocks) {
-			std::cout << "block: " << std::string(bd.first->getName()) << (bd.second.reachable ? " (1)" : " (0)") << std::endl;
-			for (auto &edge : bd.second.edges) {
-				std::cout << "  from: " << std::string(edge.origin->getName()) << std::endl;
-				if (edge.cond)
-					std::cout << "    cond: " << std::string(edge.cond->getName()) << " = " << (edge.condV ? "true" : "false") << std::endl;
-			}
-		}
-
-		for (auto &v : values) {
-			auto &vd = v.second;
-			std::cout << "value: " << std::string(v.first->getName()) << " ";
-			//v.first->print(errs());
-			std::cout << " / min: " << vd.min << " / max: " << vd.max << std::endl;
-		}
-	}
-
-	bool trackValue(Value *v) {
-		if (!isa<User>(v)) return false;
-
-		auto prevVd = values[v];
-		auto &vd = values[v];
-
-		if (auto ci = dyn_cast<llvm::ConstantInt>(v)) {
-			int intVal = (int)*ci->getValue().getRawData();
-			vd.min = intVal;
-			vd.max = intVal;
-		}
-
-		if (auto add = dyn_cast<BinaryOperator>(v)) {
-			auto &lhs = values[add->getOperand(0)];
-			auto &rhs = values[add->getOperand(1)];
-
-			switch (add->getOpcode()) {
-			case llvm::Instruction::Add:
-				vd.min = lhs.min + rhs.min;
-				vd.max = lhs.max + rhs.max;
-				break;
-
-			default:
-				std::cerr << "unsupported binary operation" << std::endl;
-			}
-		}
-
-		if (auto phi = dyn_cast<PHINode>(v)) {
-			vd.isBottom = true;
-			for (int i = 0; i < phi->getNumIncomingValues(); ++i)
-				if (blocks[phi->getIncomingBlock(i)].reachable)
-					vd = ValueDomain::join(vd, values[phi->getIncomingValue(i)]);
-		}
-
-		if (auto cmp = dyn_cast<ICmpInst>(v)) {
-			auto &lhs = values[cmp->getOperand(0)];
-			auto &rhs = values[cmp->getOperand(1)];
-
-			bool vTrue, vFalse, swapOut = false;
-
-			switch (cmp->getPredicate()) {
-			case ICmpInst::ICMP_NE: swapOut = true;
-			case ICmpInst::ICMP_EQ:
-				vFalse = lhs.min != lhs.max || rhs.min != rhs.max || lhs.min != rhs.min;
-				vTrue = lhs.max >= rhs.min && rhs.max >= lhs.min;
-				break;
-
-			case ICmpInst::ICMP_SGE: swapOut = true;
-			case ICmpInst::ICMP_SLT:
-				vFalse = lhs.max >= rhs.min;
-				vTrue = lhs.min < rhs.max;
-				break;
-
-			case ICmpInst::ICMP_SGT: swapOut = true;
-			case ICmpInst::ICMP_SLE:
-				vFalse = lhs.max > rhs.min;
-				vTrue = lhs.min <= rhs.max;
-				break;
-
-			default:
-				std::cerr << "unsupported comparison" << std::endl;
-				exit(1);
-			}
-
-			if (swapOut) std::swap(vFalse, vTrue);
-			vd.min = vFalse ? 0 : 1;
-			vd.max = vTrue ? 1 : 0;
-		}
-
-		return !(prevVd == vd);
-	}
+	void dump();
+	bool trackValue(Value *v);
 
 	bool iterate(llvm::Function &func) {
 		bool hasChanged = false;
@@ -167,6 +88,7 @@ struct OptimizerPass : public FunctionPass {
 
 		// update domains for all variables
 		for (auto &block : func.getBasicBlockList()) {
+			if (!blocks[&block].reachable) continue;
 			for (auto &phi : block.phis())
 				for (auto &op : phi.incoming_values()) hasChanged = hasChanged || trackValue(op.get());
 			for (auto &inst : block.getInstList())
@@ -252,9 +174,16 @@ struct OptimizerPass : public FunctionPass {
 			}
 		}
 
-		while (iterate(func)) std::cout << "iterated..." << std::endl;
+		int it = 0;
+		while (iterate(func)) {
+			if (++it > 1000) {
+				std::cerr << "aborting optimization" << std::endl;
+				return false;
+			}
 
-		dump();
+			//std::cout << "\n\niterated..." << std::endl;
+			//dump();
+		}
 
 		// @todo combine the following
 		fixPHINodes(func);
@@ -280,11 +209,120 @@ struct OptimizerPass : public FunctionPass {
 			block->eraseFromParent();
 		}
 
-		errs() << "Optimizer: ";
-		errs().write_escaped(func.getName()) << '\n';
-		return false;
+		return true;
 	}
 };
+
+std::ostream &operator<<(std::ostream &os, OptimizerPass::ValueDomain const &vd) {
+    if (vd.isBottom) return os << "bottom";
+    if (vd.isTop()) return os << "top";
+    return os << "[" << vd.min << ";" << vd.max << "]";
+}
+
+void OptimizerPass::dump() {
+	for (auto &bd : blocks) {
+		std::cout << "block: " << std::string(bd.first->getName()) << (bd.second.reachable ? " (1)" : " (0)") << std::endl;
+		/*for (auto &edge : bd.second.edges) {
+			std::cout << "  from: " << std::string(edge.origin->getName()) << std::endl;
+			if (edge.cond)
+				std::cout << "    cond: " << std::string(edge.cond->getName()) << " = " << (edge.condV ? "true" : "false") << std::endl;
+		}*/
+	}
+
+	for (auto &v : values) {
+		auto &vd = v.second;
+		if (!v.first->hasName()) continue;
+
+		std::cout << "value " << std::string(v.first->getName()) << ": " << vd << std::endl;
+		//v.first->print(errs());
+	}
+}
+
+bool OptimizerPass::trackValue(Value *v) {
+	if (!isa<User>(v)) return false;
+
+	auto prevVd = values[v];
+	auto &vd = values[v];
+
+	if (auto ci = dyn_cast<llvm::ConstantInt>(v)) {
+		int intVal = (int)*ci->getValue().getRawData();
+		vd.isBottom = false;
+		vd.min = intVal;
+		vd.max = intVal;
+	}
+
+	if (auto add = dyn_cast<BinaryOperator>(v)) {
+		auto &lhs = values[add->getOperand(0)];
+		auto &rhs = values[add->getOperand(1)];
+
+		if (lhs.isTop() || lhs.isBottom) vd = lhs;
+		else if (rhs.isTop() || rhs.isBottom) vd = rhs;
+		else {
+			switch (add->getOpcode()) {
+			case llvm::Instruction::Add:
+				vd.isBottom = false;
+				vd.min = lhs.min + rhs.min;
+				vd.max = lhs.max + rhs.max;
+				break;
+
+			default:
+				std::cerr << "unsupported binary operation" << std::endl;
+			}
+		}
+	}
+
+	if (auto phi = dyn_cast<PHINode>(v)) {
+		vd.isBottom = true;
+		for (int i = 0; i < phi->getNumIncomingValues(); ++i)
+			if (blocks[phi->getIncomingBlock(i)].reachable)
+				vd = ValueDomain::join(vd, values[phi->getIncomingValue(i)]);
+	}
+
+	if (auto cmp = dyn_cast<ICmpInst>(v)) {
+		auto &lhs = values[cmp->getOperand(0)];
+		auto &rhs = values[cmp->getOperand(1)];
+
+		bool vTrue, vFalse, swapOut = false;
+
+		switch (cmp->getPredicate()) {
+		case ICmpInst::ICMP_NE: swapOut = true;
+		case ICmpInst::ICMP_EQ:
+			vFalse = lhs.min != lhs.max || rhs.min != rhs.max || lhs.min != rhs.min;
+			vTrue = lhs.max >= rhs.min && rhs.max >= lhs.min;
+			break;
+
+		case ICmpInst::ICMP_SGE: swapOut = true;
+		case ICmpInst::ICMP_SLT:
+			vFalse = lhs.max >= rhs.min;
+			vTrue = lhs.min < rhs.max;
+			break;
+
+		case ICmpInst::ICMP_SGT: swapOut = true;
+		case ICmpInst::ICMP_SLE:
+			vFalse = lhs.max > rhs.min;
+			vTrue = lhs.min <= rhs.max;
+			break;
+
+		default:
+			std::cerr << "unsupported comparison" << std::endl;
+			exit(1);
+		}
+
+		if (swapOut) std::swap(vFalse, vTrue);
+		vd.isBottom = false;
+		vd.min = vFalse ? 0 : 1;
+		vd.max = vTrue ? 1 : 0;
+	}
+
+	if (prevVd == vd) return false;
+
+	if (!prevVd.isBottom && !vd.isBottom) {
+		//std::cout << "widening (caused by " << prevVd << " -> " << vd << ")" << std::endl;
+		vd = ValueDomain::top();
+	}
+
+	return true;
+}
 
 char OptimizerPass::ID = 0;
 
