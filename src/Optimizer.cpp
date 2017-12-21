@@ -1,11 +1,14 @@
 #include "Optimizer.h"
-#include "Compiler.h"
 
 #include "llvm/Pass.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include <iostream>
 
 using namespace llvm;
 extern bool debug_mode;
@@ -20,7 +23,7 @@ struct OptimizerPass : public FunctionPass {
 		bool condV;
 	};
 
-	struct ValueDomain {
+	struct ValueDomain { // @warning overflow behavior not yet taken into account
 		bool isBottom = true;
 		int min = INT_MIN, max = INT_MAX;
 
@@ -341,6 +344,14 @@ bool OptimizerPass::trackValue(Value *v) {
 
 char OptimizerPass::ID = 0;
 
+struct CompilerResult { // @todo @fixme @important not DRY
+	Compiler *compiler;
+	std::vector<llvm::GlobalValue *> values;
+	bool shouldExecute;
+
+	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}
+};
+
 Optimizer::Optimizer(Source<CompilerResult> *source, Module *mod)
 : Stream<CompilerResult, CompilerResult>(source), fpm(mod) {
 	fpm.add(createPromoteMemoryToRegisterPass());
@@ -350,8 +361,7 @@ Optimizer::Optimizer(Source<CompilerResult> *source, Module *mod)
 bool Optimizer::next(CompilerResult *result) {
 	if (this->source->next(result)) {
 		for (auto &value : result->values)
-			if (isa<llvm::Function>(value))
-				fpm.run(*cast<llvm::Function>(value));
+			if (isa<llvm::Function>(value)) fpm.run(*cast<llvm::Function>(value));
 		return true;
 	} else
 		return false;

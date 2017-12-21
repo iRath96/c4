@@ -45,6 +45,12 @@ $(BIN): $(OBJ)
 	@echo "===> LD $@"
 	$(Q)$(CXX) -o $(BIN) $(OBJ) $(LDFLAGS)
 
+# Urgh… #fml
+# the LLVM used by my build system is compiled with RTTI disabled,
+# which is why we need to disable it, too -- but only for one file
+$(BINDIR)/Optimizer.o: $(SRCDIR)/Optimizer.cpp
+	$(Q)$(CXX) $(CXXFLAGS) -fno-rtti -MMD -c -o $@ $<
+
 $(BINDIR)/%.o: $(SRCDIR)/%.cpp
 	@echo "===> CXX $<"
 	$(Q)$(CXX) $(CXXFLAGS) -MMD -c -o $@ $<
