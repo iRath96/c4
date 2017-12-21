@@ -16,9 +16,9 @@ protected:
 	llvm::Module *mod;
 public:
 	std::string outPath;
-	
-	FileSink(Compiler *source, std::string outPath);
+	bool print;
 
+	FileSink(Source<CompilerResult> *source, llvm::Module *mod, std::string outPath, bool print = false);
 	virtual bool next(void *);
 };
 

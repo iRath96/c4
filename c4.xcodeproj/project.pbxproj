@@ -14,6 +14,7 @@
 		FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */; };
 		FAEF05C31FEBC2600076EB37 /* JITEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */; };
 		FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */; };
+		FAEF05C91FEBDEB60076EB37 /* Optimizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C71FEBDEB60076EB37 /* Optimizer.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -46,6 +47,8 @@
 		FAEF05C21FEBC2600076EB37 /* JITEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JITEngine.h; sourceTree = "<group>"; };
 		FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FileSink.cpp; sourceTree = "<group>"; };
 		FAEF05C51FEBC35A0076EB37 /* FileSink.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FileSink.h; sourceTree = "<group>"; };
+		FAEF05C71FEBDEB60076EB37 /* Optimizer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Optimizer.cpp; sourceTree = "<group>"; };
+		FAEF05C81FEBDEB60076EB37 /* Optimizer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Optimizer.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,10 +117,12 @@
 				FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */,
 				FAEF05BC1FE7BDC40076EB37 /* Compiler.h */,
 				FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */,
-				FAEF05C21FEBC2600076EB37 /* JITEngine.h */,
-				FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */,
+				FAEF05C81FEBDEB60076EB37 /* Optimizer.h */,
+				FAEF05C71FEBDEB60076EB37 /* Optimizer.cpp */,
 				FAEF05C51FEBC35A0076EB37 /* FileSink.h */,
 				FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */,
+				FAEF05C21FEBC2600076EB37 /* JITEngine.h */,
+				FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */,
 			);
 			name = compiler;
 			sourceTree = "<group>";
@@ -180,6 +185,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA2C09C71FD5A6BA00C891A5 /* Analyzer.cpp in Sources */,
+				FAEF05C91FEBDEB60076EB37 /* Optimizer.cpp in Sources */,
 				FAEF05C31FEBC2600076EB37 /* JITEngine.cpp in Sources */,
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
 				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,

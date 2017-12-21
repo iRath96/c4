@@ -5,7 +5,7 @@
 int printf(char *, ...);
 
 int main(void) {
-	int i;
+	int i = 0;
 
 	while (i <= 20) {
 		if (i % 3 == 0) printf("Fizz");

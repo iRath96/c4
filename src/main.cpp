@@ -12,6 +12,7 @@
 #include "Compiler.h"
 #include "FileSink.h"
 #include "JITEngine.h"
+#include "Optimizer.h"
 
 
 bool debug_mode = false;
@@ -93,10 +94,11 @@ void parse(const char *filename) {
 
 	Analyzer analyzer(buffer.createChild());
 	Compiler compiler(&analyzer, name);
-	FileSink compilerOutput(&compiler, llPath);
+	Optimizer optimizer(&compiler, compiler.modPtr.get());
+	FileSink output(&optimizer, compiler.modPtr.get(), llPath, debug_mode);
 
 	try {
-		if (mode == COMPILE) compilerOutput.drain();
+		if (mode == COMPILE) output.drain();
 		else if (mode == TOKENIZE) {
 			while (true) {
 				Token t;
@@ -123,7 +125,7 @@ void parse(const char *filename) {
 		exit(1);
 	}
 
-	if (mode == PRINT_AST || debug_mode) {
+	if (mode == PRINT_AST) {
 		Beautifier beautifier(buffer.createChild());
 		beautifier.drain();
 	}
@@ -137,7 +139,7 @@ void repl() {
 
 	Analyzer analyzer(buffer.createChild());
 	Compiler compiler(&analyzer, "repl");
-	JITEngine jit(&compiler);
+	JITEngine jit(&compiler, &compiler); // @todo style
 
 	source.parser = &parser;
 

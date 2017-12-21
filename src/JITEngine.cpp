@@ -17,12 +17,12 @@
 #include <iostream>
 #include <memory>
 
-JITEngine::JITEngine(Compiler *source) : Stream<CompilerResult, void>(source) {
+JITEngine::JITEngine(Source<CompilerResult> *source, Compiler *compiler) : Stream<CompilerResult, void>(source) {
 	LLVMInitializeNativeTarget();
 	LLVMInitializeNativeAsmPrinter();
 
 	std::string errStr;
-	engine = llvm::EngineBuilder(std::move(source->modPtr))
+	engine = llvm::EngineBuilder(std::move(compiler->modPtr))
 		.setErrorStr(&errStr)
 		//.setUseMCJIT(true)
 		.setMCJITMemoryManager(llvm::make_unique<llvm::SectionMemoryManager>())

@@ -14,7 +14,7 @@ class JITEngine : public Stream<CompilerResult, void> {
 protected:
 	llvm::ExecutionEngine *engine;
 public:
-	JITEngine(Compiler *source);
+	JITEngine(Source<CompilerResult> *source, Compiler *compiler);
 
 	virtual bool next(void *);
 };
