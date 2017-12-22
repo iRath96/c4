@@ -17,14 +17,13 @@ struct OptimizerPass : public FunctionPass {
 	static char ID;
 	OptimizerPass() : FunctionPass(ID) {}
 
-	struct Edge {
-		BasicBlock *origin;
+	struct Condition {
 		Value *cond = nullptr;
 		bool condV;
 	};
 
 	struct ValueDomain { // @warning overflow behavior not yet taken into account
-		bool isBottom = true;
+		bool isBottom = false;
 		bool isDead = false;
 		int min = INT_MIN, max = INT_MAX;
 
@@ -149,6 +148,14 @@ struct OptimizerPass : public FunctionPass {
 			_add(rhs, lhs, swappedPredicate(pred));
 		}
 
+		void removeInstruction(Instruction *instr) {
+			std::vector<std::pair<Value *, Value *>> pairs;
+			for (auto &p : predicates)
+				if (p.first.first == instr || p.first.second == instr)
+					pairs.push_back(p.first);
+			for (auto &p : pairs) predicates.erase(p);
+		}
+
 		CmpInst::Predicate get(Value *lhs, Value *rhs) {
 			if (lhs == rhs) return ICmpInst::ICMP_EQ;
 			auto it = predicates.find(std::make_pair(lhs, rhs));
@@ -203,8 +210,21 @@ struct OptimizerPass : public FunctionPass {
 	struct BlockDomain {
 		ConstraintSet cs;
 
-		std::vector<Edge> edges;
-		bool isEntry = false, reachable = false;
+		std::map<BasicBlock *, Condition> edges;
+		bool replaceBlock(BasicBlock *block, BasicBlock *replacement) {
+			if (edges.find(block) == edges.end()) return false;
+			edges[replacement] = edges[block];
+			edges.erase(block);
+			return true;
+		}
+
+		bool removeEdge(BasicBlock *origin) {
+			if (edges.find(origin) == edges.end()) return false;
+			edges.erase(origin);
+			return true;
+		}
+
+		bool isEntry = false, reachable = true;
 
 		bool operator==(const BlockDomain &other) {
 			return other.isEntry == isEntry && other.reachable == reachable;
@@ -229,15 +249,18 @@ struct OptimizerPass : public FunctionPass {
 
 			bd.reachable = false;
 			for (auto &edge : bd.edges) {
-				if (!blocks[edge.origin].reachable) continue;
-				if (!edge.cond || values[edge.cond].contains(edge.condV)) {
+				if (!blocks[edge.first].reachable) continue;
+				if (!edge.second.cond || values[edge.second.cond].contains(edge.second.condV)) {
 					bd.reachable = true;
 					break;
 				}
 			}
 
 			if (!(prevBd == bd)) {
-				if (debug_mode) std::cout << "change: block " << std::string(b.first->getName()) << std::endl;
+				if (debug_mode) {
+					std::cout << "change: block " << std::string(b.first->getName());
+					std::cout << (bd.reachable ? "" : " unreachable") << std::endl;
+				}
 				hasChanged = true;
 			}
 		}
@@ -263,7 +286,7 @@ struct OptimizerPass : public FunctionPass {
 
 				if (phi->getNumIncomingValues() == 1) {
 					phi->replaceAllUsesWith(phi->getIncomingValue(0));
-					phi->eraseFromParent();
+					removeInstruction(phi);
 				}
 			}
 		}
@@ -278,28 +301,53 @@ struct OptimizerPass : public FunctionPass {
 			for (auto &constant : constants) {
 				Value *newValue = llvm::ConstantInt::get(constant->getType(), values[constant].min);
 				constant->replaceAllUsesWith(newValue);
+				values.erase(constant);
 				constant->eraseFromParent();
 			}
 		}
 	}
 
-	void fixBranches(llvm::Function &func) {
+	void replaceBranch(BasicBlock *origin, BranchInst *branch, BranchInst *newBranch) {
+		for (auto succ : branch->successors()) blocks[succ].removeEdge(origin);
+
+		// @todo recalculate constraint set?
+
+		if (debug_mode) {
+			std::cerr << "replacing "; branch->print(errs());
+			std::cerr << " with "; newBranch->print(errs());
+			std::cerr << std::endl;
+		}
+
+		newBranch->insertAfter(branch);
+		branch->eraseFromParent();
+
+		Condition c; // @todo not DRY
+		c.cond = newBranch->isConditional() ? newBranch->getCondition() : nullptr;
+		c.condV = 1;
+
+		blocks[newBranch->getSuccessor(0)].edges[origin] = c;
+		if (newBranch->isConditional() && newBranch->getSuccessor(0) != newBranch->getSuccessor(1)) {
+			c.condV = 0;
+			blocks[newBranch->getSuccessor(1)].edges[origin] = c;
+		}
+	}
+
+	void fixBranches(llvm::Function &func) { // @todo return hasChanged! / invalidates dead-code analysis
 		for (auto &block : func.getBasicBlockList()) {
 			std::vector<BranchInst *> branches; // conditional branches
 			for (auto &inst : block.getInstList())
 				if (auto br = dyn_cast<BranchInst>(&inst))
 					if (br->isConditional()) branches.push_back(br);
 
-			for (auto &branch : branches)
+			for (auto &branch : branches) {
 				if (auto c = dyn_cast<ConstantInt>(branch->getCondition())) {
 					auto newBranch = BranchInst::Create(branch->getSuccessor(c->isZero() ? 1 : 0));
-					newBranch->insertAfter(branch);
-					branch->eraseFromParent();
-				} /* else if (branch->getSuccessor(0) == branch->getSuccessor(1)) {
+					replaceBranch(&block, branch, newBranch);
+				} else if (branch->getSuccessor(0) == branch->getSuccessor(1)) {
 					auto newBranch = BranchInst::Create(branch->getSuccessor(0));
-					newBranch->insertAfter(branch);
-					branch->eraseFromParent();
-				} */
+					replaceBranch(&block, branch, newBranch);
+				}
+			}
 		}
 	}
 
@@ -309,33 +357,91 @@ struct OptimizerPass : public FunctionPass {
 			for (auto &inst : block.getInstList())
 				if (values[&inst].isDead) dead.push_back(&inst);
 
-			for (auto &d : dead) d->eraseFromParent();
+			for (auto &d : dead) removeInstruction(d);
 		}
 	}
 
-	void removeUnreachableCode() { // @todo name simplifyCFG
-		for (auto &b : blocks) {
-			auto &block = b.first;
-			auto &bd = b.second;
+	void removeUnreachableCode(llvm::Function &func) { // @todo name simplifyCFG
+		std::vector<BasicBlock *> bl;
+		for (auto &block : func.getBasicBlockList()) bl.push_back(&block);
+
+		for (auto &block : bl) {
+			auto &bd = blocks[block];
 
 			if (!bd.reachable) {
-				block->eraseFromParent();
+				removeBlock(block);
 				continue;
 			}
 
-			if (block->getInstList().size() > 1) continue;
+			// merge with following block
 
-			auto branch = dyn_cast<BranchInst>(&block->getInstList().front());
+			auto isUsless = block->getInstList().size() == 1 && !bd.isEntry;
+
+			auto branch = dyn_cast<BranchInst>(block->getTerminator());
 			if (!branch || branch->isConditional()) continue; // might be a return
 
 			auto replacement = branch->getSuccessor(0);
-			if (bd.isEntry && blocks[replacement].edges.size() > 1)
-				// cannot replace entry with block that has predecessors
+			if (blocks[replacement].edges.size() > 1 && !isUsless) {
+				// cannot merge with block that has multiple predecessors...
+				// ...unless we're a useless block
+				std::cerr << "cannot merge " << block->getName().str() << " into " << replacement->getName().str() << std::endl;
 				continue;
+			}
 
-			block->replaceAllUsesWith(replacement);
-			block->eraseFromParent();
+			mergeBlock(block, replacement);
 		}
+	}
+
+	void mergeBlock(BasicBlock *block, BasicBlock *replacement) {
+		if (debug_mode) {
+			std::cerr << "merge block " << block->getName().str()
+				<< " into " << replacement->getName().str() << std::endl;
+		}
+
+		auto insertionPoint = &replacement->getInstList().front();
+		std::vector<Instruction *> instr; // @todo copy
+		for (auto &i : block->getInstList()) if (!dyn_cast<TerminatorInst>(&i)) instr.push_back(&i);
+		for (auto &i : instr) i->moveBefore(insertionPoint);
+
+		// @todo merge constraintSet?
+		blocks[replacement].isEntry = blocks[block].isEntry;
+		for (auto &edge : blocks[block].edges) blocks[replacement].edges.insert(edge);
+		blocks[replacement].removeEdge(block);
+
+		blocks.erase(block);
+
+		for (auto &b : blocks) b.second.replaceBlock(block, replacement);
+
+		block->replaceAllUsesWith(replacement);
+		removeBlock(block);
+	}
+
+	void removeBlock(BasicBlock *block) {
+		if (debug_mode) std::cout << "removing block " << block->getName().str() << std::endl;
+
+		std::vector<Instruction *> instr; // @todo better copy method?
+		for (auto &i : block->getInstList()) instr.push_back(&i);
+		for (auto &i : instr) removeInstruction(i);
+
+		for (auto &b : blocks) b.second.removeEdge(block);
+		blocks.erase(block);
+
+		block->eraseFromParent();
+	}
+
+	void removeInstruction(Instruction *instr) {
+		if (debug_mode) {
+			std::cerr << "removing instruction ";
+			instr->print(errs());
+			std::cerr << std::endl;
+		}
+
+		for (auto &b : blocks)
+			// @todo would it suffice to only update blocks[block] here?
+			b.second.cs.removeInstruction(instr);
+
+		values.erase(instr);
+		instr->eraseFromParent();
 	}
 
 	// @todo @important CSE analysis
@@ -364,18 +470,17 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &block : func.getBasicBlockList()) {
 			auto term = block.getTerminator();
 
-			Edge edge;
-			edge.origin = &block;
-			edge.condV = 1;
+			Condition c;
+			c.condV = 1;
 
 			if (auto br = dyn_cast<BranchInst>(term))
-				if (br->isConditional()) edge.cond = br->getCondition();
+				if (br->isConditional()) c.cond = br->getCondition();
 
 			for (auto succ : term->successors()) {
-				if (edge.cond) {
-					if (auto cmp = dyn_cast<ICmpInst>(edge.cond)) {
+				if (c.cond) {
+					if (auto cmp = dyn_cast<ICmpInst>(c.cond)) {
 						auto pred = cmp->getPredicate();
-						if (!edge.condV) pred = ConstraintSet::oppositePredicate(pred);
+						if (!c.condV) pred = ConstraintSet::oppositePredicate(pred);
 
 						blocks[succ].cs.add(
 							cmp->getOperand(0),
@@ -384,22 +489,40 @@ struct OptimizerPass : public FunctionPass {
 						);
 					} else {
 						blocks[succ].cs.add(
-							edge.cond,
-							ConstantInt::get(edge.cond->getType(), 0),
-							edge.condV ? ICmpInst::ICMP_NE : ICmpInst::ICMP_EQ
+							c.cond,
+							ConstantInt::get(c.cond->getType(), 0),
+							c.condV ? ICmpInst::ICMP_NE : ICmpInst::ICMP_EQ
 						);
 					}
 				}
 				
-				blocks[succ].edges.push_back(edge);
-				edge.condV = 0;
+				blocks[succ].edges[&block] = c;
+				c.condV = 0;
 			}
 		}
+
+		// mark unreferenced blocks as unreachable
+		for (auto &block : func.getBasicBlockList())
+			if (blocks.find(&block) == blocks.end())
+				blocks[&block].reachable = false;
 
 		//if (debug_mode) dumpAnalysis();
 
 		int it = 0;
-		while (iterate(func)) {
+		while (true) {
+			if (debug_mode) {
+				if (it > 0) std::cout << std::endl;
+				std::cout << "iteration #" << it << std::endl;
+			}
+			
+			if (!iterate(func)) break;
+
+			fixPHINodes(func);
+			fixConstants(func);
+			fixBranches(func);
+			removeDeadCode(func);
+			removeUnreachableCode(func);
+			
 			if (++it > 1000) {
 				std::cerr << "aborting optimization" << std::endl;
 				return false;
@@ -413,15 +536,10 @@ struct OptimizerPass : public FunctionPass {
 			*/
 		}
 
-		if (debug_mode) dumpAnalysis();
-
-		// @todo combine the following
-		fixPHINodes(func);
-		fixConstants(func);
-		fixBranches(func);
-		removeDeadCode(func);
-
-		removeUnreachableCode();
+		if (debug_mode) {
+			std::cout << std::endl << "fixpoint:" << std::endl;
+			dumpAnalysis();
+		}
 
 		return true;
 	}
@@ -453,17 +571,24 @@ std::ostream &operator<<(std::ostream &os, OptimizerPass::ConstraintSet const &c
 	return os;
 }
 
-void OptimizerPass::dumpAnalysis() {
-	for (auto &bd : blocks) {
-		std::cout << "block: " << std::string(bd.first->getName()) << (bd.second.reachable ? " (1)" : " (0)") << std::endl;
-		std::cout << bd.second.cs << std::endl;
+std::ostream &operator<<(std::ostream &os, OptimizerPass::BlockDomain const &bd) {
+	if (bd.isEntry) os << " entry";
+	if (bd.reachable) os << " reachable";
+	else os << " unreachable";
+	os << std::endl << bd.cs;
 
-		/*for (auto &edge : bd.second.edges) {
-			std::cout << "  from: " << std::string(edge.origin->getName()) << std::endl;
-			if (edge.cond)
-				std::cout << "    cond: " << std::string(edge.cond->getName()) << " = " << (edge.condV ? "true" : "false") << std::endl;
-		}*/
+	for (auto &edge : bd.edges) {
+		os << "  from " << std::string(edge.first->getName());
+		if (edge.second.cond)
+			os << " (" << edge.second.cond->getName().str() << " = " << (edge.second.condV ? "true)" : "false)");
+		os << std::endl;
 	}
+	return os;
+}
+
+void OptimizerPass::dumpAnalysis() {
+	for (auto &bd : blocks)
+		std::cout << "block: " << std::string(bd.first->getName()) << bd.second;
 
 	for (auto &v : values) {
 		auto &vd = v.second;
