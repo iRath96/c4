@@ -479,6 +479,7 @@ protected:
 	virtual void visit(NamedTypeSpecifier &) {}
 
 	llvm::Value *testZero(llvm::Value *v) {
+		if (v->getType() == builder.getInt1Ty()) return v;
 		return builder.CreateICmpNE(v, matchType(builder.getInt32(0), v->getType()), "cond");
 	}
 
