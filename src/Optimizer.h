@@ -2,7 +2,12 @@
 #define Optimizer_h
 
 #include "streams.h"
-#include "llvm/IR/LegacyPassManager.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include <llvm/IR/LegacyPassManager.h>
+#pragma GCC diagnostic pop
 
 namespace llvm {
 	class Module;

@@ -844,7 +844,7 @@ protected:
 			);
 
 		auto &lhs = exprType(*node.when_true);
-		auto &rhs = exprType(*node.when_false);
+		exprType(*node.when_false);
 
 		// @todo compare lhs and rhs type
 

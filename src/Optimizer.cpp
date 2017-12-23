@@ -1,14 +1,36 @@
 #include "Optimizer.h"
 
-#include "llvm/Pass.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/ValueSymbolTable.h"
-#include "llvm/Support/raw_ostream.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include <llvm/Pass.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/ValueSymbolTable.h>
+#include <llvm/Support/raw_ostream.h>
+#pragma GCC diagnostic pop
 
 #include <iostream>
+#include <map>
+#include <set>
+
+// modified from:
+// https://stackoverflow.com/questions/24263259/c-stdseterase-with-stdremove-if
+
+template <class T, class Comp, class Alloc, class Predicate>
+bool discard_if(std::set<T, Comp, Alloc>& c, Predicate pred) {
+	bool has_changed = false;
+    for (auto it{c.begin()}, end{c.end()}; it != end; ) {
+        if (pred(*it)) {
+        	it = c.erase(it);
+        	has_changed = true;
+        } else ++it;
+    }
+
+    return has_changed;
+}
 
 using namespace llvm;
 extern bool debug_mode;
@@ -26,6 +48,8 @@ struct OptimizerPass : public FunctionPass {
 		bool isBottom = false;
 		bool isDead = false;
 		int min = INT_MIN, max = INT_MAX;
+
+		Value *memSize = nullptr; // @todo @important for malloc (+memIndex)
 
 		static ValueDomain join(ValueDomain &a, ValueDomain &b) {
 			if (a.isBottom) return b;
@@ -55,7 +79,7 @@ struct OptimizerPass : public FunctionPass {
 	};
 
 	struct ConstraintSet {
-		bool isBottom = false; // bottom = can never become true
+		bool isBottom = false; // bottom <=> can never become true
 		bool isTop() const { return !isBottom && predicates.empty(); }
 
 		bool isPure = true; // all contained predicates are equivalent
@@ -144,8 +168,20 @@ struct OptimizerPass : public FunctionPass {
 		}
 
 		void add(Value *lhs, Value *rhs, CmpInst::Predicate pred) {
-			_add(lhs, rhs, pred);
-			_add(rhs, lhs, swappedPredicate(pred));
+			if (isBottom) return;
+
+			addSingle(lhs, rhs, pred);
+			addSingle(rhs, lhs, swappedPredicate(pred));
+		}
+
+		void inherit(const ConstraintSet &cs) {
+			if (isBottom) return;
+
+			isPure = false;
+
+			for (auto &pred : cs.predicates)
+				// @todo could be more efficient if we didn't add entailments from parent
+				addSingle(pred.first.first, pred.first.second, pred.second);
 		}
 
 		void removeInstruction(Instruction *instr) {
@@ -163,8 +199,6 @@ struct OptimizerPass : public FunctionPass {
 			return it->second;
 		}
 
-		// @todo merge+entailment, becomes impure
-
 		std::map<std::pair<Value *, Value *>, CmpInst::Predicate> predicates;
 
 	protected:
@@ -172,7 +206,10 @@ struct OptimizerPass : public FunctionPass {
 			predicates[std::make_pair(lhs, rhs)] = pred;
 		}
 
-		void _add(Value *lhs, Value *rhs, CmpInst::Predicate pred) {
+		void addSingle(Value *lhs, Value *rhs, CmpInst::Predicate pred) {
+			// @todo maybe use unordered_pairs with asymmetric predicates?
+			// @todo also calculate entailments
+
 			auto prevPred = get(lhs, rhs);
 			if (conflict(prevPred, pred)) {
 				isBottom = true;
@@ -184,6 +221,7 @@ struct OptimizerPass : public FunctionPass {
 			auto cmp = dyn_cast<CmpInst>(lhs);
 			auto cint = dyn_cast<ConstantInt>(rhs);
 
+			// @todo also consider PHINodes
 			if (cmp && cint) {
 				auto subPred = cmp->getPredicate();
 				bool inv = false;
@@ -210,8 +248,15 @@ struct OptimizerPass : public FunctionPass {
 	struct BlockDomain {
 		ConstraintSet cs;
 
+		std::set<BasicBlock *> dominators;
 		std::map<BasicBlock *, Condition> edges;
+
+		bool isDominatedBy(BasicBlock *block) {
+			return dominators.find(block) != dominators.end();
+		}
+
 		bool replaceBlock(BasicBlock *block, BasicBlock *replacement) {
+			dominators.erase(block);
 			if (edges.find(block) == edges.end()) return false;
 			edges[replacement] = edges[block];
 			edges.erase(block);
@@ -219,6 +264,7 @@ struct OptimizerPass : public FunctionPass {
 		}
 
 		bool removeEdge(BasicBlock *origin) {
+			dominators.erase(origin);
 			if (edges.find(origin) == edges.end()) return false;
 			edges.erase(origin);
 			return true;
@@ -384,7 +430,7 @@ struct OptimizerPass : public FunctionPass {
 			if (blocks[replacement].edges.size() > 1 && !isUsless) {
 				// cannot merge with block that has multiple predecessors...
 				// ...unless we're a useless block
-				std::cerr << "cannot merge " << block->getName().str() << " into " << replacement->getName().str() << std::endl;
+				//std::cerr << "cannot merge " << block->getName().str() << " into " << replacement->getName().str() << std::endl;
 				continue;
 			}
 
@@ -405,6 +451,7 @@ struct OptimizerPass : public FunctionPass {
 
 		// @todo merge constraintSet?
 		blocks[replacement].isEntry = blocks[block].isEntry;
+		// dominators stay the same (@todo really?)
 		for (auto &edge : blocks[block].edges) blocks[replacement].edges.insert(edge);
 		blocks[replacement].removeEdge(block);
 
@@ -459,14 +506,16 @@ struct OptimizerPass : public FunctionPass {
 		return values[value];
 	}
 
-	bool runOnFunction(llvm::Function &func) override {
+	void initialize(llvm::Function &func) {
 		blocks.clear();
 		values.clear();
 
+		// mark entry block
 		auto &entry = blocks[&func.getEntryBlock()];
 		entry.reachable = true;
 		entry.isEntry = true;
 
+		// find edges
 		for (auto &block : func.getBasicBlockList()) {
 			auto term = block.getTerminator();
 
@@ -495,7 +544,7 @@ struct OptimizerPass : public FunctionPass {
 						);
 					}
 				}
-				
+
 				blocks[succ].edges[&block] = c;
 				c.condV = 0;
 			}
@@ -505,6 +554,75 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &block : func.getBasicBlockList())
 			if (blocks.find(&block) == blocks.end())
 				blocks[&block].reachable = false;
+
+		// find dominators
+		findDominators();
+		propagateConstraintSets();
+	}
+
+	void findDominators() { // fixpoint approach
+		for (auto &bd : blocks) {
+			auto &dom = bd.second.dominators;
+			dom.clear();
+
+			if (bd.second.isEntry) dom.insert(bd.first);
+			else for (auto &bd2 : blocks) dom.insert(bd2.first);
+		}
+
+		//std::cerr << "finding dominators" << std::endl;
+		while (true) {
+			//std::cerr << "  step" << std::endl;
+
+			bool hasChanged = false;
+			for (auto &bd : blocks) {
+				if (bd.second.edges.size() == 0) continue;
+
+				auto &dom = bd.second.dominators;
+				for (auto &edge : bd.second.edges) {
+					auto &pre = blocks[edge.first];
+					hasChanged = hasChanged || discard_if(dom, [&](BasicBlock *b) {
+						return b != bd.first && !pre.isDominatedBy(b);
+					});
+				}
+			}
+
+			if (!hasChanged) break;
+		}
+
+		//std::cerr << "  ...done" << std::endl;
+	}
+
+	void propagateConstraintSets() {
+		std::map<BasicBlock *, bool> finished;
+		while (true) {
+			bool hasChanged = false;
+
+			for (auto &bd : blocks) {
+				if (finished[bd.first]) continue;
+
+				for (auto &dom : bd.second.dominators)
+					if (dom != bd.first && !finished[dom]) goto nextBlock;
+
+				// @todo "OR" together predecessor constraints
+
+				//std::cerr << "propagating for " << bd.first->getName().str() << std::endl;
+				for (auto &dom : bd.second.dominators)
+					// @todo don't inherit from all dominators,
+					// only inherit from direct dominators
+					bd.second.cs.inherit(blocks[dom].cs);
+
+				finished[bd.first] = true;
+				hasChanged = true;
+			nextBlock:
+				continue;
+			}
+
+			if (!hasChanged) return;
+		}
+	}
+
+	bool runOnFunction(llvm::Function &func) override {
+		initialize(func);
 
 		//if (debug_mode) dumpAnalysis();
 
@@ -553,6 +671,7 @@ std::ostream &operator<<(std::ostream &os, OptimizerPass::ValueDomain const &vd)
 }
 
 std::ostream &operator<<(std::ostream &os, OptimizerPass::ConstraintSet const &cs) {
+	if (cs.isBottom) return os << "  constraints: bottom" << std::endl;
 	for (auto &pred : cs.predicates) {
 		pred.first.first->print(errs());
 		switch (pred.second) {
@@ -578,11 +697,15 @@ std::ostream &operator<<(std::ostream &os, OptimizerPass::BlockDomain const &bd)
 	os << std::endl << bd.cs;
 
 	for (auto &edge : bd.edges) {
-		os << "  from " << std::string(edge.first->getName());
+		os << "  from " << edge.first->getName().str();
 		if (edge.second.cond)
 			os << " (" << edge.second.cond->getName().str() << " = " << (edge.second.condV ? "true)" : "false)");
 		os << std::endl;
 	}
+
+	for (auto &dom : bd.dominators)
+		os << "  dom " << dom->getName().str() << std::endl;
+
 	return os;
 }
 

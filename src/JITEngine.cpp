@@ -1,18 +1,20 @@
 #include "JITEngine.h"
 #include "Compiler.h"
 
-#include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/raw_ostream.h"
-
-//#include "llvm/ExecutionEngine/Interpreter.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-
-#include "llvm/IR/Module.h"
-#include "llvm/IR/GlobalValue.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include <llvm/Support/SystemUtils.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
+//#include <llvm/ExecutionEngine/Interpreter.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/ExecutionEngine/MCJIT.h>
+#include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/GlobalValue.h>
+#pragma GCC diagnostic pop
 
 #include <iostream>
 #include <memory>

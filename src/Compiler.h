@@ -8,16 +8,20 @@
 #include <map>
 #include <vector>
 
-#include "llvm/IR/Module.h"                /* Module */
-#include "llvm/IR/Function.h"              /* Function */
-#include "llvm/IR/Constant.h"              /* Constant::getNullValue */
-#include "llvm/IR/IRBuilder.h"             /* IRBuilder */
-#include "llvm/IR/LLVMContext.h"           /* LLVMContext */
-#include "llvm/IR/GlobalValue.h"           /* GlobaleVariable, LinkageTypes */
-#include "llvm/IR/Verifier.h"              /* verifyFunction, verifyModule */
-#include "llvm/Support/Signals.h"          /* Nice stacktrace output */
-#include "llvm/Support/SystemUtils.h"
-#include "llvm/Support/PrettyStackTrace.h"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Constant.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/GlobalValue.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/Signals.h>
+#include <llvm/Support/SystemUtils.h>
+#include <llvm/Support/PrettyStackTrace.h>
+#pragma GCC diagnostic pop
 
 using namespace ast;
 
@@ -156,8 +160,8 @@ protected:
 		for (auto &item : node.items) inspect(item);
 	}
 
-	void visit(Declaration &node) { visit(node, false); }
-	void visit(Declaration &node, bool isGlobal) {
+	void visit(Declaration &node) { declaration(node, false); }
+	void declaration(Declaration &node, bool isGlobal) {
 		for (const auto &decl : node.declarators) {
 			auto dr = (DeclarationRef *)decl.annotation.get();
 			if (values.find(dr) == values.end()) {
@@ -198,11 +202,11 @@ protected:
 	}
 
 	virtual void visit(GlobalVariable &node) {
-		visit(node.declaration, true);
+		declaration(node.declaration, true);
 	}
 
 	virtual void visit(Function &node) {
-		visit(node.declaration, true);
+		declaration(node.declaration, true);
 
 		auto &decl = node.declaration.declarators.front();
 		auto dr = (DeclarationRef *)decl.annotation.get();
@@ -394,7 +398,8 @@ protected:
 		}
 	}
 
-	virtual void visit(ConditionalExpression &node) {
+	virtual void visit(ConditionalExpression &) {
+		// @todo @minor
 	}
 
 	virtual void visit(ExpressionList &node) {
@@ -407,7 +412,7 @@ protected:
 		auto fnType = (llvm::FunctionType *)fnPtrType->getElementType();
 		std::vector<llvm::Value *> args;
 
-		int i = 0;
+		unsigned int i = 0;
 		for (const auto &arg : node.arguments) {
 			value = getValue(*arg);
 			if (i < fnType->getNumParams()) // function might be variadic
