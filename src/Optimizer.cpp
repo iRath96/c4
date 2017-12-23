@@ -279,13 +279,12 @@ struct OptimizerPass : public FunctionPass {
 
 	std::map<BasicBlock *, BlockDomain> blocks;
 	std::map<Value *, ValueDomain> values;
+	bool hasChanged;
 
 	void dumpAnalysis();
 	bool trackValue(Value *v, BasicBlock *block);
 
-	bool iterate(llvm::Function &func) {
-		bool hasChanged = false;
-
+	void iterate(llvm::Function &func) {
 		// update reachability
 		for (auto &b : blocks) {
 			auto prevBd = b.second;
@@ -315,8 +314,6 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &block : func.getBasicBlockList())
 			for (auto &inst : block.getInstList())
 				hasChanged = hasChanged || trackValue(&inst, &block);
-
-		return hasChanged;
 	}
 
 	void fixPHINodes(llvm::Function &func) {
@@ -326,7 +323,7 @@ struct OptimizerPass : public FunctionPass {
 				if (auto phi = dyn_cast<PHINode>(&inst)) phiNodes.push_back(phi);
 
 			for (auto &phi : phiNodes) {
-				for (int i = 0; i < phi->getNumIncomingValues();)
+				for (unsigned i = 0; i < phi->getNumIncomingValues();)
 					if (!blocks[phi->getIncomingBlock(i)].reachable) phi->removeIncomingValue(i);
 					else ++i;
 
@@ -413,7 +410,6 @@ struct OptimizerPass : public FunctionPass {
 
 		for (auto &block : bl) {
 			auto &bd = blocks[block];
-
 			if (!bd.reachable) {
 				removeBlock(block);
 				continue;
@@ -439,9 +435,24 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	void mergeBlock(BasicBlock *block, BasicBlock *replacement) {
+		hasChanged = true;
+
 		if (debug_mode) {
 			std::cerr << "merge block " << block->getName().str()
 				<< " into " << replacement->getName().str() << std::endl;
+		}
+
+		// important: fix all phi usages
+		// (we will always have exactly one predecessor of there is a live phi node)
+		auto &edges = blocks[block].edges;
+		if (edges.size() == 1) for (auto &v : values) {
+			if (auto phi = dyn_cast<PHINode>(v.first)) {
+				if (std::find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
+					continue;
+
+				//std::cerr << "  found phi "; phi->print(errs()); std::cerr << std::endl;
+				for (auto &b : phi->blocks()) if (b == block) b = edges.begin()->first;
+			}
 		}
 
 		auto insertionPoint = &replacement->getInstList().front();
@@ -464,6 +475,8 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	void removeBlock(BasicBlock *block) {
+		hasChanged = true;
+
 		if (debug_mode) std::cout << "removing block " << block->getName().str() << std::endl;
 
 		std::vector<Instruction *> instr; // @todo better copy method?
@@ -492,7 +505,8 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	// @todo @important CSE analysis
-	ValueDomain getVD(Value *value, BasicBlock *block) {
+	// @todo use block info for constraints?
+	ValueDomain getVD(Value *value, BasicBlock *) {
 		if (auto ci = dyn_cast<llvm::ConstantInt>(value)) {
 			int intVal = (int)*ci->getValue().getRawData();
 
@@ -632,14 +646,18 @@ struct OptimizerPass : public FunctionPass {
 				if (it > 0) std::cout << std::endl;
 				std::cout << "iteration #" << it << std::endl;
 			}
-			
-			if (!iterate(func)) break;
+
+			hasChanged = false;
+
+			iterate(func);
 
 			fixPHINodes(func);
 			fixConstants(func);
 			fixBranches(func);
 			removeDeadCode(func);
 			removeUnreachableCode(func);
+
+			if (!hasChanged) break;
 			
 			if (++it > 1000) {
 				std::cerr << "aborting optimization" << std::endl;
@@ -784,7 +802,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		}
 	} else if (auto phi = dyn_cast<PHINode>(v)) {
 		vd.isBottom = true;
-		for (int i = 0; i < phi->getNumIncomingValues(); ++i)
+		for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i)
 			if (blocks[phi->getIncomingBlock(i)].reachable) {
 				auto inVd = getVD(phi->getIncomingValue(i), block);
 				vd = ValueDomain::join(vd, inVd);

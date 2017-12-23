@@ -62,6 +62,10 @@ protected:
 	std::map<const DeclarationRef *, llvm::Value *> values;
 	std::map<const Type *, llvm::Type *> types;
 
+	llvm::BasicBlock *loopHeader, *loopBody, *loopEnd;
+	std::map<std::string, llvm::BasicBlock *> labels;
+	std::map<std::string, std::vector<llvm::BranchInst *>> labelRefs;
+
 	llvm::Type *createType(const Type *type) {
 		auto it = types.find(type);
 		if (it != types.end()) return it->second;
@@ -155,8 +159,21 @@ protected:
 		cres.values.push_back(func);
 	}
 
+	void createLabels(const PtrVector<Label> &labels) {
+		for (auto &lab : labels)
+			if (auto il = dynamic_cast<IdentifierLabel *>(lab.get())) {
+				auto block = llvm::BasicBlock::Create(ctx, il->id, func, 0);
+				builder.CreateBr(block);
+				builder.SetInsertPoint(block);
+
+				this->labels[il->id] = block;
+				for (auto &ref : labelRefs[il->id]) ref->setSuccessor(0, block);
+			} else
+				throw AnalyzerError("only identifier labels supported", lab->pos); // @todo CompilerError
+	}
+
 	virtual void visit(CompoundStatement &node) {
-		// @todo labels
+		createLabels(node.labels);
 		for (auto &item : node.items) inspect(item);
 	}
 
@@ -467,6 +484,7 @@ protected:
 	}
 
 	virtual void visit(ExpressionStatement &node) {
+		createLabels(node.labels);
 		visit(node.expressions);
 	}
 
@@ -489,20 +507,24 @@ protected:
 	}
 
 	virtual void visit(IterationStatement &node) {
-		auto header = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
-		auto body = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
-		auto end = llvm::BasicBlock::Create(ctx, "while-end", func, 0);
+		createLabels(node.labels);
 
-		builder.CreateBr(header);
-		builder.SetInsertPoint(header);
-		builder.CreateCondBr(testZero(getValue(node.condition)), body, end);
-		builder.SetInsertPoint(body);
+		loopHeader = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
+		loopBody = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
+		loopEnd = llvm::BasicBlock::Create(ctx, "while-end", func, 0);
+
+		builder.CreateBr(loopHeader);
+		builder.SetInsertPoint(loopHeader);
+		builder.CreateCondBr(testZero(getValue(node.condition)), loopBody, loopEnd);
+		builder.SetInsertPoint(loopBody);
 		inspect(node.body);
-		builder.CreateBr(header);
-		builder.SetInsertPoint(end);
+		builder.CreateBr(loopHeader);
+		builder.SetInsertPoint(loopEnd);
 	}
 
 	virtual void visit(SelectionStatement &node) {
+		createLabels(node.labels);
+
 		auto header = llvm::BasicBlock::Create(ctx, "if-header", func, 0);
 		auto ifTrue = llvm::BasicBlock::Create(ctx, "if-true", func, 0);
 		auto end = llvm::BasicBlock::Create(ctx, "if-end", func, 0);
@@ -525,11 +547,30 @@ protected:
 		builder.SetInsertPoint(end);
 	}
 
-	virtual void visit(ReturnStatement &node) {
-		builder.CreateRet(matchType(getValue(node.expressions), func->getReturnType()));
-
+	void createDeadBlock() {
+		// @todo don't even bother inserting here!
 		auto deadBlock = llvm::BasicBlock::Create(ctx, "dead-block", func, 0);
 		builder.SetInsertPoint(deadBlock);
+	}
+
+	virtual void visit(ReturnStatement &node) {
+		createLabels(node.labels);
+
+		builder.CreateRet(matchType(getValue(node.expressions), func->getReturnType()));
+		createDeadBlock();
+	}
+
+	virtual void visit(GotoStatement &node) {
+		auto target = labels[node.target];
+		if (!target) target = builder.GetInsertBlock(); // will be patched later
+		labelRefs[node.target].push_back(builder.CreateBr(target));
+		createDeadBlock();
+	}
+
+	virtual void visit(ContinueStatement &node) {
+		createLabels(node.labels);
+		builder.CreateBr(node.keyword == lexer::Token::Keyword::BREAK ? loopEnd : loopHeader);
+		createDeadBlock();
 	}
 };
 
