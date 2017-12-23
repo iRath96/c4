@@ -246,6 +246,10 @@ struct OptimizerPass : public FunctionPass {
 	};
 
 	struct BlockDomain {
+		BlockDomain() {
+			if (debug_mode) std::cerr << "bd created" << std::endl;
+		}
+
 		ConstraintSet cs;
 
 		std::set<BasicBlock *> dominators;
@@ -303,7 +307,7 @@ struct OptimizerPass : public FunctionPass {
 
 			if (!(prevBd == bd)) {
 				if (debug_mode) {
-					std::cout << "change: block " << std::string(b.first->getName());
+					std::cout << "change: block " << b.first->getName().str();
 					std::cout << (bd.reachable ? "" : " unreachable") << std::endl;
 				}
 				hasChanged = true;
@@ -466,13 +470,13 @@ struct OptimizerPass : public FunctionPass {
 					phi->print(errs());
 					std::cerr << std::endl;
 				}
-				
+
 				if (std::find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
 					continue;
 
 				auto phiValue = phi->removeIncomingValue(block, false);
 				for (const auto &edge : edges)
-					phi->addIncoming(phiValue, edge.first);
+					if (blocks[edge.first].reachable) phi->addIncoming(phiValue, edge.first);
 
 				if (debug_mode) {
 					std::cerr << "  changed phi ";
@@ -492,8 +496,6 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &edge : blocks[block].edges) blocks[replacement].edges.insert(edge);
 		blocks[replacement].removeEdge(block);
 
-		blocks.erase(block);
-
 		for (auto &b : blocks) b.second.replaceBlock(block, replacement);
 
 		block->replaceAllUsesWith(replacement);
@@ -501,6 +503,8 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	void removeBlock(BasicBlock *block) {
+		assert(block->getNumUses() == 0);
+
 		hasChanged = true;
 
 		if (debug_mode) std::cout << "removing block " << block->getName().str() << std::endl;
@@ -798,6 +802,8 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		// don't need to update domain, nobody cares about this value 😟
 	} else if (!isa<User>(v) || isa<TerminatorInst>(v)) {
 		// cannot be referenced, do not analyse
+	} else if (auto bc = dyn_cast<BitCastInst>(v)) {
+		vd = getVD(bc->llvm::User::getOperand(0), block); // @todo
 	} else if (
 		dyn_cast<GetElementPtrInst>(v) ||
 		dyn_cast<LoadInst>(v) ||
@@ -819,6 +825,21 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 				vd.isBottom = false;
 				vd.min = lhs.min + rhs.min;
 				vd.max = lhs.max + rhs.max;
+				break;
+
+			case llvm::Instruction::Mul:
+				vd.isBottom = false;
+
+				// @todo overflow protection
+				if (lhs.contains(0) || rhs.contains(0)) vd.min = 0;
+				else
+					vd.min = (lhs.min > 0 && rhs.min < 0 ? lhs.max : lhs.min) * (lhs.min < 0 && rhs.min > 0 ? rhs.max : rhs.min);
+
+				vd.max = std::max(
+					std::max(lhs.min * rhs.min, lhs.min * rhs.max),
+					std::max(lhs.max * rhs.min, lhs.max * rhs.max)
+				);
+
 				break;
 
 			default:

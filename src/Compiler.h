@@ -53,6 +53,10 @@ public:
 	std::unique_ptr<llvm::Module> modPtr;
 
 protected:
+	struct Loop {
+		llvm::BasicBlock *header, *body, *end;
+	};
+
 	bool shouldLoad;
 	llvm::Value *value;
 	llvm::Function *func;
@@ -62,7 +66,7 @@ protected:
 	std::map<const DeclarationRef *, llvm::Value *> values;
 	std::map<const Type *, llvm::Type *> types;
 
-	llvm::BasicBlock *loopHeader, *loopBody, *loopEnd;
+	Loop loop;
 	std::map<std::string, llvm::BasicBlock *> labels;
 	std::map<std::string, std::vector<llvm::BranchInst *>> labelRefs;
 
@@ -507,25 +511,29 @@ protected:
 	}
 
 	virtual void visit(IterationStatement &node) {
+		auto prevLoop = loop;
+
 		createLabels(node.labels);
 
-		loopHeader = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
-		loopBody = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
-		loopEnd = llvm::BasicBlock::Create(ctx, "while-end", func, 0);
+		loop.header = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
+		loop.body = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
+		loop.end = llvm::BasicBlock::Create(ctx, "while-end", func, 0);
 
-		builder.CreateBr(loopHeader);
-		builder.SetInsertPoint(loopHeader);
-		builder.CreateCondBr(testZero(getValue(node.condition)), loopBody, loopEnd);
-		builder.SetInsertPoint(loopBody);
+		builder.CreateBr(loop.header);
+		builder.SetInsertPoint(loop.header);
+		builder.CreateCondBr(testZero(getValue(node.condition)), loop.body, loop.end);
+		builder.SetInsertPoint(loop.body);
 		inspect(node.body);
-		builder.CreateBr(loopHeader);
-		builder.SetInsertPoint(loopEnd);
+		builder.CreateBr(loop.header);
+		builder.SetInsertPoint(loop.end);
+
+		loop = prevLoop;
 	}
 
 	virtual void visit(SelectionStatement &node) {
 		createLabels(node.labels);
 
-		auto header = llvm::BasicBlock::Create(ctx, "if-header", func, 0);
+		auto header = llvm::BasicBlock::Create(ctx, "if-header", func, 0); // only exists for readability
 		auto ifTrue = llvm::BasicBlock::Create(ctx, "if-true", func, 0);
 		auto end = llvm::BasicBlock::Create(ctx, "if-end", func, 0);
 		auto ifFalse = node.when_false.get() ? llvm::BasicBlock::Create(ctx, "if-false", func, 0) : end;
@@ -569,7 +577,7 @@ protected:
 
 	virtual void visit(ContinueStatement &node) {
 		createLabels(node.labels);
-		builder.CreateBr(node.keyword == lexer::Token::Keyword::BREAK ? loopEnd : loopHeader);
+		builder.CreateBr(node.keyword == lexer::Token::Keyword::BREAK ? loop.end : loop.header);
 		createDeadBlock();
 	}
 };
