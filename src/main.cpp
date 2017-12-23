@@ -62,6 +62,7 @@ public:
 		fclose(f);
 
 		*output = std::string(buffer, length);
+		free(buffer);
 
 		hasFinished = true;
 		return true;

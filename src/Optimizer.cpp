@@ -342,6 +342,11 @@ struct OptimizerPass : public FunctionPass {
 				if (values[&inst].isConstant()) constants.push_back(&inst);
 
 			for (auto &constant : constants) {
+				if (debug_mode) {
+					std::cerr << "replacing singular value "; constant->print(errs());
+					std::cerr << std::endl;
+				}
+
 				Value *newValue = llvm::ConstantInt::get(constant->getType(), values[constant].min);
 				constant->replaceAllUsesWith(newValue);
 				values.erase(constant);
@@ -351,18 +356,28 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	void replaceBranch(BasicBlock *origin, BranchInst *branch, BranchInst *newBranch) {
-		for (auto succ : branch->successors()) blocks[succ].removeEdge(origin);
-
-		// @todo recalculate constraint set?
-
 		if (debug_mode) {
 			std::cerr << "replacing "; branch->print(errs());
 			std::cerr << " with "; newBranch->print(errs());
 			std::cerr << std::endl;
 		}
 
-		newBranch->insertAfter(branch);
+		for (auto succ : branch->successors()) blocks[succ].removeEdge(origin);
+		
+		// fix phi values
+		for (auto succ : branch->successors()) {
+			auto s = newBranch->successors();
+			if (std::find(s.begin(), s.end(), succ) != s.end()) continue;
+
+			// deleted path
+			for (auto &phi : succ->phis()) phi.removeIncomingValue(origin);
+		}
+		
+		newBranch->insertBefore(branch);
 		branch->eraseFromParent();
+		values.erase(branch); // @todo investigate why this is needed
+
+		// @todo recalculate constraint set?
 
 		Condition c; // @todo not DRY
 		c.cond = newBranch->isConditional() ? newBranch->getCondition() : nullptr;
@@ -375,7 +390,7 @@ struct OptimizerPass : public FunctionPass {
 		}
 	}
 
-	void fixBranches(llvm::Function &func) { // @todo return hasChanged! / invalidates dead-code analysis
+	void fixBranches(llvm::Function &func) { // @todo invalidates dead-code analysis?
 		for (auto &block : func.getBasicBlockList()) {
 			std::vector<BranchInst *> branches; // conditional branches
 			for (auto &inst : block.getInstList())
@@ -442,18 +457,29 @@ struct OptimizerPass : public FunctionPass {
 				<< " into " << replacement->getName().str() << std::endl;
 		}
 
-		// important: fix all phi usages
-		// (we will always have exactly one predecessor of there is a live phi node)
+		// fix all phi usages
 		auto &edges = blocks[block].edges;
-		if (edges.size() == 1) for (auto &v : values) {
+		for (auto &v : values)
 			if (auto phi = dyn_cast<PHINode>(v.first)) {
+				if (debug_mode) {
+					std::cerr << "  found phi ";
+					phi->print(errs());
+					std::cerr << std::endl;
+				}
+				
 				if (std::find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
 					continue;
 
-				//std::cerr << "  found phi "; phi->print(errs()); std::cerr << std::endl;
-				for (auto &b : phi->blocks()) if (b == block) b = edges.begin()->first;
+				auto phiValue = phi->removeIncomingValue(block, false);
+				for (const auto &edge : edges)
+					phi->addIncoming(phiValue, edge.first);
+
+				if (debug_mode) {
+					std::cerr << "  changed phi ";
+					phi->print(errs());
+					std::cerr << std::endl;
+				}
 			}
-		}
 
 		auto insertionPoint = &replacement->getInstList().front();
 		std::vector<Instruction *> instr; // @todo copy
@@ -461,8 +487,8 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &i : instr) i->moveBefore(insertionPoint);
 
 		// @todo merge constraintSet?
-		blocks[replacement].isEntry = blocks[block].isEntry;
 		// dominators stay the same (@todo really?)
+		blocks[replacement].isEntry = blocks[block].isEntry;
 		for (auto &edge : blocks[block].edges) blocks[replacement].edges.insert(edge);
 		blocks[replacement].removeEdge(block);
 
