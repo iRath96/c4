@@ -247,3 +247,412 @@ bool PointerType::isCompatible(const Type &other) const {
 bool NullPointerType::isCompatible(const Type &other) const {
 	return dynamic_cast<const ArithmeticType *>(&other) || dynamic_cast<const PointerType *>(&other);
 }
+
+#pragma mark - Analyzer
+
+void Analyzer::visit(REPLStatement &node) { inspect(node.statement); }
+
+void Analyzer::visit(CaseLabel &node) {
+	if (!scopes.find<SwitchScope>().get()) error("'case' statement not in switch statement", node);
+}
+
+void Analyzer::visit(DefaultLabel &node) {
+	if (!scopes.find<SwitchScope>().get()) error("'default' statement not in switch statement", node);
+}
+
+void Analyzer::visit(IdentifierLabel &node) {
+	auto &scope = *scopes.find<FunctionScope>();
+	scope.resolveLabel(node.id, node.pos);
+}
+
+void Analyzer::createLabels(PtrVector<Label> &labels) {
+	for (auto &lab : labels) inspect(lab);
+}
+
+void Analyzer::visit(GotoStatement &node) {
+	createLabels(node.labels);
+
+	auto &scope = *scopes.find<FunctionScope>();
+	scope.referenceLabel(node.target, node.pos); // @todo target pos
+}
+
+void Analyzer::visit(ContinueStatement &node) {
+	createLabels(node.labels);
+
+	if (!scopes.find<IterationScope>().get())
+		error(
+			std::string("'") +
+			(node.keyword == lexer::Token::Keyword::BREAK ? "break" : "continue") +
+			"' statement not in loop statement",
+			node
+		);
+}
+
+void Analyzer::visitBlockItems(CompoundStatement &node) {
+	for (auto &item : node.items) inspect(item);
+}
+
+void Analyzer::visit(CompoundStatement &node) {
+	createLabels(node.labels);
+
+	scopes.execute<BlockScope>([&]() {
+		visitBlockItems(node);
+	});
+}
+
+void Analyzer::visit(TypeName &node) {
+	Type::create(node.specifiers, node.declarator, node.pos, scopes);
+}
+
+void Analyzer::visit(Declaration &node) { declaration(node, false); }
+void Analyzer::declaration(Declaration &node, bool isGlobal) {
+	auto scope = scopes.find<BlockScope>();
+	auto specifiers = node.specifiers;
+
+	Ptr<Type> type = Type::create(specifiers, node.pos, scopes);
+	if (node.declarators.empty()) {
+		for (auto &spec : node.specifiers)
+			if (auto ct = dynamic_cast<const ComposedTypeSpecifier *>(spec.get()))
+				if (ct->isNamed() && ct->isQualified())
+					// some composed type was declared, this is valid.
+					return;
+
+		error("declaration does not declare anything", node);
+	}
+
+	for (auto &decl : node.declarators) {
+		Ptr<Type> dtype;
+		scopes.execute<FunctionScope>([&]() {
+			inspect(decl);
+			dtype = type->applyDeclarator(decl, scopes);
+		});
+
+		if (!dtype->isComplete()) {
+			if (isGlobal) {
+				auto scope = scopes.find<FileScope>();
+				scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
+			} else
+				error("variable has incomplete type '" + dtype->describe() + "'", node);
+		}
+
+		// find identifier
+		if (decl.isAbstract())
+			// @todo assert(false) here
+			error("abstract declarator in declaration", node);
+		else {
+			bool isDefinition = decl.initializer.get();
+			if (!isGlobal && !dtype->isFunction()) isDefinition = true;
+			decl.annotate(scope->declareVariable(decl.name, dtype, decl.pos, isDefinition));
+		}
+
+		if (decl.initializer.get()) {
+			auto itp = exprType(*decl.initializer);
+			if (!Type::canCompare(*itp.type, *dtype, true))
+				error(
+					"initializing '" + dtype->describe() + "' with an expression of " +
+					"incompatible type '" + itp.type->describe() + "'",
+					*decl.initializer
+				);
+		}
+	}
+}
+
+void Analyzer::visit(GlobalVariable &node) {
+	declaration(node.declaration, true);
+}
+
+void Analyzer::visit(Function &node) {
+	auto &decl = node.declaration.declarators.front();
+	if (decl.modifiers.empty())
+		error("expected ';' after top level declarator", node);
+
+	auto t = Type::create(node.declaration.specifiers, node.pos, scopes);
+
+	auto scope = scopes.find<BlockScope>();
+	scopes.execute<FunctionScope>([&]() {
+		scopes.execute<FunctionScope>([&]() {
+			// structs need to have FunctionScope
+			// @todo not DRY with Declaration &, also: not very elegant
+			t = t->applyDeclarator(decl, scopes);
+		});
+
+		auto fn = dynamic_cast<FunctionType *>(t.get());
+		if (!fn->returnType->isComplete())
+			error("incomplete result type in function definition", node);
+
+		decl.annotate(scope->declareVariable(decl.name, t, node.pos, true));
+
+		auto scope = scopes.find<FunctionScope>(); // @todo as callback param?
+		scope->returnType = fn->returnType;
+
+		if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
+			for (auto &param : plist->parameters) {
+				if (param.declarator.isAbstract())
+					error("parameter name omitted", param);
+
+				inspect(param);
+			}
+		} // @todo else assert(false);
+
+		for (auto &declaration : node.declarations)
+			inspect(declaration);
+
+		visitBlockItems(node.body);
+	});
+}
+
+void Analyzer::visit(ParameterDeclaration &node) {
+	Ptr<Type> type = Type::create(node.specifiers, node.declarator, node.pos, scopes);
+
+	if (node.declarator.isAbstract()) return;
+
+	auto scope = scopes.find<FunctionScope>();
+	node.annotate(scope->declareVariable(node.declarator.name, type, node.declarator.pos, true));
+}
+
+void Analyzer::visit(IdentifierExpression &node) {
+	Ptr<DeclarationRef> dr;
+	if (!scopes.resolveVariable(node.text, dr))
+		error("use of undeclared identifier '" + std::string(node.text) + "'", node);
+
+	node.annotate(dr);
+}
+
+void Analyzer::visit(Constant &node) { node.annotate(node.isChar ? charType : (node.value ? intType : nullptrType)); }
+void Analyzer::visit(StringLiteral &node) { node.annotate(stringType); }
+
+void Analyzer::visit(CastExpression &node) {
+	auto tp = exprType(*node.expression);
+
+	auto &target = node.type;
+	Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos, scopes);
+
+	if (type->isVoid())
+		node.annotate(new TypePair(false, type));
+	else if (!tp.type->isScalar())
+		error("operand of type '" + tp.type->describe() + "' where arithmetic or pointer type is required", node);
+	else
+		node.annotate(new TypePair(tp.lvalue, type));
+}
+
+void Analyzer::visit(UnaryExpression &node) {
+	using Punctuator = lexer::Token::Punctuator;
+
+	auto tp = exprType(*node.operand);
+
+	switch (node.op) {
+	case Punctuator::ASTERISK:
+		node.annotate(new TypePair(true, tp.type->dereference(node.pos)));
+		break;
+
+	case Punctuator::BIT_AND:
+		if (!tp.lvalue)
+			error("cannot take the address of an rvalue of type '" + tp.type->describe() + "'", node);
+		node.annotate(new TypePair(false, tp.type->reference()));
+		break;
+
+	default:
+		// @todo
+		node.annotate(new TypePair(tp.lvalue, tp.type));
+		break;
+	}
+}
+
+void Analyzer::visit(BinaryExpression &node) {
+	using namespace lexer;
+	using Op = lexer::Token::Punctuator;
+	using Prec = lexer::Token::Precedence;
+
+	auto lhs = exprType(*node.lhs);
+	auto rhs = exprType(*node.rhs);
+
+	switch (node.op) {
+	case Op::PLUS: node.annotate(new TypePair(false, Type::add(lhs.type, rhs.type, node.pos))); break;
+	case Op::MINUS: node.annotate(new TypePair(false, Type::subtract(lhs.type, rhs.type, node.pos))); break;
+	default:
+		switch (Token::precedence(node.op)) {
+		case Prec::MULTIPLICATIVE: // integer for %, arithmetic otherwise
+		case Prec::SHIFT: // integer
+		case Prec::AND:
+		case Prec::INCLUSIVE_OR:
+		case Prec::EXCLUSIVE_OR:
+		{
+			if (!lhs.type->isArithmetic() || !rhs.type->isArithmetic())
+				error(
+					"invalid operands to binary expression ('" + lhs.type->describe() +
+					"' and '" + rhs.type->describe() + "')",
+					node
+				);
+			node.annotate(new TypePair(false, lhs.type)); // @todo?
+			break;
+		}
+
+		case Prec::LOGICAL_OR:
+		case Prec::LOGICAL_AND:
+			if (!lhs.type->isScalar() || !rhs.type->isScalar())
+				error(
+					"invalid operands to binary expression ('" + lhs.type->describe() +
+					"' and '" + rhs.type->describe() + "')",
+					node
+				);
+			node.annotate(intType);
+			break;
+
+		case Prec::ASSIGNMENT:
+			if (!lhs.lvalue) error("expression is not assignable", node);
+			if (!Type::canCompare(*lhs.type, *rhs.type, true))
+				error(
+					"assigning to '" + lhs.type->describe() +
+					"' from incompatible type '" + rhs.type->describe() + "'",
+					*node.rhs
+				);
+			node.annotate(new TypePair(false, lhs.type));
+			break;
+
+		case Prec::EQUALITY: {
+			if (!Type::canCompare(*lhs.type, *rhs.type))
+				error(
+					"comparison of distinct pointer types ('" + lhs.type->describe() + "' and '" +
+					rhs.type->describe() + "')",
+					node
+				);
+			node.annotate(intType);
+			break;
+		}
+
+		case Prec::RELATIONAL:
+			if (!lhs.type->isCompatible(*rhs.type))
+				error(
+					"comparison of distinct pointer types ('" + lhs.type->describe() + "' and '" +
+					rhs.type->describe() + "')",
+					node
+				);
+			node.annotate(intType);
+			break;
+
+		default:
+			error("operator not implemented", node);
+		}
+	}
+}
+
+void Analyzer::visit(ConditionalExpression &node) {
+	auto cond = exprType(*node.condition);
+	if (!cond.type->isScalar())
+		error(
+			"used type '" + cond.type->describe() +
+			"' where arithmetic or pointer type is required", *node.condition
+		);
+
+	auto &lhs = exprType(*node.when_true);
+	exprType(*node.when_false);
+
+	// @todo compare lhs and rhs type
+
+	node.annotate(new TypePair(lhs.lvalue, lhs.type));
+}
+
+void Analyzer::visit(ExpressionList &node) {
+	auto lastType = voidType;
+	for (auto &child : node.children) {
+		inspect(*child);
+		lastType = child->annotation;
+	}
+	node.annotate(lastType);
+}
+
+void Analyzer::visit(CallExpression &node) {
+	auto tp = exprType(*node.function);
+
+	PtrVector<Type> argumentTypes;
+	for (auto &arg : node.arguments) {
+		auto tp = exprType(*arg);
+		argumentTypes.push_back(tp.type);
+	}
+
+	node.annotate(new TypePair(false, tp.type->call(argumentTypes, node.pos)));
+}
+
+void Analyzer::visit(SubscriptExpression &node) {
+	auto base = exprType(*node.base);
+	auto subscript = exprType(node.subscript);
+
+	auto result = Type::add(base.type, subscript.type, node.pos);
+
+	node.annotate(new TypePair(true, result->dereference(node.pos)));
+}
+
+void Analyzer::visit(MemberExpression &node) {
+	auto base = exprType(*node.base);
+
+	if (node.dereference) {
+		base.lvalue = true;
+		base.type = base.type->dereference(node.pos);
+	}
+
+	node.annotate(new TypePair(base.lvalue, base.type->getMember(node.id, node.pos).type));
+}
+
+void Analyzer::visit(PostExpression &node) {
+	auto t = exprType(*node.base);
+	// @todo test if this makes sense
+	node.annotate(new TypePair(false, t.type));
+}
+
+void Analyzer::visit(ExpressionStatement &node) {
+	createLabels(node.labels);
+	exprType(node.expressions);
+}
+
+void Analyzer::visit(SizeofExpressionTypeName &node) {
+	node.annotate(intType);
+}
+
+void Analyzer::visit(SizeofExpressionUnary &node) {
+	exprType(*node.expression);
+	node.annotate(intType);
+}
+
+void Analyzer::visit(IterationStatement &node) {
+	createLabels(node.labels);
+
+	auto cond = exprType(node.condition);
+	if (!cond.type->isScalar())
+		error(
+			"statement requires expression of scalar type ('" + cond.type->describe() +
+			"' invalid)", node.condition
+		);
+
+	scopes.execute<IterationScope>([&]() {
+		inspect(node.body);
+	});
+}
+
+void Analyzer::visit(SelectionStatement &node) {
+	createLabels(node.labels);
+
+	auto cond = exprType(node.condition);
+	if (!cond.type->isScalar())
+		error(
+			"statement requires expression of scalar type ('" + cond.type->describe() +
+			"' invalid)", node.condition
+		);
+
+	inspect(node.when_true);
+	inspect(node.when_false);
+}
+
+void Analyzer::visit(ReturnStatement &node) {
+	createLabels(node.labels);
+
+	auto scope = scopes.find<FunctionScope>();
+	auto expectedType = scope->returnType;
+	auto givenType = exprType(node.expressions);
+
+	if (!Type::canCompare(*expectedType, *givenType.type, true))
+		throw AnalyzerError(
+			"returning '" + givenType.type->describe() + "' from a function with incompatible " +
+			"result type '" + expectedType->describe() + "'",
+			node.pos
+		);
+}
