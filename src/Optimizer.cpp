@@ -35,6 +35,14 @@ bool discard_if(std::set<T, Comp, Alloc>& c, Predicate pred) {
 using namespace llvm;
 extern bool debug_mode;
 
+void debug_print(std::string prefix, Value *value) {
+	if (!debug_mode) return;
+
+	std::cout << prefix;
+	value->print(outs());
+	std::cout << std::endl;
+}
+
 struct OptimizerPass : public FunctionPass {
 	static char ID;
 	OptimizerPass() : FunctionPass(ID) {}
@@ -117,8 +125,8 @@ struct OptimizerPass : public FunctionPass {
 			if (a == b) return true;
 			switch (a) {
 			case ICmpInst::ICMP_EQ: return b == ICmpInst::ICMP_SGE || b == ICmpInst::ICMP_SLE;
-			case ICmpInst::ICMP_SLE: return b == ICmpInst::ICMP_SLT;
-			case ICmpInst::ICMP_SGE: return b == ICmpInst::ICMP_SGT;
+			case ICmpInst::ICMP_SLT: return b == ICmpInst::ICMP_SLE;
+			case ICmpInst::ICMP_SGT: return b == ICmpInst::ICMP_SGE;
 			default: return false;
 			}
 		}
@@ -346,10 +354,7 @@ struct OptimizerPass : public FunctionPass {
 				if (values[&inst].isConstant()) constants.push_back(&inst);
 
 			for (auto &constant : constants) {
-				if (debug_mode) {
-					std::cerr << "replacing singular value "; constant->print(errs());
-					std::cerr << std::endl;
-				}
+				debug_print("replacing singular value", constant);
 
 				Value *newValue = llvm::ConstantInt::get(constant->getType(), values[constant].min);
 				constant->replaceAllUsesWith(newValue);
@@ -465,11 +470,7 @@ struct OptimizerPass : public FunctionPass {
 		auto &edges = blocks[block].edges;
 		for (auto &v : values)
 			if (auto phi = dyn_cast<PHINode>(v.first)) {
-				if (debug_mode) {
-					std::cerr << "  found phi ";
-					phi->print(errs());
-					std::cerr << std::endl;
-				}
+				debug_print("  found phi", phi);
 
 				if (std::find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
 					continue;
@@ -478,11 +479,7 @@ struct OptimizerPass : public FunctionPass {
 				for (const auto &edge : edges)
 					if (blocks[edge.first].reachable) phi->addIncoming(phiValue, edge.first);
 
-				if (debug_mode) {
-					std::cerr << "  changed phi ";
-					phi->print(errs());
-					std::cerr << std::endl;
-				}
+				debug_print("  changed phi", phi);
 			}
 
 		auto insertionPoint = &replacement->getInstList().front();
@@ -511,7 +508,7 @@ struct OptimizerPass : public FunctionPass {
 
 		std::vector<Instruction *> instr; // @todo better copy method?
 		for (auto &i : block->getInstList()) instr.push_back(&i);
-		for (auto &i : instr) removeInstruction(i);
+		for (auto &i : instr) removeInstruction(i, false); // @todo why is efp=false needed?
 
 		for (auto &b : blocks) b.second.removeEdge(block);
 		blocks.erase(block);
@@ -519,19 +516,15 @@ struct OptimizerPass : public FunctionPass {
 		block->eraseFromParent();
 	}
 
-	void removeInstruction(Instruction *instr) {
-		if (debug_mode) {
-			std::cerr << "removing instruction ";
-			instr->print(errs());
-			std::cerr << std::endl;
-		}
+	void removeInstruction(Instruction *instr, bool efp = true) {
+		debug_print("removing instruction", instr);
 
 		for (auto &b : blocks)
 			// @todo would it suffice to only update blocks[block] here?
 			b.second.cs.removeInstruction(instr);
 
 		values.erase(instr);
-		instr->eraseFromParent();
+		if (efp) instr->eraseFromParent();
 	}
 
 	// @todo @important CSE analysis
@@ -687,19 +680,14 @@ struct OptimizerPass : public FunctionPass {
 			removeDeadCode(func);
 			removeUnreachableCode(func);
 
+			if (debug_mode) func.print(errs());
+
 			if (!hasChanged) break;
 			
 			if (++it > 1000) {
 				std::cerr << "aborting optimization" << std::endl;
 				return false;
 			}
-
-			/*
-			if (debug_mode) {
-				std::cout << "\n\niterated..." << std::endl;
-				dumpAnalysis();
-			}
-			*/
 		}
 
 		if (debug_mode) {
@@ -723,12 +711,12 @@ std::ostream &operator<<(std::ostream &os, OptimizerPass::ConstraintSet const &c
 	for (auto &pred : cs.predicates) {
 		pred.first.first->print(errs());
 		switch (pred.second) {
-		case llvm::CmpInst::ICMP_EQ:  os << " == "; break;
-		case llvm::CmpInst::ICMP_NE:  os << " != "; break;
-		case llvm::CmpInst::ICMP_SLE: os << " <= "; break;
-		case llvm::CmpInst::ICMP_SLT: os << " < ";  break;
-		case llvm::CmpInst::ICMP_SGE: os << " >= "; break;
-		case llvm::CmpInst::ICMP_SGT: os << " > ";  break;
+		case CmpInst::ICMP_EQ:  os << " == "; break;
+		case CmpInst::ICMP_NE:  os << " != "; break;
+		case CmpInst::ICMP_SLE: os << " <= "; break;
+		case CmpInst::ICMP_SLT: os << " < ";  break;
+		case CmpInst::ICMP_SGE: os << " >= "; break;
+		case CmpInst::ICMP_SGT: os << " > ";  break;
 		default: os << " ? ";
 		}
 		pred.first.second->print(errs());
@@ -779,7 +767,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		bool hasSideEffect = !(
 			dyn_cast<Constant>(v) ||
 			dyn_cast<BinaryOperator>(v) ||
-			dyn_cast<ICmpInst>(v) || // we can do this, div-by-zero is undefined behavior!
+			dyn_cast<ICmpInst>(v) || // we can optimize this, div-by-zero is undefined behavior!
 			dyn_cast<PHINode>(v) ||
 			dyn_cast<SelectInst>(v)
 		);
@@ -817,18 +805,46 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		auto lhs = getVD(add->getOperand(0), block);
 		auto rhs = getVD(add->getOperand(1), block);
 
-		if (lhs.isTop() || lhs.isBottom) vd = lhs;
-		else if (rhs.isTop() || rhs.isBottom) vd = rhs;
+		if (lhs.isBottom) vd = lhs;
+		else if (rhs.isBottom) vd = rhs;
 		else {
+			vd.isBottom = false;
+
 			switch (add->getOpcode()) {
-			case llvm::Instruction::Add:
-				vd.isBottom = false;
+			case Instruction::Add:
+				if (lhs.isTop() || rhs.isTop()) {
+					vd = ValueDomain::top(false);
+					break;
+				}
+
 				vd.min = lhs.min + rhs.min;
 				vd.max = lhs.max + rhs.max;
+
 				break;
 
-			case llvm::Instruction::Mul:
-				vd.isBottom = false;
+			case Instruction::Sub: {
+				auto epred = blocks[block].cs.get(add->getOperand(0), add->getOperand(1));
+
+				vd.min = lhs.min - rhs.max;
+				vd.max = lhs.max - rhs.min;
+
+				switch (epred) {
+				case CmpInst::ICMP_EQ: vd.min = vd.max = 0; break;
+				case CmpInst::ICMP_SGT: vd.min = std::max(vd.min, 1); break;
+				case CmpInst::ICMP_SGE: vd.min = std::max(vd.min, 0); break;
+				case CmpInst::ICMP_SLT: vd.max = std::min(vd.max, -1); break;
+				case CmpInst::ICMP_SLE: vd.max = std::min(vd.max, 0); break;
+				default: break;
+				}
+
+				break;
+			}
+
+			case Instruction::Mul:
+				if (lhs.isTop() || rhs.isTop()) {
+					vd = ValueDomain::top(false);
+					break;
+				}
 
 				// @todo overflow protection
 				if (lhs.contains(0) || rhs.contains(0)) vd.min = 0;
@@ -897,10 +913,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		vd.min = vFalse ? 0 : 1;
 		vd.max = vTrue ? 1 : 0;
 	} else {
-		if (debug_mode) {
-			std::cerr << "unsupported instruction" << std::endl;
-			v->print(errs());
-		}
+		debug_print("unsupported instruction", v);
 		vd = ValueDomain::top(false);
 	}
 
