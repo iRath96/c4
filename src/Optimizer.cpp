@@ -820,6 +820,8 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 				vd.min = lhs.min + rhs.min;
 				vd.max = lhs.max + rhs.max;
 
+				// @todo test if one side is zero! (also test predicates?) -- also for sub, mul!
+
 				break;
 
 			case Instruction::Sub: {

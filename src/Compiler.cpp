@@ -137,10 +137,11 @@ void Compiler::declaration(Declaration &node, bool isGlobal) {
 			} else if (isGlobal) {
 				auto type = createType(dr->type.get());
 
+				bool external = node.isExternal;
 				auto global = new llvm::GlobalVariable(
 					*mod, type, false,
-					llvm::GlobalValue::CommonLinkage,
-					llvm::Constant::getNullValue(type),
+					external ? llvm::GlobalValue::ExternalLinkage : llvm::GlobalValue::CommonLinkage,
+					external ? nullptr : llvm::Constant::getNullValue(type),
 					decl.name
 				);
 

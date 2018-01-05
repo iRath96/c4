@@ -571,15 +571,17 @@ protected:
 
 	bool read_external_declaration(Ptr<ExternalDeclaration> &node)
 	OPTION
+		NON_UNIQUE
+		
 		auto pos = peek().pos;
 
 		PtrVector<TypeSpecifier> specifiers;
 		Declarator declarator;
 		bool has_declarator, needs_declaration_list, needs_initialization, is_declaration;
+		bool is_external = read_keyword(Token::Keyword::EXTERN);
 
 		NON_OPTIONAL(read_declaration_specifiers(specifiers))
 
-		NON_UNIQUE
 		has_declarator = read_declarator(declarator, false);
 		needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
 		needs_initialization = has_declarator && peek().punctuator == Token::Punctuator::ASSIGN;
@@ -593,6 +595,7 @@ protected:
 			node.reset(n);
 
 			n->declaration.specifiers = std::move(specifiers);
+			n->declaration.isExternal = is_external;
 
 			if (needs_initialization) {
 				shift(); // consume assign

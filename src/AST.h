@@ -283,6 +283,8 @@ struct ReturnStatement : JumpStatement {
 #pragma mark - Declarations
 
 struct Declaration : BlockItem {
+	bool isExternal; // @todo storage class
+
 	PtrVector<TypeSpecifier> specifiers;
 	Vector<Declarator> declarators;
 	ACCEPT
