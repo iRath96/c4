@@ -157,7 +157,11 @@ public:
 
 	int depth;
 	virtual bool next(Ptr<External> *result) {
-		if (this->i && peek().kind == Token::Kind::END) return false;
+		if (peek().kind == Token::Kind::END) {
+			if (!this->i)
+				throw ParserError("empty file", lexer::TextPosition());
+			return false;
+		}
 
 		depth = 0;
 		if (allowTLS) {

@@ -1,1 +1,1 @@
-tests/parser/empty/input.c:1:1: error: type specifier expected
+tests/parser/empty/input.c:1:1: error: empty file
