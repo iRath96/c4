@@ -128,6 +128,7 @@ struct DeclaratorModifier : Node {};
 struct DeclaratorParameterList : DeclaratorModifier {
 	ast::Vector<ast::ParameterDeclaration> parameters;
 	bool isVariadic = false;
+	bool removedVoid = false;
 	ACCEPT
 };
 

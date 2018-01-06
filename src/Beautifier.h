@@ -102,7 +102,7 @@ protected:
 
 	virtual void visit(DeclaratorParameterList &node) { // @todo variadic
 		std::cout << "(";
-		if (node.parameters.empty()) std::cout << "void";
+		if (node.removedVoid) std::cout << "void";
 		else join(node.parameters, ", ");
 		std::cout << ")";
 	}

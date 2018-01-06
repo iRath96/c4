@@ -414,8 +414,10 @@ protected:
 				if (p.declarator.isAbstract() && p.declarator.modifiers.empty() && p.specifiers.size() == 1) {
 					auto s = p.specifiers.front();
 					if (auto nt = dynamic_cast<NamedTypeSpecifier *>(s.get()))
-						if (nt->id == "void")
+						if (nt->id == "void") {
 							p_suffix->parameters.clear(); // no parameters taken
+							p_suffix->removedVoid = true;
+						}
 				}
 			}
 
@@ -427,6 +429,8 @@ protected:
 		}
 
 		i = last_good_i;
+
+		FAIL_IF_EMPTY
 	OTHERWISE_FAIL("direct declarator expected")
 
 	bool read_type_name(TypeName &node)

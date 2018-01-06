@@ -126,6 +126,11 @@ void parse(const char *filename) {
 		exit(1);
 	}
 
+	if (debug_mode) {
+		parser.print_debug_tree();
+		parser.print_context();
+	}
+
 	if (mode == PRINT_AST) {
 		Beautifier beautifier(buffer.createChild());
 		beautifier.drain();
