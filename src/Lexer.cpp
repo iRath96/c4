@@ -345,7 +345,7 @@ void Lexer::replace_eol(std::string &input) {
 	size_t length = input.length();
 
 	int skip = 0;
-	for (int i = 0; i < length; ++i) {
+	for (size_t i = 0; i < length; ++i) {
 		char c_in = input[i + skip];
 		char c_out = c_in;
 
