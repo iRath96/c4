@@ -108,7 +108,13 @@ protected:
 	}
 
 	virtual void visit(Declarator &node) {
+		bool isAbstractFn = !node.modifiers.empty()
+			&& !dynamic_cast<DeclaratorPointer *>(node.modifiers.back().get())
+			&& node.isAbstract();
+
 		for (auto &mod : node.modifiers) {
+			if (isAbstractFn && mod == node.modifiers.back())
+				continue;
 			std::cout << "(";
 			if (dynamic_cast<DeclaratorPointer *>(mod.get())) // @todo DeclaratorPrefix class?
 				inspect(mod);
@@ -120,6 +126,8 @@ protected:
 		for (auto it = node.modifiers.rbegin(); it != node.modifiers.rend(); ++it) {
 			if (!dynamic_cast<DeclaratorPointer *>(it->get()))
 				inspect(*it);
+			if (isAbstractFn && *it == node.modifiers.back())
+				continue;
 			std::cout << ")";
 		}
 
