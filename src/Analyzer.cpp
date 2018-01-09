@@ -300,8 +300,12 @@ void Analyzer::visit(CompoundStatement &node) {
 	});
 }
 
+Ptr<Type> Analyzer::typeFromTypeName(TypeName &node) {
+	return Type::create(node.specifiers, node.declarator, node.pos, scopes);
+}
+
 void Analyzer::visit(TypeName &node) {
-	Type::create(node.specifiers, node.declarator, node.pos, scopes);
+	typeFromTypeName(node);
 }
 
 void Analyzer::visit(Declaration &node) { declaration(node, false); }
@@ -425,7 +429,7 @@ void Analyzer::visit(CastExpression &node) {
 	auto tp = exprType(*node.expression);
 
 	auto &target = node.type;
-	Ptr<Type> type = Type::create(target.specifiers, target.declarator, target.pos, scopes);
+	Ptr<Type> type = typeFromTypeName(target);
 
 	if (type->isVoid())
 		node.annotate(new TypePair(false, type));
@@ -605,6 +609,7 @@ void Analyzer::visit(ExpressionStatement &node) {
 }
 
 void Analyzer::visit(SizeofExpressionTypeName &node) {
+	node.type.annotate(new TypePair(false, typeFromTypeName(node.type)));
 	node.annotate(intType);
 }
 

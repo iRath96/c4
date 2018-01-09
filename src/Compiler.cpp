@@ -58,6 +58,7 @@ llvm::Value *Compiler::getValue(Expression &expr, bool load) {
 }
 
 llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
+	if (type->isVoidTy()) return nullptr; // discard value ("return (void)...;")
 	if (type == value->getType()) return value;
 	if (value->getType()->isPointerTy())
 		return builder.CreatePointerCast(value, type);
@@ -65,8 +66,8 @@ llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
 }
 
 Compiler::Compiler(Source<Ptr<ast::External>> *source, std::string moduleName)
-: Stream<Ptr<External>, CompilerResult>(source), builder(ctx), allocaBuilder(ctx) {
-	mod = new llvm::Module(moduleName, ctx);
+: Stream<Ptr<External>, CompilerResult>(source), builder(ctx), allocaBuilder(ctx), mod(new llvm::Module(moduleName, ctx)),
+dataLayout(mod) {
 	modPtr.reset(mod);
 }
 
@@ -211,7 +212,8 @@ void Compiler::visit(Function &node) {
 void Compiler::visit(IdentifierExpression &node) {
 	auto dr = (DeclarationRef *)node.annotation.get();
 	value = values[dr];
-	if (shouldLoad) value = builder.CreateLoad(value, "rval");
+	if (shouldLoad && !dr->type->isFunction()) // cannot load functions
+		value = builder.CreateLoad(value, "rval");
 }
 
 void Compiler::visit(Constant &node) {
@@ -366,7 +368,15 @@ void Compiler::visit(ExpressionList &node) {
 void Compiler::visit(CallExpression &node) {
 	auto fn = getValue(*node.function, false);
 	auto fnPtrType = (llvm::PointerType *)fn->getType();
+
+	if (!llvm::isa<llvm::FunctionType>(fnPtrType->getElementType())) {
+		// @todo not elegant
+		fn = builder.CreateLoad(value, "deref");
+		fnPtrType = (llvm::PointerType *)fn->getType();
+	}
+
 	auto fnType = (llvm::FunctionType *)fnPtrType->getElementType();
+
 	std::vector<llvm::Value *> args;
 
 	unsigned int i = 0;
@@ -380,8 +390,18 @@ void Compiler::visit(CallExpression &node) {
 	value = builder.CreateCall(fn, args);
 }
 
+void Compiler::visit(CastExpression &node) {
+	value = getValue(*node.expression);
+}
+
 void Compiler::visit(SubscriptExpression &node) {
-	auto lhs = getValue(*node.base), rhs = getValue(node.subscript);
+	// @todo not elegant
+	auto lhsType = createType(((DeclarationRef *)node.base->annotation.get())->type.get());
+	auto rhsType = createType(((DeclarationRef *)node.subscript.annotation.get())->type.get());
+
+	auto lhs = matchType(getValue(*node.base), lhsType);
+	auto rhs = matchType(getValue(node.subscript), rhsType);
+
 	bool lptr = lhs->getType()->isPointerTy();
 	value = builder.CreateGEP(lptr ? lhs : rhs, lptr ? rhs : lhs, "gep");
 	if (shouldLoad) value = builder.CreateLoad(value, "subs");
@@ -429,13 +449,15 @@ void Compiler::visit(ExpressionStatement &node) {
 }
 
 void Compiler::visit(SizeofExpressionTypeName &node) {
-	auto &type = ((TypePair *)node.annotation.get())->type;
-	value = builder.getInt32((uint32_t)type->getSize(lexer::TextPosition())); // @todo
+	auto &type = ((TypePair *)node.type.annotation.get())->type;
+	size_t size = dataLayout.getTypeAllocSize(createType(type.get()));
+	value = builder.getInt32((uint32_t)size);
 }
 
-void Compiler::visit(SizeofExpressionUnary &node) {
+void Compiler::visit(SizeofExpressionUnary &node) { // @todo not DRY, @todo remove my own getSize
 	auto &type = ((TypePair *)node.annotation.get())->type;
-	value = builder.getInt32((uint32_t)type->getSize(lexer::TextPosition()));
+	size_t size = dataLayout.getTypeAllocSize(createType(type.get()));
+	value = builder.getInt32((uint32_t)size);
 }
 
 llvm::Value *Compiler::testZero(llvm::Value *v) {

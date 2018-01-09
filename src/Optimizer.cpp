@@ -16,11 +16,13 @@
 #include <map>
 #include <set>
 
+using namespace std;
+
 // modified from:
 // https://stackoverflow.com/questions/24263259/c-stdseterase-with-stdremove-if
 
 template <class T, class Comp, class Alloc, class Predicate>
-bool discard_if(std::set<T, Comp, Alloc>& c, Predicate pred) {
+bool discard_if(set<T, Comp, Alloc>& c, Predicate pred) {
 	bool has_changed = false;
     for (auto it{c.begin()}, end{c.end()}; it != end; ) {
         if (pred(*it)) {
@@ -35,12 +37,12 @@ bool discard_if(std::set<T, Comp, Alloc>& c, Predicate pred) {
 using namespace llvm;
 extern bool debug_mode;
 
-void debug_print(std::string prefix, Value *value) {
+void debug_print(string prefix, Value *value) {
 	if (!debug_mode) return;
 
-	std::cout << prefix;
+	cout << prefix;
 	value->print(outs());
-	std::cout << std::endl;
+	cout << endl;
 }
 
 struct OptimizerPass : public FunctionPass {
@@ -102,7 +104,7 @@ struct OptimizerPass : public FunctionPass {
 			case ICmpInst::ICMP_SLE: return ICmpInst::ICMP_SGT;
 
 			default:
-				std::cerr << "unsupported comparison" << std::endl;
+				cerr << "unsupported comparison" << endl;
 				exit(1);
 			}
 		}
@@ -144,7 +146,7 @@ struct OptimizerPass : public FunctionPass {
 			case CmpInst::BAD_ICMP_PREDICATE: return false;
 
 			default:
-				std::cerr << "unsupported comparison" << std::endl;
+				cerr << "unsupported comparison" << endl;
 				exit(1);
 			}
 		}
@@ -193,7 +195,7 @@ struct OptimizerPass : public FunctionPass {
 		}
 
 		void removeInstruction(Instruction *instr) {
-			std::vector<std::pair<Value *, Value *>> pairs;
+			vector<pair<Value *, Value *>> pairs;
 			for (auto &p : predicates)
 				if (p.first.first == instr || p.first.second == instr)
 					pairs.push_back(p.first);
@@ -202,16 +204,16 @@ struct OptimizerPass : public FunctionPass {
 
 		CmpInst::Predicate get(Value *lhs, Value *rhs) {
 			if (lhs == rhs) return ICmpInst::ICMP_EQ;
-			auto it = predicates.find(std::make_pair(lhs, rhs));
+			auto it = predicates.find(make_pair(lhs, rhs));
 			if (it == predicates.end()) return CmpInst::BAD_ICMP_PREDICATE;
 			return it->second;
 		}
 
-		std::map<std::pair<Value *, Value *>, CmpInst::Predicate> predicates;
+		map<pair<Value *, Value *>, CmpInst::Predicate> predicates;
 
 	protected:
 		void set(Value *lhs, Value *rhs, CmpInst::Predicate pred) {
-			predicates[std::make_pair(lhs, rhs)] = pred;
+			predicates[make_pair(lhs, rhs)] = pred;
 		}
 
 		void addSingle(Value *lhs, Value *rhs, CmpInst::Predicate pred) {
@@ -238,7 +240,7 @@ struct OptimizerPass : public FunctionPass {
 				case llvm::CmpInst::ICMP_EQ: inv = cint->isZero(); break;
 				case llvm::CmpInst::ICMP_NE: inv = !cint->isZero(); break;
 				default:
-					std::cerr << "comparison comparison not supported" << std::endl;
+					cerr << "comparison comparison not supported" << endl;
 					return;
 				}
 
@@ -255,13 +257,13 @@ struct OptimizerPass : public FunctionPass {
 
 	struct BlockDomain {
 		BlockDomain() {
-			if (debug_mode) std::cerr << "bd created" << std::endl;
+			if (debug_mode) cerr << "bd created" << endl;
 		}
 
 		ConstraintSet cs;
 
-		std::set<BasicBlock *> dominators;
-		std::map<BasicBlock *, Condition> edges;
+		set<BasicBlock *> dominators;
+		map<BasicBlock *, Condition> edges;
 
 		bool isDominatedBy(BasicBlock *block) {
 			return dominators.find(block) != dominators.end();
@@ -289,8 +291,8 @@ struct OptimizerPass : public FunctionPass {
 		}
 	};
 
-	std::map<BasicBlock *, BlockDomain> blocks;
-	std::map<Value *, ValueDomain> values;
+	map<BasicBlock *, BlockDomain> blocks;
+	map<Value *, ValueDomain> values;
 	bool hasChanged;
 
 	void dumpAnalysis();
@@ -315,8 +317,8 @@ struct OptimizerPass : public FunctionPass {
 
 			if (!(prevBd == bd)) {
 				if (debug_mode) {
-					std::cout << "change: block " << b.first->getName().str();
-					std::cout << (bd.reachable ? "" : " unreachable") << std::endl;
+					cout << "change: block " << b.first->getName().str();
+					cout << (bd.reachable ? "" : " unreachable") << endl;
 				}
 				hasChanged = true;
 			}
@@ -330,7 +332,7 @@ struct OptimizerPass : public FunctionPass {
 
 	void fixPHINodes(llvm::Function &func) {
 		for (auto &block : func.getBasicBlockList()) {
-			std::vector<PHINode *> phiNodes;
+			vector<PHINode *> phiNodes;
 			for (auto &inst : block.getInstList())
 				if (auto phi = dyn_cast<PHINode>(&inst)) phiNodes.push_back(phi);
 
@@ -349,7 +351,7 @@ struct OptimizerPass : public FunctionPass {
 
 	void fixConstants(llvm::Function &func) {
 		for (auto &block : func.getBasicBlockList()) {
-			std::vector<Instruction *> constants;
+			vector<Instruction *> constants;
 			for (auto &inst : block.getInstList())
 				if (values[&inst].isConstant()) constants.push_back(&inst);
 
@@ -366,9 +368,9 @@ struct OptimizerPass : public FunctionPass {
 
 	void replaceBranch(BasicBlock *origin, BranchInst *branch, BranchInst *newBranch) {
 		if (debug_mode) {
-			std::cerr << "replacing "; branch->print(errs());
-			std::cerr << " with "; newBranch->print(errs());
-			std::cerr << std::endl;
+			cerr << "replacing "; branch->print(errs());
+			cerr << " with "; newBranch->print(errs());
+			cerr << endl;
 		}
 
 		for (auto succ : branch->successors()) blocks[succ].removeEdge(origin);
@@ -376,7 +378,7 @@ struct OptimizerPass : public FunctionPass {
 		// fix phi values
 		for (auto succ : branch->successors()) {
 			auto s = newBranch->successors();
-			if (std::find(s.begin(), s.end(), succ) != s.end()) continue;
+			if (find(s.begin(), s.end(), succ) != s.end()) continue;
 
 			// deleted path
 			for (auto &phi : succ->phis()) phi.removeIncomingValue(origin);
@@ -401,7 +403,7 @@ struct OptimizerPass : public FunctionPass {
 
 	void fixBranches(llvm::Function &func) { // @todo invalidates dead-code analysis?
 		for (auto &block : func.getBasicBlockList()) {
-			std::vector<BranchInst *> branches; // conditional branches
+			vector<BranchInst *> branches; // conditional branches
 			for (auto &inst : block.getInstList())
 				if (auto br = dyn_cast<BranchInst>(&inst))
 					if (br->isConditional()) branches.push_back(br);
@@ -420,7 +422,7 @@ struct OptimizerPass : public FunctionPass {
 
 	void removeDeadCode(llvm::Function &func) {
 		for (auto &block : func.getBasicBlockList()) {
-			std::vector<Instruction *> dead;
+			vector<Instruction *> dead;
 			for (auto &inst : block.getInstList())
 				if (values[&inst].isDead) dead.push_back(&inst);
 
@@ -429,7 +431,7 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	void removeUnreachableCode(llvm::Function &func) { // @todo name simplifyCFG
-		std::vector<BasicBlock *> bl;
+		vector<BasicBlock *> bl;
 		for (auto &block : func.getBasicBlockList()) bl.push_back(&block);
 
 		for (auto &block : bl) {
@@ -450,7 +452,7 @@ struct OptimizerPass : public FunctionPass {
 			if (blocks[replacement].edges.size() > 1 && !isUsless) {
 				// cannot merge with block that has multiple predecessors...
 				// ...unless we're a useless block
-				//std::cerr << "cannot merge " << block->getName().str() << " into " << replacement->getName().str() << std::endl;
+				//cerr << "cannot merge " << block->getName().str() << " into " << replacement->getName().str() << endl;
 				continue;
 			}
 
@@ -462,8 +464,8 @@ struct OptimizerPass : public FunctionPass {
 		hasChanged = true;
 
 		if (debug_mode) {
-			std::cerr << "merge block " << block->getName().str()
-				<< " into " << replacement->getName().str() << std::endl;
+			cerr << "merge block " << block->getName().str()
+				<< " into " << replacement->getName().str() << endl;
 		}
 
 		// fix all phi usages
@@ -472,7 +474,7 @@ struct OptimizerPass : public FunctionPass {
 			if (auto phi = dyn_cast<PHINode>(v.first)) {
 				debug_print("  found phi", phi);
 
-				if (std::find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
+				if (find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
 					continue;
 
 				auto phiValue = phi->removeIncomingValue(block, false);
@@ -483,7 +485,7 @@ struct OptimizerPass : public FunctionPass {
 			}
 
 		auto insertionPoint = &replacement->getInstList().front();
-		std::vector<Instruction *> instr; // @todo copy
+		vector<Instruction *> instr; // @todo copy
 		for (auto &i : block->getInstList()) if (!dyn_cast<TerminatorInst>(&i)) instr.push_back(&i);
 		for (auto &i : instr) i->moveBefore(insertionPoint);
 
@@ -504,9 +506,9 @@ struct OptimizerPass : public FunctionPass {
 
 		hasChanged = true;
 
-		if (debug_mode) std::cout << "removing block " << block->getName().str() << std::endl;
+		if (debug_mode) cout << "removing block " << block->getName().str() << endl;
 
-		std::vector<Instruction *> instr; // @todo better copy method?
+		vector<Instruction *> instr; // @todo better copy method?
 		for (auto &i : block->getInstList()) instr.push_back(&i);
 		for (auto &i : instr) removeInstruction(i, false); // @todo why is efp=false needed?
 
@@ -606,9 +608,9 @@ struct OptimizerPass : public FunctionPass {
 			else for (auto &bd2 : blocks) dom.insert(bd2.first);
 		}
 
-		//std::cerr << "finding dominators" << std::endl;
+		//cerr << "finding dominators" << endl;
 		while (true) {
-			//std::cerr << "  step" << std::endl;
+			//cerr << "  step" << endl;
 
 			bool hasChanged = false;
 			for (auto &bd : blocks) {
@@ -626,11 +628,11 @@ struct OptimizerPass : public FunctionPass {
 			if (!hasChanged) break;
 		}
 
-		//std::cerr << "  ...done" << std::endl;
+		//cerr << "  ...done" << endl;
 	}
 
 	void propagateConstraintSets() {
-		std::map<BasicBlock *, bool> finished;
+		map<BasicBlock *, bool> finished;
 		while (true) {
 			bool hasChanged = false;
 
@@ -642,7 +644,7 @@ struct OptimizerPass : public FunctionPass {
 
 				// @todo "OR" together predecessor constraints
 
-				//std::cerr << "propagating for " << bd.first->getName().str() << std::endl;
+				//cerr << "propagating for " << bd.first->getName().str() << endl;
 				for (auto &dom : bd.second.dominators)
 					// @todo don't inherit from all dominators,
 					// only inherit from direct dominators
@@ -666,8 +668,8 @@ struct OptimizerPass : public FunctionPass {
 		int it = 0;
 		while (true) {
 			if (debug_mode) {
-				if (it > 0) std::cout << std::endl;
-				std::cout << "iteration #" << it << std::endl;
+				if (it > 0) cout << endl;
+				cout << "iteration #" << it << endl;
 			}
 
 			hasChanged = false;
@@ -685,13 +687,14 @@ struct OptimizerPass : public FunctionPass {
 			if (!hasChanged) break;
 			
 			if (++it > 1000) {
-				std::cerr << "aborting optimization" << std::endl;
+				cerr << func.getName().str() << endl;
+				cerr << "aborting optimization" << endl;
 				return false;
 			}
 		}
 
 		if (debug_mode) {
-			std::cout << std::endl << "fixpoint:" << std::endl;
+			cout << endl << "fixpoint:" << endl;
 			dumpAnalysis();
 		}
 
@@ -699,15 +702,15 @@ struct OptimizerPass : public FunctionPass {
 	}
 };
 
-std::ostream &operator<<(std::ostream &os, OptimizerPass::ValueDomain const &vd) {
+ostream &operator<<(ostream &os, OptimizerPass::ValueDomain const &vd) {
 	if (vd.isDead) os << "dead ";
     if (vd.isBottom) return os << "bottom";
     if (vd.isTop()) return os << "top";
     return os << "[" << vd.min << ";" << vd.max << "]";
 }
 
-std::ostream &operator<<(std::ostream &os, OptimizerPass::ConstraintSet const &cs) {
-	if (cs.isBottom) return os << "  constraints: bottom" << std::endl;
+ostream &operator<<(ostream &os, OptimizerPass::ConstraintSet const &cs) {
+	if (cs.isBottom) return os << "  constraints: bottom" << endl;
 	for (auto &pred : cs.predicates) {
 		pred.first.first->print(errs());
 		switch (pred.second) {
@@ -720,40 +723,40 @@ std::ostream &operator<<(std::ostream &os, OptimizerPass::ConstraintSet const &c
 		default: os << " ? ";
 		}
 		pred.first.second->print(errs());
-		os << std::endl;
+		os << endl;
 	}
 
 	return os;
 }
 
-std::ostream &operator<<(std::ostream &os, OptimizerPass::BlockDomain const &bd) {
+ostream &operator<<(ostream &os, OptimizerPass::BlockDomain const &bd) {
 	if (bd.isEntry) os << " entry";
 	if (bd.reachable) os << " reachable";
 	else os << " unreachable";
-	os << std::endl << bd.cs;
+	os << endl << bd.cs;
 
 	for (auto &edge : bd.edges) {
 		os << "  from " << edge.first->getName().str();
 		if (edge.second.cond)
 			os << " (" << edge.second.cond->getName().str() << " = " << (edge.second.condV ? "true)" : "false)");
-		os << std::endl;
+		os << endl;
 	}
 
 	for (auto &dom : bd.dominators)
-		os << "  dom " << dom->getName().str() << std::endl;
+		os << "  dom " << dom->getName().str() << endl;
 
 	return os;
 }
 
 void OptimizerPass::dumpAnalysis() {
 	for (auto &bd : blocks)
-		std::cout << "block: " << std::string(bd.first->getName()) << bd.second;
+		cout << "block: " << string(bd.first->getName()) << bd.second;
 
 	for (auto &v : values) {
 		auto &vd = v.second;
 		if (!v.first->hasName()) continue;
 
-		std::cout << "value " << std::string(v.first->getName()) << ": " << vd << std::endl;
+		cout << "value " << string(v.first->getName()) << ": " << vd << endl;
 		//v.first->print(errs());
 	}
 }
@@ -772,11 +775,11 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 			dyn_cast<SelectInst>(v)
 		);
 
-		//v->print(errs()); std::cerr << " " << (hasSideEffect ? "se" : "ne") << std::endl;
+		//v->print(errs()); cerr << " " << (hasSideEffect ? "se" : "ne") << endl;
 		if (hasSideEffect) vd.isDead = false;
 		else { // check if we're referenced
 			for (auto &use : v->uses()) {
-				//std::cerr << "used by "; use.getUser()->print(errs()); std::cerr << std::endl;
+				//cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
 				if (!values[use.getUser()].isDead) {
 					vd.isDead = false;
 					break;
@@ -827,15 +830,19 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 			case Instruction::Sub: {
 				auto epred = blocks[block].cs.get(add->getOperand(0), add->getOperand(1));
 
-				vd.min = lhs.min - rhs.max;
-				vd.max = lhs.max - rhs.min;
+				if (lhs.isTop() || rhs.isTop())
+					vd = ValueDomain::top(false);
+				else {
+					vd.min = lhs.min - rhs.max;
+					vd.max = lhs.max - rhs.min;
+				}
 
 				switch (epred) {
 				case CmpInst::ICMP_EQ: vd.min = vd.max = 0; break;
-				case CmpInst::ICMP_SGT: vd.min = std::max(vd.min, 1); break;
-				case CmpInst::ICMP_SGE: vd.min = std::max(vd.min, 0); break;
-				case CmpInst::ICMP_SLT: vd.max = std::min(vd.max, -1); break;
-				case CmpInst::ICMP_SLE: vd.max = std::min(vd.max, 0); break;
+				case CmpInst::ICMP_SGT: vd.min = max(vd.min, 1); break;
+				case CmpInst::ICMP_SGE: vd.min = max(vd.min, 0); break;
+				case CmpInst::ICMP_SLT: vd.max = min(vd.max, -1); break;
+				case CmpInst::ICMP_SLE: vd.max = min(vd.max, 0); break;
 				default: break;
 				}
 
@@ -853,15 +860,15 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 				else
 					vd.min = (lhs.min > 0 && rhs.min < 0 ? lhs.max : lhs.min) * (lhs.min < 0 && rhs.min > 0 ? rhs.max : rhs.min);
 
-				vd.max = std::max(
-					std::max(lhs.min * rhs.min, lhs.min * rhs.max),
-					std::max(lhs.max * rhs.min, lhs.max * rhs.max)
+				vd.max = max(
+					max(lhs.min * rhs.min, lhs.min * rhs.max),
+					max(lhs.max * rhs.min, lhs.max * rhs.max)
 				);
 
 				break;
 
 			default:
-				if (debug_mode) std::cerr << "unsupported binary operation" << std::endl;
+				if (debug_mode) cerr << "unsupported binary operation" << endl;
 				vd = ValueDomain::top(false);
 			}
 		}
@@ -901,7 +908,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 				break;
 
 			default:
-				std::cerr << "unsupported comparison" << std::endl;
+				cerr << "unsupported comparison" << endl;
 				exit(1);
 			}
 		} else {
@@ -910,7 +917,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 			vFalse = !ConstraintSet::entails(entailPred, cmpPred);
 		}
 
-		if (swapOut) std::swap(vFalse, vTrue);
+		if (swapOut) swap(vFalse, vTrue);
 		vd.isBottom = false;
 		vd.min = vFalse ? 0 : 1;
 		vd.max = vTrue ? 1 : 0;
@@ -927,15 +934,15 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	if (prevVd == vd) return false;
 
 	if (!prevVd.isBottom && !vd.isBottom && !prevVd.isTop() && !vd.isTop() && !vd.isDead) {
-		if (debug_mode) std::cout << "widening" << std::endl;
+		if (debug_mode) cout << "widening" << endl;
 		vd = ValueDomain::top(vd.isDead);
 	}
 
 	if (debug_mode) {
-		std::cout << "change: value ";
-		if (v->hasName()) std::cout << std::string(v->getName());
+		cout << "change: value ";
+		if (v->hasName()) cout << string(v->getName());
 		else v->print(errs());
-		std::cout << " (" << prevVd << " -> " << vd << ")" << std::endl;
+		cout << " (" << prevVd << " -> " << vd << ")" << endl;
 	}
 	return true;
 }
@@ -944,7 +951,7 @@ char OptimizerPass::ID = 0;
 
 struct CompilerResult { // @todo @fixme @important not DRY
 	Compiler *compiler;
-	std::vector<llvm::GlobalValue *> values;
+	vector<llvm::GlobalValue *> values;
 	bool shouldExecute;
 
 	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}

@@ -13,6 +13,7 @@
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/DataLayout.h>
 #pragma GCC diagnostic pop
 
 namespace llvm {
@@ -46,6 +47,7 @@ protected:
 	llvm::LLVMContext ctx;
 	llvm::IRBuilder<> builder, allocaBuilder;
 	llvm::Module *mod;
+	llvm::DataLayout dataLayout;
 
 public:
 	std::unique_ptr<llvm::Module> modPtr;
@@ -106,6 +108,7 @@ protected:
 	virtual void visit(ConditionalExpression &);
 	virtual void visit(ExpressionList &node);
 	virtual void visit(CallExpression &node);
+	virtual void visit(CastExpression &node);
 	virtual void visit(SubscriptExpression &node);
 	virtual void visit(MemberExpression &node);
 	virtual void visit(PostExpression &node);

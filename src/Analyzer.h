@@ -260,8 +260,8 @@ public:
 	virtual std::string name() const { return "nullptr"; }
 	virtual bool isNullPointer() const { return true; }
 
-	virtual size_t getSize(lexer::TextPosition) const { return 4; } // @todo pointer size
-	virtual size_t getAlignment() const { return 4; }
+	virtual size_t getSize(lexer::TextPosition) const { return 8; } // @todo pointer size
+	virtual size_t getAlignment() const { return 8; }
 };
 
 class ComposedType : public Type {
@@ -367,7 +367,7 @@ public:
 	}
 
 	virtual size_t getSize(lexer::TextPosition) const { return size_; }
-	virtual size_t getAlignment() const { return 4; }
+	virtual size_t getAlignment() const { return 4; } // @todo
 };
 
 class FunctionType : public Type {
@@ -425,7 +425,7 @@ public:
 		throw AnalyzerError("sizeof function undefined", pos);
 	}
 
-	virtual size_t getAlignment() const { return 4; } // @todo: ?
+	virtual size_t getAlignment() const { return 8; } // @todo: ?
 };
 
 class VoidType : public Type {
@@ -462,8 +462,8 @@ public:
 	virtual std::string describe() const { return base->describe() + "*"; }
 	virtual bool isVoidPointer() const { return base->isVoid(); }
 
-	virtual size_t getSize(lexer::TextPosition) const { return 4; }
-	virtual size_t getAlignment() const { return 4; }
+	virtual size_t getSize(lexer::TextPosition) const { return 8; } // @todo @important
+	virtual size_t getAlignment() const { return 8; }
 };
 
 class ExpressionStack {
@@ -542,6 +542,7 @@ protected:
 	void declaration(Declaration &node, bool isGlobal);
 	void visitBlockItems(CompoundStatement &node);
 	void createLabels(PtrVector<Label> &labels);
+	Ptr<Type> typeFromTypeName(TypeName &node);
 
 	virtual void visit(REPLStatement &node);
 	virtual void visit(GotoStatement &node);
