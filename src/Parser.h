@@ -409,7 +409,7 @@ protected:
 				p_suffix->isVariadic = true;
 			}
 
-			if (p_suffix->parameters.size() == 1) {
+			if (p_suffix->parameters.size() == 1 && !p_suffix->isVariadic) {
 				auto p = p_suffix->parameters.front();
 				if (p.declarator.isAbstract() && p.declarator.modifiers.empty() && p.specifiers.size() == 1) {
 					auto s = p.specifiers.front();
