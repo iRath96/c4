@@ -1,0 +1,1 @@
+tests/parser/invalid_external/input.c:1:15: error: type specifier expected

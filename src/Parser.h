@@ -588,7 +588,9 @@ protected:
 		bool has_declarator, needs_declaration_list, needs_initialization, is_declaration;
 		bool is_external = read_keyword(Token::Keyword::EXTERN);
 
+		UNIQUE
 		NON_OPTIONAL(read_declaration_specifiers(specifiers))
+		NON_UNIQUE
 
 		has_declarator = read_declarator(declarator, false);
 		needs_declaration_list = has_declarator && peek().punctuator == Token::Punctuator::COMMA;
