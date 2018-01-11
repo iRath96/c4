@@ -241,13 +241,13 @@ void Compiler::visit(UnaryExpression &node) {
 	case P::PLUSPLUS: {
 		auto var = getValue(*node.operand, false);
 		value = builder.CreateLoad(value, "load");
-		value = builder.CreateAdd(value, matchType(builder.getInt8(1), value->getType()), "pre-inc");
+		value = performAdd(value, builder.getInt8(1), "pre-inc");
 		builder.CreateStore(value, var);
 	}; break;
 	case P::MINUSMINUS: {
 		auto var = getValue(*node.operand, false);
 		value = builder.CreateLoad(value, "load");
-		value = builder.CreateSub(value, matchType(builder.getInt8(1), value->getType()), "pre-dec");
+		value = performSub(value, builder.getInt8(1), "pre-dec");
 		builder.CreateStore(value, var);
 	}; break;
 
@@ -304,6 +304,23 @@ void Compiler::createLogicalOr(BinaryExpression &node) {
 	value = phi;
 }
 
+llvm::Value *Compiler::performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
+	bool lptr = lhs->getType()->isPointerTy();
+	bool rptr = rhs->getType()->isPointerTy();
+
+	if (lptr || rptr) return builder.CreateGEP(lptr ? lhs : rhs, lptr ? rhs : lhs, name);
+	return builder.CreateAdd(lhs, matchType(rhs, lhs->getType()), name);
+}
+
+llvm::Value *Compiler::performSub(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
+	bool lptr = lhs->getType()->isPointerTy();
+	bool rptr = rhs->getType()->isPointerTy();
+	
+	if (lptr && rptr) return builder.CreatePtrDiff(lhs, rhs, name);
+	else if (lptr) return builder.CreateGEP(lhs, builder.CreateNeg(rhs, "inv"), name);
+	else return builder.CreateSub(lhs, matchType(rhs, lhs->getType()), name);
+}
+
 void Compiler::visit(BinaryExpression &node) {
 	using Op = lexer::Token::Punctuator;
 	using Prec = lexer::Token::Precedence;
@@ -337,17 +354,8 @@ void Compiler::visit(BinaryExpression &node) {
 	case Op::CMP_NEQ: value = builder.CreateICmpNE(lhs, matchType(rhs, type), "cmp"); break;
 
 	// arithmetic
-	case Op::PLUS: {
-		bool lptr = lhs->getType()->isPointerTy();
-		bool rptr = rhs->getType()->isPointerTy();
-		if (lptr || rptr) value = builder.CreateGEP(lptr ? lhs : rhs, lptr ? rhs : lhs, "gep");
-		else value = builder.CreateAdd(lhs, rhs, "add");
-	}; break;
-	case Op::MINUS: {
-		bool lptr = lhs->getType()->isPointerTy();
-		if (lptr) value = builder.CreateGEP(lhs, builder.CreateNeg(rhs, "inv"), "gep");
-		else value = builder.CreateSub(lhs, rhs);
-	}; break;
+	case Op::PLUS: value = performAdd(lhs, rhs); break;
+	case Op::MINUS: value = performSub(lhs, rhs); break;
 
 	// multiplicative
 	case Op::ASTERISK: value = builder.CreateMul(lhs, rhs); break;
@@ -391,19 +399,12 @@ void Compiler::visit(CallExpression &node) {
 }
 
 void Compiler::visit(CastExpression &node) {
-	value = getValue(*node.expression);
+	auto type = createType(((DeclarationRef *)node.annotation.get())->type.get());
+	value = matchType(getValue(*node.expression), type);
 }
 
 void Compiler::visit(SubscriptExpression &node) {
-	// @todo not elegant
-	auto lhsType = createType(((DeclarationRef *)node.base->annotation.get())->type.get());
-	auto rhsType = createType(((DeclarationRef *)node.subscript.annotation.get())->type.get());
-
-	auto lhs = matchType(getValue(*node.base), lhsType);
-	auto rhs = matchType(getValue(node.subscript), rhsType);
-
-	bool lptr = lhs->getType()->isPointerTy();
-	value = builder.CreateGEP(lptr ? lhs : rhs, lptr ? rhs : lhs, "gep");
+	value = performAdd(getValue(*node.base), getValue(node.subscript));
 	if (shouldLoad) value = builder.CreateLoad(value, "subs");
 }
 
@@ -430,13 +431,13 @@ void Compiler::visit(PostExpression &node) {
 	case P::PLUSPLUS: { // @todo not DRY
 		auto var = getValue(*node.base, false);
 		value = builder.CreateLoad(value, "load");
-		auto v = builder.CreateAdd(value, matchType(builder.getInt8(1), value->getType()), "post-inc");
+		auto v = performAdd(value, builder.getInt8(1), "post-inc");
 		builder.CreateStore(v, var);
 	}; break;
 	case P::MINUSMINUS: {
 		auto var = getValue(*node.base, false);
 		value = builder.CreateLoad(value, "load");
-		auto v = builder.CreateSub(value, matchType(builder.getInt8(1), value->getType()), "post-dec");
+		auto v = performSub(value, builder.getInt8(1), "post-dec");
 		builder.CreateStore(v, var);
 	}; break;
 	default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError

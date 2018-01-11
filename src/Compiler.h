@@ -80,6 +80,9 @@ protected:
 	llvm::Value *matchType(llvm::Value *value, llvm::Type *type);
 	llvm::Value *testZero(llvm::Value *v);
 
+	llvm::Value *performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name = "add");
+	llvm::Value *performSub(llvm::Value *lhs, llvm::Value *rhs, std::string name = "sub");
+
 	void createLabels(const PtrVector<Label> &labels);
 	void createDeadBlock();
 
