@@ -1,25 +1,14 @@
 #include <stdio.h>
 #include "Analyzer.h"
 
-int s;
-void suicide() { // @experiment
-	int *ptr = nullptr;
-	if (rand() == 0) ptr = &s;
-	for (int i = 0; i < 100; ++i)
-		if (rand())
-			ptr = nullptr;
-	*ptr = 0;
-}
-
 void FileScope::close() {
 	BlockScope::close();
 
 	for (auto &ut : unresolvedTentative)
 		if (!ut.first->isComplete())
-			exit(0); // @experiment
-			/*throw AnalyzerError(
+			throw AnalyzerError(
 				"tentative definition has type '" + ut.first->describe()  + "' that is never completed"
-			, ut.second);*/
+			, ut.second);
 }
 
 Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
@@ -29,7 +18,6 @@ Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type
 		if (isDefined) {
 			if (v.second->isDefined) {
 				// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-				suicide(); // @experiment
 				throw AnalyzerError("redefinition of '" + name + "'", pos);
 			} else {
 				v.second->isDefined = true;
@@ -38,7 +26,6 @@ Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type
 
 		if (!v.second->type->isCompatible(*type)) {
 			// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-			exit(42); // @experiment
 			throw AnalyzerError("conflicting types for '" + name + "'", pos);
 		}
 
@@ -77,8 +64,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 	using Keyword = lexer::Token::Keyword;
 
 	if (specifiers.size() != 1)
-		exit(0); // @experiment
-		//throw AnalyzerError("must have exactly one type specifier", pos);
+		throw AnalyzerError("must have exactly one type specifier", pos);
 
 	auto &spec = *specifiers.begin();
 	if (auto nt = dynamic_cast<NamedTypeSpecifier *>(spec.get())) {
@@ -108,12 +94,11 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 
 		bool isNested = typeQueue.find(&cc) != typeQueue.end();
 		if (cc.isComplete() || isNested)
-			suicide(); // @experiment
-			/*throw AnalyzerError(
+			throw AnalyzerError(
 				std::string(isNested ? "nested " : "") +
 				"redefinition of '" + std::string(comp->name) + "'",
 				comp->pos
-			);*/
+			);
 
 		typeQueue.insert(&cc);
 
@@ -124,8 +109,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 				if (subcc && !subcc->hasTag()) {
 					cc.addAnonymousStructure(type, declaration.pos);
 				} else if (!subcc)
-					exit(42); // @experiment
-					//throw AnalyzerError("declaration does not declare anything", declaration.pos);
+					throw AnalyzerError("declaration does not declare anything", declaration.pos);
 			} else
 				for (auto &decl : declaration.declarators) {
 					Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
@@ -337,8 +321,7 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 					// some composed type was declared, this is valid.
 					return;
 
-		exit(0); // @experiment
-		//error("declaration does not declare anything", node);
+		error("declaration does not declare anything", node);
 	}
 
 	for (auto &decl : node.declarators) {
@@ -385,8 +368,7 @@ void Analyzer::visit(GlobalVariable &node) {
 void Analyzer::visit(Function &node) {
 	auto &decl = node.declaration.declarators.front();
 	if (decl.modifiers.empty())
-		suicide(); // @experiment
-		//error("expected ';' after top level declarator", node);
+		error("expected ';' after top level declarator", node);
 
 	auto t = Type::create(node.declaration.specifiers, node.pos, scopes);
 
@@ -400,8 +382,7 @@ void Analyzer::visit(Function &node) {
 
 		auto fn = dynamic_cast<FunctionType *>(t.get());
 		if (!fn->returnType->isComplete())
-			exit(42); // @experiment
-			//error("incomplete result type in function definition", node);
+			error("incomplete result type in function definition", node);
 
 		decl.annotate(scope->declareVariable(decl.name, t, node.pos, true));
 
@@ -411,7 +392,7 @@ void Analyzer::visit(Function &node) {
 		if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
 			for (auto &param : plist->parameters) {
 				if (param.declarator.isAbstract())
-					;// @experiment error("parameter name omitted", param);
+					error("parameter name omitted", param);
 
 				inspect(param);
 			}
