@@ -370,7 +370,7 @@ void Compiler::visit(ConditionalExpression &) {
 }
 
 void Compiler::visit(ExpressionList &node) {
-	for (auto &child : node.children) inspect(child);
+	for (auto &child : node.children) getValue(*child, true);
 }
 
 void Compiler::visit(CallExpression &node) {
