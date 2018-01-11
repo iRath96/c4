@@ -61,6 +61,7 @@ public:
 		__label__ deny;
 
 #define _OPTION_SUFFIX \
+		error_flag = _initial_ef; \
 		_DEBUG_RETURN(true) \
 		deny: \
 		i = _initial_i; \
@@ -394,7 +395,11 @@ protected:
 		int last_good_i;
 
 		size_t insertionIndex = node.modifiers.size(); // @todo not efficient
-		NON_OPTIONAL(read_direct_declarator_prefix(node, isAbstract) || isAbstract)
+		if (isAbstract) { // @todo common pattern
+			OPTIONAL(read_direct_declarator_prefix(node, isAbstract))
+		} else {
+			NON_OPTIONAL(read_direct_declarator_prefix(node, isAbstract))
+		}
 
 		last_good_i = i;
 		while (!eof()) {
@@ -403,7 +408,7 @@ protected:
 			if (!read_punctuator(Token::Punctuator::RB_OPEN)) break;
 
 			OPTIONAL(read_parameter_type_list(p_suffix->parameters))
-			if (read_punctuator(Token::Punctuator::COMMA)) {
+			if (read_punctuator(Token::Punctuator::COMMA)) { // @bug this allows (, ...)
 				UNIQUE
 				NON_OPTIONAL(read_punctuator(Token::Punctuator::ELIPSES))
 				p_suffix->isVariadic = true;
