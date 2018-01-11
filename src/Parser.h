@@ -369,8 +369,6 @@ protected:
 
 	bool read_declarator(Declarator &node, bool isAbstract)
 	OPTION
-		NON_UNIQUE // @experiment disable error reporting, might fix the broken test…
-
 		node.pos = peek().pos;
 
 		bool has_pointer;
