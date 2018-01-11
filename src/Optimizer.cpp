@@ -92,8 +92,6 @@ struct OptimizerPass : public FunctionPass {
 		bool isBottom = false; // bottom <=> can never become true
 		bool isTop() const { return !isBottom && predicates.empty(); }
 
-		bool isPure = true; // all contained predicates are equivalent
-
 		static CmpInst::Predicate oppositePredicate(CmpInst::Predicate pred) {
 			switch (pred) {
 			case ICmpInst::ICMP_NE: return ICmpInst::ICMP_EQ;
@@ -152,7 +150,7 @@ struct OptimizerPass : public FunctionPass {
 		}
 
 	public:
-		static CmpInst::Predicate join(CmpInst::Predicate a, CmpInst::Predicate b) {
+		static CmpInst::Predicate join(CmpInst::Predicate a, CmpInst::Predicate b) { // a "and" b
 			// assume no conflict
 			if (a == b) return a;
 
@@ -185,13 +183,23 @@ struct OptimizerPass : public FunctionPass {
 		}
 
 		void inherit(const ConstraintSet &cs) {
-			if (isBottom) return;
+			if (isBottom) {
+				isBottom = false;
+				predicates = cs.predicates;
+				return;
+			}
 
-			isPure = false;
+			// perform OR
+			for (auto &pred : cs.predicates) {
+				auto &lhs = pred.first.first;
+				auto &rhs = pred.first.second;
 
-			for (auto &pred : cs.predicates)
-				// @todo could be more efficient if we didn't add entailments from parent
-				addSingle(pred.first.first, pred.first.second, pred.second);
+				auto a = get(lhs, rhs);
+				auto b = pred.second;
+
+				if (entails(a, b)) addSingle(lhs, rhs, a);
+				else if (entails(b, a)) addSingle(lhs, rhs, b);
+			}
 		}
 
 		void removeInstruction(Instruction *instr) {
@@ -209,7 +217,7 @@ struct OptimizerPass : public FunctionPass {
 			return it->second;
 		}
 
-		map<pair<Value *, Value *>, CmpInst::Predicate> predicates;
+		map<pair<Value *, Value *>, CmpInst::Predicate> predicates; // @todo asymmetric store
 
 	protected:
 		void set(Value *lhs, Value *rhs, CmpInst::Predicate pred) {
@@ -260,10 +268,40 @@ struct OptimizerPass : public FunctionPass {
 			if (debug_mode) cerr << "bd created" << endl;
 		}
 
-		ConstraintSet cs;
-
 		set<BasicBlock *> dominators;
 		map<BasicBlock *, Condition> edges;
+		ConstraintSet cs;
+
+		void propagateConstraints(map<BasicBlock *, BlockDomain> &blocks) {
+			cs = ConstraintSet();
+			cs.isBottom = true;
+
+			for (auto &edge : edges) {
+				ConstraintSet edgeCS = blocks[edge.first].cs;
+
+				auto &c = edge.second;
+				if (c.cond) {
+					if (auto cmp = dyn_cast<ICmpInst>(c.cond)) {
+						auto pred = cmp->getPredicate();
+						if (!c.condV) pred = ConstraintSet::oppositePredicate(pred);
+
+						edgeCS.add(
+							cmp->getOperand(0),
+							cmp->getOperand(1),
+							pred
+						);
+					} else {
+						edgeCS.add(
+							c.cond,
+							ConstantInt::get(c.cond->getType(), 0),
+							c.condV ? ICmpInst::ICMP_NE : ICmpInst::ICMP_EQ
+						);
+					}
+				}
+
+				cs.inherit(edgeCS); // @todo name this "join"?
+			}
+		}
 
 		bool isDominatedBy(BasicBlock *block) {
 			return dominators.find(block) != dominators.end();
@@ -565,25 +603,6 @@ struct OptimizerPass : public FunctionPass {
 				if (br->isConditional()) c.cond = br->getCondition();
 
 			for (auto succ : term->successors()) {
-				if (c.cond) {
-					if (auto cmp = dyn_cast<ICmpInst>(c.cond)) {
-						auto pred = cmp->getPredicate();
-						if (!c.condV) pred = ConstraintSet::oppositePredicate(pred);
-
-						blocks[succ].cs.add(
-							cmp->getOperand(0),
-							cmp->getOperand(1),
-							pred
-						);
-					} else {
-						blocks[succ].cs.add(
-							c.cond,
-							ConstantInt::get(c.cond->getType(), 0),
-							c.condV ? ICmpInst::ICMP_NE : ICmpInst::ICMP_EQ
-						);
-					}
-				}
-
 				blocks[succ].edges[&block] = c;
 				c.condV = 0;
 			}
@@ -639,16 +658,10 @@ struct OptimizerPass : public FunctionPass {
 			for (auto &bd : blocks) {
 				if (finished[bd.first]) continue;
 
-				for (auto &dom : bd.second.dominators)
-					if (dom != bd.first && !finished[dom]) goto nextBlock;
+				for (auto &edge : bd.second.edges)
+					if (!finished[edge.first]) goto nextBlock; // @todo @important ignore loop edges
 
-				// @todo "OR" together predecessor constraints
-
-				//cerr << "propagating for " << bd.first->getName().str() << endl;
-				for (auto &dom : bd.second.dominators)
-					// @todo don't inherit from all dominators,
-					// only inherit from direct dominators
-					bd.second.cs.inherit(blocks[dom].cs);
+				bd.second.propagateConstraints(blocks);
 
 				finished[bd.first] = true;
 				hasChanged = true;
