@@ -197,8 +197,8 @@ struct OptimizerPass : public FunctionPass {
 				auto a = get(lhs, rhs);
 				auto b = pred.second;
 
-				if (entails(a, b)) addSingle(lhs, rhs, a);
-				else if (entails(b, a)) addSingle(lhs, rhs, b);
+				if (entails(a, b)) addSingle(lhs, rhs, b);
+				else if (entails(b, a)) addSingle(lhs, rhs, a);
 			}
 		}
 
