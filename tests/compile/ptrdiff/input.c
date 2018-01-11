@@ -17,5 +17,5 @@ int main(void) {
 		++i;
 	}
 
-	printf("last: *%x = %d\n", b - 1, *(b - 1));
+	printf("last: %x = %d\n", (b - 1) - a, *(b - 1));
 }
