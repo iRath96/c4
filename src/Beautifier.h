@@ -112,16 +112,23 @@ protected:
 			&& !dynamic_cast<DeclaratorPointer *>(node.modifiers.back().get())
 			&& node.isAbstract();
 
+		bool hasP = false;
+
 		for (auto &mod : node.modifiers) {
 			if (isAbstractFn && mod == node.modifiers.back())
 				continue;
 			std::cout << "(";
-			if (dynamic_cast<DeclaratorPointer *>(mod.get())) // @todo DeclaratorPrefix class?
+			if (dynamic_cast<DeclaratorPointer *>(mod.get())) { // @todo DeclaratorPrefix class?
 				inspect(mod);
+				hasP = true;
+			} else
+				hasP = false;
 		}
 
 		if (!node.isAbstract())
 			std::cout << node.name;
+		else if (hasP && isAbstractFn)
+			std::cout << " ";
 
 		for (auto it = node.modifiers.rbegin(); it != node.modifiers.rend(); ++it) {
 			if (!dynamic_cast<DeclaratorPointer *>(it->get()))
