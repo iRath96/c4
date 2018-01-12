@@ -83,6 +83,8 @@ public:
 };
 
 void parse(const char *filename) {
+	bool do_optimize = false;
+
 	std::string name(filename);
 	size_t i = name.rfind('/') + 1, j = name.rfind('.');
 	std::string llPath = name.substr(i, j - i) + ".ll";
@@ -96,7 +98,7 @@ void parse(const char *filename) {
 	Analyzer analyzer(buffer.createChild());
 	Compiler compiler(&analyzer, name);
 	Optimizer optimizer(&compiler, compiler.modPtr.get());
-	FileSink output(&optimizer, compiler.modPtr.get(), llPath, debug_mode);
+	FileSink output(do_optimize ? (Source<CompilerResult> *)&optimizer : (Source<CompilerResult> *)&compiler, compiler.modPtr.get(), llPath, debug_mode);
 
 	try {
 		if (mode == COMPILE) output.drain();
