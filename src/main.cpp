@@ -17,7 +17,7 @@
 
 bool debug_mode = false;
 bool enable_output = true;
-bool do_sema = false;
+bool do_sema = true;
 enum {
 	TOKENIZE, PARSE, PRINT_AST, COMPILE
 } mode = COMPILE;
