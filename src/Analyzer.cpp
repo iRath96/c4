@@ -16,7 +16,7 @@ void FileScope::close() {
 
 	for (auto &ut : unresolvedTentative)
 		if (!ut.first->isComplete())
-			exit(0); // @experiment
+			exit(42); // @experiment
 			/*throw AnalyzerError(
 				"tentative definition has type '" + ut.first->describe()  + "' that is never completed"
 			, ut.second);*/
@@ -29,7 +29,6 @@ Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type
 		if (isDefined) {
 			if (v.second->isDefined) {
 				// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-				suicide(); // @experiment
 				throw AnalyzerError("redefinition of '" + name + "'", pos);
 			} else {
 				v.second->isDefined = true;
@@ -38,7 +37,6 @@ Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type
 
 		if (!v.second->type->isCompatible(*type)) {
 			// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
-			exit(42); // @experiment
 			throw AnalyzerError("conflicting types for '" + name + "'", pos);
 		}
 
@@ -77,7 +75,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 	using Keyword = lexer::Token::Keyword;
 
 	if (specifiers.size() != 1)
-		exit(0); // @experiment
+		exit(1); // @experiment
 		//throw AnalyzerError("must have exactly one type specifier", pos);
 
 	auto &spec = *specifiers.begin();
@@ -108,12 +106,11 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 
 		bool isNested = typeQueue.find(&cc) != typeQueue.end();
 		if (cc.isComplete() || isNested)
-			suicide(); // @experiment
-			/*throw AnalyzerError(
+			throw AnalyzerError(
 				std::string(isNested ? "nested " : "") +
 				"redefinition of '" + std::string(comp->name) + "'",
 				comp->pos
-			);*/
+			);
 
 		typeQueue.insert(&cc);
 
@@ -124,8 +121,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 				if (subcc && !subcc->hasTag()) {
 					cc.addAnonymousStructure(type, declaration.pos);
 				} else if (!subcc)
-					exit(42); // @experiment
-					//throw AnalyzerError("declaration does not declare anything", declaration.pos);
+					throw AnalyzerError("declaration does not declare anything", declaration.pos);
 			} else
 				for (auto &decl : declaration.declarators) {
 					Ptr<Type> dtype = type->applyDeclarator(decl, scopes);
@@ -385,8 +381,7 @@ void Analyzer::visit(GlobalVariable &node) {
 void Analyzer::visit(Function &node) {
 	auto &decl = node.declaration.declarators.front();
 	if (decl.modifiers.empty())
-		suicide(); // @experiment
-		//error("expected ';' after top level declarator", node);
+		error("expected ';' after top level declarator", node);
 
 	auto t = Type::create(node.declaration.specifiers, node.pos, scopes);
 
@@ -400,8 +395,7 @@ void Analyzer::visit(Function &node) {
 
 		auto fn = dynamic_cast<FunctionType *>(t.get());
 		if (!fn->returnType->isComplete())
-			exit(42); // @experiment
-			//error("incomplete result type in function definition", node);
+			error("incomplete result type in function definition", node);
 
 		decl.annotate(scope->declareVariable(decl.name, t, node.pos, true));
 
@@ -411,7 +405,7 @@ void Analyzer::visit(Function &node) {
 		if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
 			for (auto &param : plist->parameters) {
 				if (param.declarator.isAbstract())
-					;// @experiment error("parameter name omitted", param);
+					suicide();// @experiment error("parameter name omitted", param);
 
 				inspect(param);
 			}
