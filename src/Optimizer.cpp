@@ -37,11 +37,11 @@ bool discard_if(set<T, Comp, Alloc>& c, Predicate pred) {
 using namespace llvm;
 extern bool debug_mode;
 
-void debug_print(string prefix, Value *value) {
+void debug_print(string prefix, Value *value, bool printValue = true) {
 	if (!debug_mode) return;
 
-	cout << prefix;
-	value->print(outs());
+	cout << prefix << " (" << value << ")";
+	if (printValue) value->print(outs());
 	cout << endl;
 }
 
@@ -338,27 +338,30 @@ struct OptimizerPass : public FunctionPass {
 
 	void iterate(llvm::Function &func) {
 		// update reachability
-		for (auto &b : blocks) {
-			auto prevBd = b.second;
-			auto &bd = b.second;
+		// @todo topology?
+		// @important isDirty all the things!
 
-			if (bd.isEntry) continue;
+		for (auto &b : blocks)
+			b.second.reachable = b.second.isEntry;
 
-			bd.reachable = false;
-			for (auto &edge : bd.edges) {
-				if (!blocks[edge.first].reachable) continue;
-				if (!edge.second.cond || values[edge.second.cond].contains(edge.second.condV)) {
-					bd.reachable = true;
-					break;
+		bool updated = true;
+		while (updated) {
+			updated = false;
+			for (auto &b : blocks) {
+				if (debug_mode) cout << b.first->getName().str() << endl;
+
+				auto &bd = b.second;
+				if (bd.reachable) continue;
+
+				for (auto &edge : bd.edges) {
+					if (debug_mode) cout << "- " << edge.first->getName().str() << endl;
+					if (!blocks[edge.first].reachable) continue;
+					if (!edge.second.cond || getGlobalVD(edge.second.cond).contains(edge.second.condV)) {
+						bd.reachable = true;
+						updated = true;
+						break;
+					}
 				}
-			}
-
-			if (!(prevBd == bd)) {
-				if (debug_mode) {
-					cout << "change: block " << b.first->getName().str();
-					cout << (bd.reachable ? "" : " unreachable") << endl;
-				}
-				hasChanged = true;
 			}
 		}
 
@@ -375,12 +378,47 @@ struct OptimizerPass : public FunctionPass {
 				if (auto phi = dyn_cast<PHINode>(&inst)) phiNodes.push_back(phi);
 
 			for (auto &phi : phiNodes) {
-				for (unsigned i = 0; i < phi->getNumIncomingValues();)
-					if (!blocks[phi->getIncomingBlock(i)].reachable) phi->removeIncomingValue(i);
-					else ++i;
+				debug_print("analysing phi", phi);
 
-				if (phi->getNumIncomingValues() == 1) {
-					phi->replaceAllUsesWith(phi->getIncomingValue(0));
+				bool hasBecomeEmpty = phi->getNumOperands() == 0;
+				for (unsigned i = 0; i < phi->getNumOperands();)
+					if (!blocks[phi->getIncomingBlock(i)].reachable) {
+						if (phi->getNumOperands() == 1) {
+							// can't remove last one, PHINodes assert at least one operand
+							hasBecomeEmpty = true;
+							break;
+						} else phi->removeIncomingValue(i);
+					} else ++i;
+
+				if (hasBecomeEmpty) {
+					// parent is not reachable, this instruction will be removed anyway
+					continue;
+				}
+
+				bool isSingular = true;
+				Value *v = nullptr;
+				for (unsigned i = 0; i < phi->getNumOperands(); ++i) {
+					Value *inV = phi->getIncomingValue(i);
+					BasicBlock *inB = phi->getIncomingBlock(i);
+
+					if (auto phi2 = dyn_cast<PHINode>(inV)) {
+						if (phi2->getParent() == phi->getParent()) {
+							// we're refering a phi node from the same block,
+							// we can therefore directly get the value
+							inV = phi2->getIncomingValueForBlock(inB);
+							assert(inV);
+							phi->setIncomingValue(i, inV);
+						}
+					}
+
+					if (!v) v = inV; // @todo check equality, not pointer equality (also commotativity)
+					if (v != inV) isSingular = false;
+				}
+
+				if (isSingular) {
+					debug_print("replacing singular phi", phi);
+
+					phi->replaceAllUsesWith(v);
 					removeInstruction(phi);
 				}
 			}
@@ -391,12 +429,12 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &block : func.getBasicBlockList()) {
 			vector<Instruction *> constants;
 			for (auto &inst : block.getInstList())
-				if (values[&inst].isConstant()) constants.push_back(&inst);
+				if (getGlobalVD(&inst).isConstant()) constants.push_back(&inst);
 
 			for (auto &constant : constants) {
 				debug_print("replacing singular value", constant);
 
-				Value *newValue = llvm::ConstantInt::get(constant->getType(), values[constant].min);
+				Value *newValue = llvm::ConstantInt::get(constant->getType(), getGlobalVD(constant).min);
 				constant->replaceAllUsesWith(newValue);
 				values.erase(constant);
 				constant->eraseFromParent();
@@ -462,7 +500,7 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &block : func.getBasicBlockList()) {
 			vector<Instruction *> dead;
 			for (auto &inst : block.getInstList())
-				if (values[&inst].isDead) dead.push_back(&inst);
+				if (getGlobalVD(&inst).isDead) dead.push_back(&inst);
 
 			for (auto &d : dead) removeInstruction(d);
 		}
@@ -537,14 +575,26 @@ struct OptimizerPass : public FunctionPass {
 
 		block->replaceAllUsesWith(replacement);
 		removeBlock(block);
+
+		if (blocks[replacement].isEntry) {
+			// set replacement as entry
+			auto func = replacement->getParent();
+			func->getBasicBlockList().remove(replacement);
+			func->getBasicBlockList().push_front(replacement);
+		}
 	}
 
 	void removeBlock(BasicBlock *block) {
-		assert(block->getNumUses() == 0);
+		if (debug_mode) cout << "removing block " << block->getName().str() << endl;
+
+		/*for (auto &use : block->uses()) {
+			auto &bd = blocks[block];
+			// only allow self-references
+			use.getUser()->print(errs()); cerr << endl;
+			assert(dyn_cast<Instruction>(use.getUser())->getParent() == block);
+		}*/
 
 		hasChanged = true;
-
-		if (debug_mode) cout << "removing block " << block->getName().str() << endl;
 
 		vector<Instruction *> instr; // @todo better copy method?
 		for (auto &i : block->getInstList()) instr.push_back(&i);
@@ -553,18 +603,27 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &b : blocks) b.second.removeEdge(block);
 		blocks.erase(block);
 
-		block->eraseFromParent();
+		block->removeFromParent(); // @todo what about eraseFromParent?
 	}
 
 	void removeInstruction(Instruction *instr, bool efp = true) {
-		debug_print("removing instruction", instr);
+		debug_print("removing instruction", instr, false);
 
 		for (auto &b : blocks)
 			// @todo would it suffice to only update blocks[block] here?
 			b.second.cs.removeInstruction(instr);
 
+		valueBlacklist.insert(instr);
 		values.erase(instr);
 		if (efp) instr->eraseFromParent();
+	}
+
+	set<Value *> valueBlacklist;
+	ValueDomain &getGlobalVD(Value *value) {
+		assert(valueBlacklist.find(value) == valueBlacklist.end());
+		if (values.find(value) == values.end())
+			if (debug_mode) cerr << "creating VD for " << value << endl;
+		return values[value];
 	}
 
 	// @todo @important CSE analysis
@@ -580,7 +639,7 @@ struct OptimizerPass : public FunctionPass {
 			return vd;
 		}
 
-		return values[value];
+		return getGlobalVD(value);
 	}
 
 	void initialize(llvm::Function &func) {
@@ -673,6 +732,199 @@ struct OptimizerPass : public FunctionPass {
 		}
 	}
 
+	bool shouldInstantiateBlock(BasicBlock *block) {
+		if (blocks[block].edges.size() < 2)
+			// can't instantiate a block with less than two predecessors
+			return false;
+
+		for (auto &phi : block->phis())
+			for (auto &value : phi.incoming_values())
+				if (dyn_cast<llvm::ConstantInt>(value))
+					return true;
+
+		// no promising phi node found
+		return false;
+	}
+
+	vector<BasicBlock *> getSuccessors(BasicBlock *block) {
+		vector<BasicBlock *> result;
+		for (const auto &b : blocks)
+			for (const auto &edge : b.second.edges)
+				if (edge.first == block)
+					result.push_back(b.first);
+		return result;
+	}
+
+	typedef map<Instruction *, map<BasicBlock *, Value *>> VMap;
+	string ind = "";
+	Value *vmapLookup(BasicBlock *block, Instruction *value, VMap &vmap) {
+		string pind;
+		if (debug_mode) {
+			cout << ind << "lookup "; value->print(errs()); cout << " for " << block->getName().str() << endl;
+			pind = ind;
+			ind = ind + "  ";
+		}
+
+		if (vmap[value].find(block) == vmap[value].end()) {
+			// value is not available, do some PHI magic
+			auto phi = PHINode::Create(value->getType(), (unsigned)blocks[block].edges.size());
+			vmap[value][block] = phi;
+
+			for (const auto &edge : blocks[block].edges)
+				phi->addIncoming(vmapLookup(edge.first, value, vmap), edge.first);
+
+			block->getInstList().push_front(phi);
+
+			if (debug_mode) {
+				cout << "  phi case " << block->getName().str() << endl;
+				phi->print(errs()); cerr << endl;
+			}
+		}
+
+		if (debug_mode) ind = pind;
+		return vmap[value][block];
+	}
+
+	void instantiateBlock(llvm::Function *func, BasicBlock *block) {
+		VMap vmap;
+		vector<BasicBlock *> newBlocks;
+
+		int i = 0;
+
+		struct SelfPHI {
+			BasicBlock *newBlock, *parentBlock;
+			Instruction *localInstr;
+			Instruction *refInstr;
+		};
+
+		BasicBlock *selfBlock = nullptr;
+		vector<SelfPHI> selfPHIs;
+
+		for (const auto &edge : blocks[block].edges) {
+			auto &parent = edge.first;
+			auto newBlock = BasicBlock::Create(block->getContext(), block->getName().str() + "-" + std::to_string(i++), func);
+			newBlocks.push_back(newBlock);
+
+			for (auto &instr : *block) {
+				if (auto phi = dyn_cast<PHINode>(&instr)) {
+					auto phiValue = phi->getIncomingValueForBlock(parent);
+					bool isSelfPHI = false;
+					if (auto phiInstr = dyn_cast<Instruction>(phiValue)) {
+						if (phiInstr->getParent() == block) {
+							SelfPHI s;
+							s.newBlock = newBlock;
+							s.parentBlock = parent;
+							s.localInstr = &instr;
+							s.refInstr = phiInstr;
+							selfPHIs.push_back(s);
+							isSelfPHI = true;
+						}
+					}
+
+					if (!isSelfPHI) vmap[&instr][newBlock] = phiValue;
+				} else {
+					auto clone = instr.clone();
+					vmap[&instr][newBlock] = clone;
+					newBlock->getInstList().push_back(clone);
+				}
+			}
+
+			// and now register block
+			auto &reg = blocks[newBlock];
+			reg.edges[parent] = edge.second;
+			reg.cs = blocks[parent].cs; // @todo
+			reg.dominators = blocks[parent].dominators;
+			reg.dominators.insert(newBlock);
+
+			// update branch from predecessor
+			if (parent == block) selfBlock = newBlock;
+			else parent->getTerminator()->replaceUsesOfWith(block, newBlock);
+		}
+
+		if (selfBlock)
+			for (auto &newBlock : newBlocks)
+				newBlock->getTerminator()->replaceUsesOfWith(block, selfBlock);
+
+		// fix successor phi nodes
+		for (const auto &succ : getSuccessors(block)) {
+			for (auto &phi : succ->phis()) {
+				auto value = phi.removeIncomingValue(block);
+				for (auto &newBlock : newBlocks)
+					phi.addIncoming(value, newBlock);
+			}
+		}
+
+		// fix successor edges
+		for (const auto &succ : getSuccessors(block)) {
+			auto prevEdge = blocks[succ].edges[block];
+			for (auto &newBlock : newBlocks)
+				blocks[succ].edges[newBlock] = prevEdge;
+
+			// erase old edge
+			blocks[succ].edges.erase(block);
+		}
+
+		// fix self PHIs
+		for (auto &selfPHI : selfPHIs) {
+			// value is not available, do some PHI magic
+			auto phi = PHINode::Create(selfPHI.refInstr->getType(), (unsigned)blocks[selfPHI.newBlock].edges.size());
+			vmap[selfPHI.localInstr][selfPHI.newBlock] = phi;
+
+			for (const auto &edge : blocks[selfPHI.newBlock].edges)
+				phi->addIncoming(vmapLookup(edge.first, selfPHI.refInstr, vmap), edge.first);
+
+			selfPHI.newBlock->getInstList().push_front(phi);
+
+			if (debug_mode) {
+				cout << " for " << selfPHI.newBlock->getName().str() << " (self-phi)" << endl;
+				phi->print(errs()); cerr << endl;
+			}
+		}
+
+		// fix references to values from outside this block
+		for (auto &value : vmap) {
+			vector<Use *> uses;
+			for (auto &use : value.first->uses()) uses.push_back(&use); // @todo copy
+			for (auto &use : uses) {
+				auto user = dyn_cast<Instruction>(use->getUser());
+				auto vp = user->getParent();
+				if (vp == block) continue; // @todo delete the block earlier?
+
+				use->set(vmapLookup(vp, value.first, vmap));
+			}
+		}
+
+		// fix all edges conditions
+		for (auto &bd : blocks) {
+			if (bd.first == block) continue;
+			
+			for (auto &edge : bd.second.edges) {
+				if (!edge.second.cond) continue;
+
+				auto cond = (Instruction *)edge.second.cond;
+				if (vmap.find(cond) != vmap.end()) {
+					debug_print("fixing edge condition", cond);
+					edge.second.cond = vmapLookup(edge.first, cond, vmap);
+					debug_print("  has become", edge.second.cond);
+				}
+			}
+		}
+
+		removeBlock(block);
+	}
+
+	void instantiateBlocks(llvm::Function &func) {
+		vector<BasicBlock *> blocks;
+		for (auto &b : func.getBasicBlockList())
+			if (shouldInstantiateBlock(&b))
+				blocks.push_back(&b);
+
+		for (auto &block : blocks) {
+			if (debug_mode) cout << "should instantiate " << block->getName().str() << endl;
+			instantiateBlock(&func, block);
+		}
+	}
+
 	bool runOnFunction(llvm::Function &func) override {
 		initialize(func);
 
@@ -695,9 +947,13 @@ struct OptimizerPass : public FunctionPass {
 			removeDeadCode(func);
 			removeUnreachableCode(func);
 
-			if (debug_mode) func.print(errs());
+			if (debug_mode && hasChanged) func.print(errs());
 
-			if (!hasChanged) break;
+			if (!hasChanged) {
+				instantiateBlocks(func);
+				if (debug_mode) func.print(errs());
+				if (!hasChanged) break;
+			}
 			
 			if (++it > 1000) {
 				cerr << func.getName().str() << endl;
@@ -775,8 +1031,8 @@ void OptimizerPass::dumpAnalysis() {
 }
 
 bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
-	auto prevVd = values[v];
-	auto &vd = values[v];
+	auto prevVd = getGlobalVD(v);
+	auto &vd = getGlobalVD(v);
 
 	vd.isDead = true;
 	if (blocks[block].reachable) {
@@ -793,7 +1049,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		else { // check if we're referenced
 			for (auto &use : v->uses()) {
 				//cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
-				if (!values[use.getUser()].isDead) {
+				if (!getGlobalVD(use.getUser()).isDead) {
 					vd.isDead = false;
 					break;
 				}
