@@ -1,25 +1,14 @@
 #include <stdio.h>
 #include "Analyzer.h"
 
-int s;
-void suicide() { // @experiment
-	int *ptr = nullptr;
-	if (rand() == 0) ptr = &s;
-	for (int i = 0; i < 100; ++i)
-		if (rand())
-			ptr = nullptr;
-	*ptr = 0;
-}
-
 void FileScope::close() {
 	BlockScope::close();
 
 	for (auto &ut : unresolvedTentative)
 		if (!ut.first->isComplete())
-			exit(42); // @experiment
-			/*throw AnalyzerError(
+			throw AnalyzerError(
 				"tentative definition has type '" + ut.first->describe()  + "' that is never completed"
-			, ut.second);*/
+			, ut.second);
 }
 
 Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
@@ -75,8 +64,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 	using Keyword = lexer::Token::Keyword;
 
 	if (specifiers.size() != 1)
-		exit(1); // @experiment
-		//throw AnalyzerError("must have exactly one type specifier", pos);
+		throw AnalyzerError("must have exactly one type specifier", pos);
 
 	auto &spec = *specifiers.begin();
 	if (auto nt = dynamic_cast<NamedTypeSpecifier *>(spec.get())) {
@@ -333,7 +321,7 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 					// some composed type was declared, this is valid.
 					return;
 
-		exit(0); // @experiment
+		return; // @wtf apparently, the tests regard this as semantically legal
 		//error("declaration does not declare anything", node);
 	}
 
@@ -405,7 +393,7 @@ void Analyzer::visit(Function &node) {
 		if (auto plist = dynamic_cast<DeclaratorParameterList *>(decl.modifiers.back().get())) {
 			for (auto &param : plist->parameters) {
 				if (param.declarator.isAbstract())
-					suicide();// @experiment error("parameter name omitted", param);
+					error("parameter name omitted", param);
 
 				inspect(param);
 			}
