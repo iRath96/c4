@@ -348,13 +348,10 @@ struct OptimizerPass : public FunctionPass {
 		while (updated) {
 			updated = false;
 			for (auto &b : blocks) {
-				if (debug_mode) cout << b.first->getName().str() << endl;
-
 				auto &bd = b.second;
 				if (bd.reachable) continue;
 
 				for (auto &edge : bd.edges) {
-					if (debug_mode) cout << "- " << edge.first->getName().str() << endl;
 					if (!blocks[edge.first].reachable) continue;
 					if (!edge.second.cond || getGlobalVD(edge.second.cond).contains(edge.second.condV)) {
 						bd.reachable = true;
@@ -787,9 +784,12 @@ struct OptimizerPass : public FunctionPass {
 
 	void instantiateBlock(llvm::Function *func, BasicBlock *block) {
 		VMap vmap;
-		vector<BasicBlock *> newBlocks;
-
 		int i = 0;
+
+		struct NewBlock {
+			BasicBlock *block = nullptr;
+			vector<Value *> phiValues;
+		};
 
 		struct SelfPHI {
 			BasicBlock *newBlock, *parentBlock;
@@ -800,57 +800,89 @@ struct OptimizerPass : public FunctionPass {
 		BasicBlock *selfBlock = nullptr;
 		vector<SelfPHI> selfPHIs;
 
-		for (const auto &edge : blocks[block].edges) {
-			auto &parent = edge.first;
-			auto newBlock = BasicBlock::Create(block->getContext(), block->getName().str() + "-" + std::to_string(i++), func);
-			newBlocks.push_back(newBlock);
+		vector<NewBlock> newBlocks;
 
+		for (const auto &edge : blocks[block].edges) {
+			NewBlock nb;
+
+			auto &parent = edge.first;
 			for (auto &instr : *block) {
 				if (auto phi = dyn_cast<PHINode>(&instr)) {
 					auto phiValue = phi->getIncomingValueForBlock(parent);
-					bool isSelfPHI = false;
-					if (auto phiInstr = dyn_cast<Instruction>(phiValue)) {
-						if (phiInstr->getParent() == block) {
-							SelfPHI s;
-							s.newBlock = newBlock;
-							s.parentBlock = parent;
-							s.localInstr = &instr;
-							s.refInstr = phiInstr;
-							selfPHIs.push_back(s);
-							isSelfPHI = true;
-						}
-					}
-
-					if (!isSelfPHI) vmap[&instr][newBlock] = phiValue;
-				} else {
-					auto clone = instr.clone();
-					vmap[&instr][newBlock] = clone;
-					newBlock->getInstList().push_back(clone);
+					nb.phiValues.push_back(phiValue);
 				}
 			}
 
-			// and now register block
-			auto &reg = blocks[newBlock];
-			reg.edges[parent] = edge.second;
-			reg.cs = blocks[parent].cs; // @todo
-			reg.dominators = blocks[parent].dominators;
-			reg.dominators.insert(newBlock);
+			for (auto &nb2 : newBlocks) {
+				if (nb.phiValues == nb2.phiValues) {
+					cout << "  found cached new block" << endl;
+					nb.block = nb2.block;
+					break;
+				}
+			}
+
+			auto &newBB = nb.block;
+			if (!newBB) {
+				// don't have a cached new BB for this set of phi values, create one
+				newBB = BasicBlock::Create(block->getContext(), block->getName().str() + "-" + std::to_string(i++), func);
+				for (auto &instr : *block) {
+					if (auto phi = dyn_cast<PHINode>(&instr)) {
+						auto phiValue = phi->getIncomingValueForBlock(parent);
+						bool isSelfPHI = false;
+						if (auto phiInstr = dyn_cast<Instruction>(phiValue)) {
+							if (phiInstr->getParent() == block) {
+								SelfPHI s;
+								s.newBlock = newBB;
+								s.parentBlock = parent;
+								s.localInstr = &instr;
+								s.refInstr = phiInstr;
+								selfPHIs.push_back(s);
+								isSelfPHI = true;
+							}
+						}
+
+						if (!isSelfPHI) vmap[&instr][newBB] = phiValue;
+					} else {
+						auto clone = instr.clone();
+						vmap[&instr][newBB] = clone;
+						newBB->getInstList().push_back(clone);
+					}
+				}
+
+				// and now register block initially
+				auto &reg = blocks[newBB];
+				reg.edges[parent] = edge.second;
+				//reg.cs = blocks[parent].cs; // @todo
+				reg.dominators = blocks[parent].dominators;
+				reg.dominators.insert(newBB);
+
+				newBlocks.push_back(nb);
+			} else {
+				// merge information with previously created block domain
+				auto &reg = blocks[newBB];
+				reg.edges[parent] = edge.second;
+				discard_if(reg.dominators, [&](BasicBlock *b) {
+					return b != newBB && !blocks[parent].isDominatedBy(b);
+				});
+			}
+
+			cout << parent->getName().str() << endl;
 
 			// update branch from predecessor
-			if (parent == block) selfBlock = newBlock;
-			else parent->getTerminator()->replaceUsesOfWith(block, newBlock);
+			if (parent == block) selfBlock = newBB;
+			else parent->getTerminator()->replaceUsesOfWith(block, newBB);
 		}
 
 		if (selfBlock)
 			for (auto &newBlock : newBlocks)
-				newBlock->getTerminator()->replaceUsesOfWith(block, selfBlock);
+				newBlock.block->getTerminator()->replaceUsesOfWith(block, selfBlock);
 
 		// fix successor phi nodes
 		for (const auto &succ : getSuccessors(block)) {
 			for (auto &phi : succ->phis()) {
 				auto value = phi.removeIncomingValue(block);
 				for (auto &newBlock : newBlocks)
-					phi.addIncoming(value, newBlock);
+					phi.addIncoming(value, newBlock.block);
 			}
 		}
 
@@ -858,7 +890,7 @@ struct OptimizerPass : public FunctionPass {
 		for (const auto &succ : getSuccessors(block)) {
 			auto prevEdge = blocks[succ].edges[block];
 			for (auto &newBlock : newBlocks)
-				blocks[succ].edges[newBlock] = prevEdge;
+				blocks[succ].edges[newBlock.block] = prevEdge;
 
 			// erase old edge
 			blocks[succ].edges.erase(block);
