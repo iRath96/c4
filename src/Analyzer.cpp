@@ -317,12 +317,11 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 	if (node.declarators.empty()) {
 		for (auto &spec : node.specifiers)
 			if (auto ct = dynamic_cast<const ComposedTypeSpecifier *>(spec.get()))
-				if (ct->isNamed() && ct->isQualified())
+				if (ct->isNamed())
 					// some composed type was declared, this is valid.
 					return;
 
-		return; // @wtf apparently, the tests regard this as semantically legal
-		//error("declaration does not declare anything", node);
+		error("declaration does not declare anything", node);
 	}
 
 	for (auto &decl : node.declarators) {
