@@ -18,6 +18,7 @@
 
 namespace llvm {
 	class Value;
+	class PHINode;
 	class Type;
 	class Module;
 };
@@ -57,6 +58,12 @@ protected:
 		llvm::BasicBlock *header, *body, *end;
 	};
 
+	struct {
+		bool needed;
+		bool prevLN; // needed for ExpressionList
+		llvm::BasicBlock *tBB, *fBB;
+	} logical;
+
 	bool shouldLoad;
 	llvm::Value *value;
 	llvm::Function *func;
@@ -76,9 +83,8 @@ public:
 
 protected:
 	llvm::Type *createType(const Type *type);
-	llvm::Value *getValue(Expression &expr, bool load = true);
+	llvm::Value *getValue(Expression &expr, bool load = true, bool logical = false);
 	llvm::Value *matchType(llvm::Value *value, llvm::Type *type);
-	llvm::Value *testZero(llvm::Value *v);
 
 	llvm::Value *performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name = "add");
 	llvm::Value *performSub(llvm::Value *lhs, llvm::Value *rhs, std::string name = "sub");
@@ -86,8 +92,10 @@ protected:
 	void createLabels(const PtrVector<Label> &labels);
 	void createDeadBlock();
 
+	llvm::PHINode *createLogicalPHI(llvm::BasicBlock *&post);
 	void createLogicalAnd(BinaryExpression &node);
 	void createLogicalOr(BinaryExpression &node);
+	void createLogicalNot(UnaryExpression &node);
 
 	virtual void visit(REPLStatement &node);
 	virtual void visit(CompoundStatement &node);

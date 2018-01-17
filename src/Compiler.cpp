@@ -49,11 +49,28 @@ llvm::Type *Compiler::createType(const Type *type) {
 	return types[type] = result;
 }
 
-llvm::Value *Compiler::getValue(Expression &expr, bool load) {
+llvm::Value *Compiler::getValue(Expression &expr, bool load, bool logicalNeeded) {
+	// @todo very ugly
 	bool prevSL = shouldLoad;
+	bool prevLN = logical.needed;
+
 	shouldLoad = load;
+	logical.needed = logicalNeeded;
+
 	inspect(expr);
+
+	if (logical.needed) {
+		if (value->getType() != builder.getInt1Ty())
+			value = builder.CreateICmpNE(value, matchType(builder.getInt1(0), value->getType()));
+		builder.CreateCondBr(value, logical.tBB, logical.fBB);
+		logical.needed = false;
+	}
+
+	logical.prevLN = logical.needed;
+
+	logical.needed = prevLN;
 	shouldLoad = prevSL;
+
 	return value;
 }
 
@@ -254,7 +271,7 @@ void Compiler::visit(UnaryExpression &node) {
 	// others
 	case P::MINUS: value = builder.CreateNeg(getValue(*node.operand)); break;
 	case P::PLUS: value = getValue(*node.operand); break;
-	case P::BIT_NOT: value = builder.CreateNot(getValue(*node.operand)); break;
+	case P::BIT_NOT: createLogicalNot(node); break;
 	case P::LOG_NOT:
 		value = getValue(*node.operand);
 		value = builder.CreateICmpEQ(value, matchType(builder.getInt32(0), value->getType()));
@@ -264,44 +281,84 @@ void Compiler::visit(UnaryExpression &node) {
 	}
 }
 
+llvm::PHINode *Compiler::createLogicalPHI(llvm::BasicBlock *&post) {
+	if (logical.needed) {
+		post = builder.GetInsertBlock();
+		return nullptr;
+	} else {
+		auto pre = builder.GetInsertBlock();
+		post = llvm::BasicBlock::Create(ctx, "logical-join", func, 0);
+
+		logical.tBB = llvm::BasicBlock::Create(ctx, "true", func, 0);
+		logical.fBB = llvm::BasicBlock::Create(ctx, "false", func, 0);
+
+		builder.SetInsertPoint(logical.tBB);
+		builder.CreateBr(post);
+
+		builder.SetInsertPoint(logical.fBB);
+		builder.CreateBr(post);
+
+		builder.SetInsertPoint(post);
+
+		auto phi = builder.CreatePHI(builder.getInt1Ty(), 2);
+		phi->addIncoming(builder.getInt1(0), logical.fBB);
+		phi->addIncoming(builder.getInt1(1), logical.tBB);
+
+		builder.SetInsertPoint(pre);
+
+		return phi;
+	}
+}
+
 void Compiler::createLogicalAnd(BinaryExpression &node) {
-	auto lhs = getValue(*node.lhs);
+	llvm::BasicBlock *post;
+	auto phi = createLogicalPHI(post);
 
-	auto pre = builder.GetInsertBlock();
-	auto c = llvm::BasicBlock::Create(ctx, "and-continue", func, 0);
-	auto end = llvm::BasicBlock::Create(ctx, "and-end", func, 0);
+	auto prevTBB = logical.tBB;
+	logical.tBB = llvm::BasicBlock::Create(ctx, "and-cont", func, 0);
+	getValue(*node.lhs, true, true);
 
-	builder.CreateCondBr(lhs, c, end);
-	builder.SetInsertPoint(c);
-	auto rhs = getValue(*node.rhs);
-	builder.CreateBr(end);
+	builder.SetInsertPoint(logical.tBB);
+	logical.tBB = prevTBB;
+	getValue(*node.rhs, true, true);
 
-	builder.SetInsertPoint(end);
+	builder.SetInsertPoint(post);
 
-	auto phi = builder.CreatePHI(lhs->getType(), 2);
-	phi->addIncoming(lhs, pre);
-	phi->addIncoming(rhs, c);
 	value = phi;
+	logical.needed = false;
 }
 
 void Compiler::createLogicalOr(BinaryExpression &node) {
-	auto lhs = getValue(*node.lhs);
+	llvm::BasicBlock *post;
+	auto phi = createLogicalPHI(post);
 
-	auto pre = builder.GetInsertBlock();
-	auto c = llvm::BasicBlock::Create(ctx, "or-continue", func, 0);
-	auto end = llvm::BasicBlock::Create(ctx, "or-end", func, 0);
+	auto prevFBB = logical.fBB;
+	logical.fBB = llvm::BasicBlock::Create(ctx, "or-cont", func, 0);
+	getValue(*node.lhs, true, true);
 
-	builder.CreateCondBr(lhs, end, c);
-	builder.SetInsertPoint(c);
-	auto rhs = getValue(*node.rhs);
-	builder.CreateBr(end);
+	builder.SetInsertPoint(logical.fBB);
+	logical.fBB = prevFBB;
+	getValue(*node.rhs, true, true);
 
-	builder.SetInsertPoint(end);
-
-	auto phi = builder.CreatePHI(lhs->getType(), 2);
-	phi->addIncoming(lhs, pre);
-	phi->addIncoming(rhs, c);
 	value = phi;
+	logical.needed = false;
+}
+
+void Compiler::createLogicalNot(UnaryExpression &node) {
+	llvm::BasicBlock *post;
+	auto phi = createLogicalPHI(post);
+
+	auto prevFBB = logical.fBB;
+	logical.fBB = logical.tBB;
+	logical.tBB = prevFBB;
+
+	getValue(*node.operand, true, true);
+
+	logical.tBB = logical.fBB;
+	logical.fBB = prevFBB;
+
+	value = phi;
+	logical.needed = false;
 }
 
 llvm::Value *Compiler::performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
@@ -370,7 +427,10 @@ void Compiler::visit(ConditionalExpression &) {
 }
 
 void Compiler::visit(ExpressionList &node) {
-	for (auto &child : node.children) getValue(*child, true);
+	for (auto &child : node.children)
+		getValue(*child, true, logical.needed && (&child == &node.children.back()));
+	
+	logical.needed = logical.prevLN;
 }
 
 void Compiler::visit(CallExpression &node) {
@@ -455,29 +515,28 @@ void Compiler::visit(SizeofExpressionTypeName &node) {
 	value = builder.getInt32((uint32_t)size);
 }
 
-void Compiler::visit(SizeofExpressionUnary &node) { // @todo not DRY, @todo remove my own getSize
+void Compiler::visit(SizeofExpressionUnary &node) { // @todo not DRY
 	auto &type = ((TypePair *)node.annotation.get())->type;
 	size_t size = dataLayout.getTypeAllocSize(createType(type.get()));
 	value = builder.getInt32((uint32_t)size);
 }
 
-llvm::Value *Compiler::testZero(llvm::Value *v) {
-	if (v->getType() == builder.getInt1Ty()) return v;
-	return builder.CreateICmpNE(v, matchType(builder.getInt32(0), v->getType()), "cond");
-}
-
 void Compiler::visit(IterationStatement &node) {
 	auto prevLoop = loop;
-
 	createLabels(node.labels);
 
 	loop.header = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
 	loop.body = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
 	loop.end = llvm::BasicBlock::Create(ctx, "while-end", func, 0);
 
+	logical.tBB = loop.body;
+	logical.fBB = loop.end;
+
 	builder.CreateBr(loop.header);
 	builder.SetInsertPoint(loop.header);
-	builder.CreateCondBr(testZero(getValue(node.condition)), loop.body, loop.end);
+
+	getValue(node.condition, true, true);
+
 	builder.SetInsertPoint(loop.body);
 	inspect(node.body);
 	builder.CreateBr(loop.header);
@@ -489,14 +548,14 @@ void Compiler::visit(IterationStatement &node) {
 void Compiler::visit(SelectionStatement &node) {
 	createLabels(node.labels);
 
-	auto header = llvm::BasicBlock::Create(ctx, "if-header", func, 0); // only exists for readability
 	auto ifTrue = llvm::BasicBlock::Create(ctx, "if-true", func, 0);
 	auto end = llvm::BasicBlock::Create(ctx, "if-end", func, 0);
 	auto ifFalse = node.when_false.get() ? llvm::BasicBlock::Create(ctx, "if-false", func, 0) : end;
 
-	builder.CreateBr(header);
-	builder.SetInsertPoint(header);
-	builder.CreateCondBr(testZero(getValue(node.condition)), ifTrue, ifFalse); // @todo @important makeCF
+	logical.tBB = ifTrue;
+	logical.fBB = ifFalse;
+
+	getValue(node.condition, true, true);
 
 	builder.SetInsertPoint(ifTrue);
 	inspect(node.when_true);
