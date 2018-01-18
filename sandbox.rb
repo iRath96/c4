@@ -9,6 +9,7 @@ test = "../#{test}"
 
 arguments = [ $BIN, "/Users/alex/Desktop/test.c" ].compact
 stdout, stderr, status = Open3.capture3(*arguments)
+puts status.inspect
 if status.exitstatus > 0
   puts stderr
   exit 1
