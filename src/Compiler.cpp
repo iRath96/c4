@@ -79,6 +79,8 @@ llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
 	if (type == value->getType()) return value;
 	if (value->getType()->isPointerTy())
 		return builder.CreatePointerCast(value, type);
+	if (type->isPointerTy())
+		return builder.CreateIntToPtr(value, type);
 	return builder.CreateIntCast(value, type, true, "cast");
 }
 
