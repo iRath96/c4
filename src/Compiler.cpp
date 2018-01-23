@@ -81,7 +81,7 @@ llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
 		return builder.CreatePointerCast(value, type);
 	if (type->isPointerTy())
 		return builder.CreateIntToPtr(value, type);
-	return builder.CreateIntCast(value, type, true, "cast");
+	return builder.CreateIntCast(value, type, false, "cast");
 }
 
 Compiler::Compiler(Source<Ptr<ast::External>> *source, std::string moduleName)
@@ -273,11 +273,8 @@ void Compiler::visit(UnaryExpression &node) {
 	// others
 	case P::MINUS: value = builder.CreateNeg(getValue(*node.operand)); break;
 	case P::PLUS: value = getValue(*node.operand); break;
-	case P::BIT_NOT: createLogicalNot(node); break;
-	case P::LOG_NOT:
-		value = getValue(*node.operand);
-		value = builder.CreateICmpEQ(value, matchType(builder.getInt32(0), value->getType()));
-		break;
+	case P::BIT_NOT: value = builder.CreateNot(getValue(*node.operand)); break;
+	case P::LOG_NOT: createLogicalNot(node); break;
 
 	default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
 	}
@@ -342,6 +339,8 @@ void Compiler::createLogicalOr(BinaryExpression &node) {
 	logical.fBB = prevFBB;
 	getValue(*node.rhs, true, true);
 
+	builder.SetInsertPoint(post);
+
 	value = phi;
 	logical.needed = false;
 }
@@ -358,6 +357,8 @@ void Compiler::createLogicalNot(UnaryExpression &node) {
 
 	logical.tBB = logical.fBB;
 	logical.fBB = prevFBB;
+
+	builder.SetInsertPoint(post);
 
 	value = phi;
 	logical.needed = false;
