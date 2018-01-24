@@ -18,6 +18,8 @@
 
 using namespace std;
 
+bool experimentalOpt = false;
+
 // modified from:
 // https://stackoverflow.com/questions/24263259/c-stdseterase-with-stdremove-if
 
@@ -982,7 +984,7 @@ struct OptimizerPass : public FunctionPass {
 			if (debug_mode && hasChanged) func.print(errs());
 
 			if (!hasChanged) {
-				instantiateBlocks(func);
+				if (experimentalOpt) instantiateBlocks(func);
 				if (debug_mode) func.print(errs());
 				if (!hasChanged) break;
 			}

@@ -19,7 +19,7 @@ bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;
 enum {
-	TOKENIZE, PARSE, PRINT_AST, COMPILE
+	TOKENIZE, PARSE, PRINT_AST, COMPILE, OPTIMIZE
 } mode = COMPILE;
 
 const char *token_kind_name(Token::Kind kind) {
@@ -84,6 +84,10 @@ public:
 
 void parse(const char *filename) {
 	bool do_optimize = false;
+	if (mode == OPTIMIZE) {
+		mode = COMPILE;
+		do_optimize = true;
+	}
 
 	std::string name(filename);
 	size_t i = name.rfind('/') + 1, j = name.rfind('.');
@@ -172,14 +176,15 @@ void repl() {
 
 int main(int argc, const char *argv[]) {
 	for (int i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "--tokenize")) mode = TOKENIZE;
-		else if (!strcmp(argv[i], "--debug")) debug_mode = true;
-		else if (!strcmp(argv[i], "--no-sema")) do_sema = false;
-		else if (!strcmp(argv[i], "--dry")) enable_output = false;
-		else if (!strcmp(argv[i], "--parse")) mode = PARSE;
+		if      (!strcmp(argv[i], "--tokenize" )) mode = TOKENIZE;
+		else if (!strcmp(argv[i], "--debug"    )) debug_mode = true;
+		else if (!strcmp(argv[i], "--no-sema"  )) do_sema = false;
+		else if (!strcmp(argv[i], "--dry"      )) enable_output = false;
+		else if (!strcmp(argv[i], "--parse"    )) mode = PARSE;
 		else if (!strcmp(argv[i], "--print-ast")) mode = PRINT_AST;
-		else if (!strcmp(argv[i], "--repl")) repl();
-		else if (!strcmp(argv[i], "--compile")) mode = COMPILE;
+		else if (!strcmp(argv[i], "--repl"     )) repl();
+		else if (!strcmp(argv[i], "--compile"  )) mode = COMPILE;
+		else if (!strcmp(argv[i], "--optimize" )) mode = OPTIMIZE;
 		else parse(argv[i]);
 	}
 }

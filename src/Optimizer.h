@@ -13,6 +13,8 @@ namespace llvm {
 	class Module;
 }
 
+extern bool experimentalOpt;
+
 class Compiler;
 struct CompilerResult;
 class Optimizer : public Stream<CompilerResult, CompilerResult> {

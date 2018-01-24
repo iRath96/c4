@@ -53,6 +53,8 @@ llvm::Value *Compiler::getValue(Expression &expr, bool load, bool logicalNeeded)
 	// @todo very ugly
 	bool prevSL = shouldLoad;
 	bool prevLN = logical.needed;
+	auto prevTBB = logical.tBB;
+	auto prevFBB = logical.fBB;
 
 	shouldLoad = load;
 	logical.needed = logicalNeeded;
@@ -66,6 +68,8 @@ llvm::Value *Compiler::getValue(Expression &expr, bool load, bool logicalNeeded)
 		logical.needed = false;
 	}
 
+	logical.tBB = prevTBB;
+	logical.fBB = prevFBB;
 	logical.prevLN = logical.needed;
 
 	logical.needed = prevLN;
@@ -81,7 +85,7 @@ llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
 		return builder.CreatePointerCast(value, type);
 	if (type->isPointerTy())
 		return builder.CreateIntToPtr(value, type);
-	return builder.CreateIntCast(value, type, false, "cast");
+	return builder.CreateIntCast(value, type, true, "cast");
 }
 
 Compiler::Compiler(Source<Ptr<ast::External>> *source, std::string moduleName)
@@ -101,7 +105,7 @@ bool Compiler::next(CompilerResult *result) {
 
 		return true;
 	} else {
-		llvm::verifyModule(*mod);
+		llvm::verifyModule(*mod, &llvm::errs());
 		return false;
 	}
 }
@@ -119,7 +123,7 @@ void Compiler::visit(REPLStatement &node) {
 
 	inspect(node.statement);
 
-	llvm::verifyFunction(*func);
+	llvm::verifyFunction(*func, &llvm::errs());
 
 	cres.values.push_back(func);
 }
@@ -225,7 +229,7 @@ void Compiler::visit(Function &node) {
 		else builder.CreateRet(llvm::Constant::getNullValue(retType));
 	}
 
-	llvm::verifyFunction(*func);
+	llvm::verifyFunction(*func, &llvm::errs()); // @todo also verifyFunction in Optimizer
 }
 
 void Compiler::visit(IdentifierExpression &node) {
@@ -299,9 +303,9 @@ llvm::PHINode *Compiler::createLogicalPHI(llvm::BasicBlock *&post) {
 
 		builder.SetInsertPoint(post);
 
-		auto phi = builder.CreatePHI(builder.getInt1Ty(), 2);
-		phi->addIncoming(builder.getInt1(0), logical.fBB);
-		phi->addIncoming(builder.getInt1(1), logical.tBB);
+		auto phi = builder.CreatePHI(builder.getInt32Ty(), 2);
+		phi->addIncoming(builder.getInt32(0), logical.fBB);
+		phi->addIncoming(builder.getInt32(1), logical.tBB);
 
 		builder.SetInsertPoint(pre);
 
@@ -314,10 +318,10 @@ void Compiler::createLogicalAnd(BinaryExpression &node) {
 	auto phi = createLogicalPHI(post);
 
 	auto prevTBB = logical.tBB;
-	logical.tBB = llvm::BasicBlock::Create(ctx, "and-cont", func, 0);
+	auto myTBB = logical.tBB = llvm::BasicBlock::Create(ctx, "and-cont", func, 0);
 	getValue(*node.lhs, true, true);
 
-	builder.SetInsertPoint(logical.tBB);
+	builder.SetInsertPoint(myTBB);
 	logical.tBB = prevTBB;
 	getValue(*node.rhs, true, true);
 
@@ -332,10 +336,10 @@ void Compiler::createLogicalOr(BinaryExpression &node) {
 	auto phi = createLogicalPHI(post);
 
 	auto prevFBB = logical.fBB;
-	logical.fBB = llvm::BasicBlock::Create(ctx, "or-cont", func, 0);
+	auto myFBB = logical.fBB = llvm::BasicBlock::Create(ctx, "or-cont", func, 0);
 	getValue(*node.lhs, true, true);
 
-	builder.SetInsertPoint(logical.fBB);
+	builder.SetInsertPoint(myFBB);
 	logical.fBB = prevFBB;
 	getValue(*node.rhs, true, true);
 
@@ -350,12 +354,14 @@ void Compiler::createLogicalNot(UnaryExpression &node) {
 	auto phi = createLogicalPHI(post);
 
 	auto prevFBB = logical.fBB;
-	logical.fBB = logical.tBB;
+	auto prevTBB = logical.tBB;
+
+	logical.fBB = prevTBB;
 	logical.tBB = prevFBB;
 
 	getValue(*node.operand, true, true);
 
-	logical.tBB = logical.fBB;
+	logical.tBB = prevTBB;
 	logical.fBB = prevFBB;
 
 	builder.SetInsertPoint(post);
