@@ -2,12 +2,12 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
 test:
-  image: prodromou87/llvm:5.0.1
+  image: reaverproject/llvm-boost:50-1.65.0
   stage: test
   script:
     - "# I really should fork the container, but I'm lazy..."
     - apt-get update
-    - apt-get install -y ruby
+    - apt-get install -y ruby g++
     - make
     - gem install diffy
     - ruby test.rb
