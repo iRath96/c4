@@ -59,9 +59,9 @@ protected:
 	};
 
 	struct {
-		bool needed;
-		bool prevLN; // needed for ExpressionList
-		llvm::BasicBlock *tBB, *fBB;
+		bool needed = false;
+		bool prevLN = false; // needed for ExpressionList
+		llvm::BasicBlock *tBB = nullptr, *fBB = nullptr;
 	} logical;
 
 	bool shouldLoad;
