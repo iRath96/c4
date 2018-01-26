@@ -1,0 +1,24 @@
+sizeof(int):    4
+sizeof(char):   1
+sizeof(int *):  8
+sizeof(int **): 8
+sizeof(char *): 8
+
+sizeof(0):   4
+sizeof(1):   4
+sizeof(1+1): 4
+sizeof('a'): 4
+sizeof("a"): 8
+
+sizeof((char)0):     1
+sizeof(((char)0)+0): 4
+sizeof('a'+'b'):     4
+sizeof('a'*'b'):     4
+
+sizeof(charV): 1
+sizeof(intV):  4
+
+sizeof(struct A): 8
+sizeof(a):        8
+sizeof(struct B): 16
+sizeof(b):        16
