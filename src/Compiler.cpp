@@ -520,15 +520,16 @@ void Compiler::visit(ExpressionStatement &node) {
 
 void Compiler::visit(SizeofExpressionTypeName &node) {
 	auto &type = ((TypePair *)node.type.annotation.get())->type;
-	size_t size = dataLayout.getTypeAllocSize(createType(type.get()));
+	size_t size = type->getSizeOverride();
+	if (!size) size = dataLayout.getTypeAllocSize(createType(type.get()));
 	value = builder.getInt32((uint32_t)size);
 }
 
 void Compiler::visit(SizeofExpressionUnary &node) {
 	// @todo not DRY
-	// @todo sizeof("string") ?
 	auto &type = ((TypePair *)node.expression->annotation.get())->type;
-	size_t size = dataLayout.getTypeAllocSize(createType(type.get()));
+	size_t size = type->getSizeOverride();
+	if (!size) size = dataLayout.getTypeAllocSize(createType(type.get()));
 	value = builder.getInt32((uint32_t)size);
 }
 

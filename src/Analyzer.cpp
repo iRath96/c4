@@ -412,8 +412,13 @@ void Analyzer::visit(IdentifierExpression &node) {
 	node.annotate(dr);
 }
 
-void Analyzer::visit(Constant &node) { node.annotate(node.isChar ? charType : (node.value ? intType : nullptrType)); }
-void Analyzer::visit(StringLiteral &node) { node.annotate(stringType); }
+void Analyzer::visit(Constant &node) {
+	node.annotate(node.isChar ? charType : (node.value ? intType : nullptrType));
+}
+
+void Analyzer::visit(StringLiteral &node) {
+	node.annotate(new TypePair(false, std::make_shared<StringLiteralType>(node.value.length())));
+}
 
 void Analyzer::visit(CastExpression &node) {
 	auto tp = exprType(*node.expression);

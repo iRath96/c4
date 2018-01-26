@@ -151,6 +151,7 @@ public:
 	}
 };
 
+// @todo type singletons!
 class Type : public std::enable_shared_from_this<Type> {
 protected:
 	static std::set<Type *> typeQueue;
@@ -191,6 +192,7 @@ public:
 	virtual bool isVoid() const { return false; }
 	virtual bool isFunction() const { return false; }
 	virtual bool isArithmetic() const { return false; }
+	virtual size_t getSizeOverride() const { return 0; }
 
 	static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
 	static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
@@ -404,6 +406,16 @@ public:
 
 	virtual std::string describe() const { return base->describe() + "*"; }
 	virtual bool isVoidPointer() const { return base->isVoid(); }
+};
+
+class StringLiteralType : public PointerType {
+public:
+	size_t length;
+
+	StringLiteralType(size_t length)
+	: PointerType(std::make_shared<ArithmeticType>(ArithmeticType::CHAR)), length(length) {}
+
+	virtual size_t getSizeOverride() const { return length+1; }
 };
 
 class ExpressionStack {
