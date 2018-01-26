@@ -1,7 +1,13 @@
 #ifndef AST_h
 #define AST_h
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "common.h"
 #include "Lexer.h"
+
 
 namespace ast {
 
@@ -84,7 +90,7 @@ struct Node {
 	void annotate(Annotation *a) { annotation.reset(a); }
 	void annotate(Ptr<Annotation> a) { annotation = a; }
 
-	lexer::TextPosition pos;
+	common::TextPosition pos;
 	virtual void accept(Visitor &) = 0;
 };
 
@@ -126,7 +132,7 @@ struct IdentifierLabel : Label {
 struct DeclaratorModifier : Node {};
 
 struct DeclaratorParameterList : DeclaratorModifier {
-	ast::Vector<ast::ParameterDeclaration> parameters;
+	Vector<ParameterDeclaration> parameters;
 	bool isVariadic = false;
 	bool removedVoid = false;
 	ACCEPT

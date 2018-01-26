@@ -10,10 +10,21 @@
 #include "Lexer.h"
 #include "AST.h"
 
+
 extern bool debug_mode;
 
-class Parser;
+using namespace ast;
+using namespace lexer;
 
+class ParserError : public common::Error {
+public:
+	ParserError(const std::string &message, common::TextPosition pos)
+	: common::Error(message, pos) {}
+
+	[[noreturn]] virtual void raise() { throw *this; }
+};
+
+class Parser;
 struct DebugTree {
 public:
 	const char *function = "(root)";
@@ -129,19 +140,7 @@ public:
 		error_flag = _prev_ef; \
 	}
 
-const char *operator_name(lexer::Token::Punctuator punctuator);
-
-class ParserError {
-public:
-	std::string message;
-	lexer::TextPosition pos;
-
-	ParserError(const std::string &message, lexer::TextPosition pos)
-	: message(message), pos(pos) {}
-};
-
-using namespace lexer;
-using namespace ast;
+const char *operator_name(Token::Punctuator punctuator);
 
 class Parser : public Stream<Token, Ptr<External>> {
 	DebugTree dbg_tree_root;
@@ -160,7 +159,7 @@ public:
 	virtual bool next(Ptr<External> *result) {
 		if (peek().kind == Token::Kind::END) {
 			if (!this->i)
-				throw ParserError("empty file", lexer::TextPosition());
+				ParserError("empty file", common::TextPosition()).raise();
 			return false;
 		}
 
@@ -227,8 +226,8 @@ protected:
 	}
 
 	[[noreturn]] void error(const std::string &message, int offset = 0) {
-		TextPosition start_pos = peek(offset).pos;
-		throw ParserError(message, start_pos);
+		auto start_pos = peek(offset).pos;
+		ParserError(message, start_pos).raise();
 	}
 
 #pragma mark - Terminals
@@ -828,7 +827,7 @@ protected:
 		NON_OPTIONAL(read_primary_expression(node))
 
 		while (!eof()) {
-			TextPosition pos = peek().pos;
+			auto pos = peek().pos;
 
 			NON_UNIQUE
 			if (read_punctuator(Token::Punctuator::SB_OPEN)) {
@@ -908,7 +907,7 @@ protected:
 		node = unary_node;
 	ELSE_OPTION
 		Ptr<Expression> u;
-		TextPosition pos = peek().pos;
+		auto pos = peek().pos;
 
 		NON_UNIQUE
 		NON_OPTIONAL(read_keyword(Token::Keyword::SIZEOF))

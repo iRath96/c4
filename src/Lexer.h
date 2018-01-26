@@ -12,14 +12,9 @@
 #include <memory>
 
 #include "streams.h"
+#include "common.h"
 
 namespace lexer {
-
-struct TextPosition {
-	unsigned int index  = 0;
-	unsigned int line   = 1;
-	unsigned int column = 1;
-};
 
 struct Token {
 	enum class Precedence : uint8_t {
@@ -131,7 +126,7 @@ struct Token {
 		END
 	};
 
-	TextPosition pos, end_pos;
+	common::TextPosition pos, end_pos;
 
 	std::string text;
 
@@ -145,24 +140,22 @@ struct Token {
 	bool isChar = false;
 };
 
+class LexerError : public common::Error {
+public:
+	LexerError(const std::string &message, common::TextPosition pos)
+	: common::Error(message, pos) {}
+
+	[[noreturn]] virtual void raise() { throw *this; }
+};
+
 class Lexer : public Stream<std::string, Token> {
 public:
-	class Error {
-	public:
-		std::string message;
-		TextPosition start_pos, end_pos;
-
-		Error(const std::string &message, TextPosition start_pos, TextPosition end_pos)
-		: message(message), start_pos(start_pos), end_pos(end_pos) {}
-	};
-
 	Lexer(Source<std::string> *source) : Stream<std::string, Token>(source) {}
-
 	virtual bool next(Token *);
 
 protected:
 	std::string buffer;
-	TextPosition pos;
+	common::TextPosition pos;
 
 	Token::Punctuator last_punctuator;
 

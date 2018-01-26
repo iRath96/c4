@@ -336,9 +336,8 @@ int Lexer::read_constant(int &output) {
 }
 
 void Lexer::error(const std::string &message, int offset) {
-	TextPosition start_pos = pos;
 	consume(offset);
-	throw Error(message, start_pos, pos);
+	LexerError(message, pos).raise();
 }
 
 void Lexer::replace_eol(std::string &input) {

@@ -13,6 +13,9 @@
 #include <llvm/Support/PrettyStackTrace.h>
 #pragma GCC diagnostic pop
 
+
+using namespace ast;
+
 llvm::Type *Compiler::createType(const Type *type) {
 	auto it = types.find(type);
 	if (it != types.end()) return it->second;

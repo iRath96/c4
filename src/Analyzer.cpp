@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "Analyzer.h"
 
+namespace ast {
+
 void FileScope::close() {
 	BlockScope::close();
 
@@ -11,7 +13,7 @@ void FileScope::close() {
 			, ut.second);
 }
 
-Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined) {
+Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type, common::TextPosition pos, bool isDefined) {
 	for (auto &v : variables) {
 		if (v.first != name) continue;
 
@@ -60,7 +62,7 @@ Ptr<Type> Type::reference() {
 	return std::make_shared<PointerType>(shared_from_this());
 }
 
-Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos, ScopeStack &scopes) {
+Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, common::TextPosition pos, ScopeStack &scopes) {
 	using Keyword = lexer::Token::Keyword;
 
 	if (specifiers.size() != 1)
@@ -129,7 +131,7 @@ Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPo
 		throw AnalyzerError("unimplemented", spec->pos);
 }
 
-Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos, ScopeStack &scopes) {
+Ptr<Type> Type::create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, common::TextPosition pos, ScopeStack &scopes) {
 	return create(specifiers, pos, scopes)->applyDeclarator(decl, scopes);
 }
 
@@ -157,7 +159,7 @@ Ptr<Type> Type::applyDeclarator(Declarator decl, ScopeStack &scopes) {
 	return result;
 }
 
-Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
+Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, common::TextPosition pos) {
 	auto arA = dynamic_cast<ArithmeticType *>(a.get());
 	auto arB = dynamic_cast<ArithmeticType *>(b.get());
 
@@ -172,7 +174,7 @@ Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
 	throw AnalyzerError("cannot add incompatible types", pos);
 }
 
-Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
+Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, common::TextPosition pos) {
 	auto arA = dynamic_cast<ArithmeticType *>(a.get());
 	auto arB = dynamic_cast<ArithmeticType *>(b.get());
 
@@ -655,4 +657,6 @@ void Analyzer::visit(ReturnStatement &node) {
 			"result type '" + expectedType->describe() + "'",
 			node.pos
 		);
+}
+
 }

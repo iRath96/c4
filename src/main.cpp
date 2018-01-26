@@ -7,6 +7,7 @@
 #include "Lexer.h"
 #include "Parser.h"
 
+#include "common.h"
 #include "Analyzer.h"
 #include "Beautifier.h"
 #include "Compiler.h"
@@ -102,7 +103,13 @@ void parse(const char *filename) {
 	Analyzer analyzer(buffer.createChild());
 	Compiler compiler(&analyzer, name);
 	Optimizer optimizer(&compiler, compiler.modPtr.get());
-	FileSink output(do_optimize ? (Source<CompilerResult> *)&optimizer : (Source<CompilerResult> *)&compiler, compiler.modPtr.get(), llPath, debug_mode);
+	FileSink output(
+		do_optimize ?
+			(Source<CompilerResult> *)&optimizer :
+			(Source<CompilerResult> *)&compiler, compiler.modPtr.get(),
+		llPath,
+		debug_mode
+	);
 
 	try {
 		if (mode == COMPILE) output.drain();
@@ -116,18 +123,7 @@ void parse(const char *filename) {
 			}
 		} else if (do_sema) analyzer.drain();
 		else buffer.drain();
-	} catch (Lexer::Error e) {
-		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.end_pos.line, e.end_pos.column, e.message.c_str());
-		exit(1);
-	} catch (ParserError e) {
-		if (debug_mode) {
-			parser.print_debug_tree();
-			parser.print_context();
-		}
-
-		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
-		exit(1);
-	} catch (AnalyzerError e) {
+	} catch (common::Error &e) {
 		fprintf(stderr, "%s:%d:%d: error: %s\n", filename, e.pos.line, e.pos.column, e.message.c_str());
 		exit(1);
 	}
@@ -156,19 +152,9 @@ void repl() {
 	source.parser = &parser;
 
 	while (true) {
-		try { // @todo not DRY
+		try {
 			jit.next(nullptr);
-		} catch (Lexer::Error e) { // @todo style mismatch with ParserError/AnalyzerError
-			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.end_pos.line, e.end_pos.column, e.message.c_str());
-		} catch (ParserError e) {
-			if (debug_mode) {
-				parser.print_debug_tree();
-				parser.print_context();
-			}
-
-			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
-			parser.reset();
-		} catch (AnalyzerError e) {
+		} catch (common::Error &e) {
 			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
 		}
 	}

@@ -2,6 +2,7 @@
 #define Analyzer_h
 
 #include "AST.h"
+#include "common.h"
 
 #include <iostream>
 #include <functional>
@@ -10,15 +11,15 @@
 #include <map>
 #include <stack>
 
-using namespace ast;
 
-class AnalyzerError {
+namespace ast {
+
+class AnalyzerError : public common::Error {
 public:
-	std::string message;
-	lexer::TextPosition pos;
+	AnalyzerError(const std::string &message, common::TextPosition pos)
+	: common::Error(message, pos) {}
 
-	AnalyzerError(const std::string &message, lexer::TextPosition pos)
-	: message(message), pos(pos) {}
+	[[noreturn]] virtual void raise() { throw *this; }
 };
 
 class Scope {
@@ -43,7 +44,7 @@ public:
 
 	Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct);
 
-	Ptr<DeclarationRef> declareVariable(std::string name, Ptr<Type> type, lexer::TextPosition pos, bool isDefined);
+	Ptr<DeclarationRef> declareVariable(std::string name, Ptr<Type> type, common::TextPosition pos, bool isDefined);
 	bool resolveVariable(std::string name, Ptr<DeclarationRef> &result) {
 		auto it = variables.find(name);
 		if (it == variables.end()) return false;
@@ -54,7 +55,7 @@ public:
 
 class FileScope : public BlockScope {
 public:
-	std::vector<std::pair<Ptr<Type>, lexer::TextPosition>> unresolvedTentative;
+	std::vector<std::pair<Ptr<Type>, common::TextPosition>> unresolvedTentative;
 	virtual void close();
 };
 
@@ -63,17 +64,17 @@ public:
 	Ptr<Type> returnType;
 
 	std::set<std::string> resolvedLabels;
-	std::map<std::string, lexer::TextPosition> unresolvedLabels;
+	std::map<std::string, common::TextPosition> unresolvedLabels;
 
-	void resolveLabel(std::string id, lexer::TextPosition pos) {
+	void resolveLabel(std::string id, common::TextPosition pos) {
 		if (resolvedLabels.find(id) != resolvedLabels.end())
-			throw AnalyzerError("redefinition of label '" + id + "'", pos);
+			AnalyzerError("redefinition of label '" + id + "'", pos).raise();
 
 		resolvedLabels.insert(id);
 		unresolvedLabels.erase(id);
 	}
 
-	void referenceLabel(std::string id, lexer::TextPosition pos) {
+	void referenceLabel(std::string id, common::TextPosition pos) {
 		if (resolvedLabels.find(id) == resolvedLabels.end())
 			unresolvedLabels.insert(std::make_pair(id, pos));
 	}
@@ -84,7 +85,7 @@ public:
 		if (unresolvedLabels.empty()) return;
 
 		auto lab = *unresolvedLabels.begin();
-		throw AnalyzerError("use of undeclared label '" + lab.first + "'", lab.second);
+		AnalyzerError("use of undeclared label '" + lab.first + "'", lab.second).raise();
 	}
 };
 
@@ -165,22 +166,22 @@ public:
 
 	static Ptr<Type> ptrdiffType;
 
-	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
-		throw AnalyzerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos);
+	virtual Ptr<Type> dereference(common::TextPosition pos) const {
+		AnalyzerError("indirection requires pointer operand ('" + describe() + "' invalid)", pos).raise();
 	}
 
-	virtual Ptr<Type> call(ast::PtrVector<Type>, lexer::TextPosition pos) const {
-		throw AnalyzerError("called object type '" + describe() + "' is not a function or function pointer", pos);
+	virtual Ptr<Type> call(ast::PtrVector<Type>, common::TextPosition pos) const {
+		AnalyzerError("called object type '" + describe() + "' is not a function or function pointer", pos).raise();
 	}
 
-	virtual const Member &getMember(std::string, lexer::TextPosition pos) const {
-		throw AnalyzerError("member reference base type '" + describe() + "' is not a structure or union", pos);
+	virtual const Member &getMember(std::string, common::TextPosition pos) const {
+		AnalyzerError("member reference base type '" + describe() + "' is not a structure or union", pos).raise();
 	}
 
 	Ptr<Type> reference(); // @todo should be const
 
-	static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, lexer::TextPosition pos, ScopeStack &scopes);
-	static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, lexer::TextPosition pos, ScopeStack &scopes);
+	static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, common::TextPosition pos, ScopeStack &scopes);
+	static Ptr<Type> create(const PtrVector<TypeSpecifier> &specifiers, const Declarator &decl, common::TextPosition pos, ScopeStack &scopes);
 
 	Ptr<Type> applyDeclarator(Declarator decl, ScopeStack &scopes);
 
@@ -194,8 +195,8 @@ public:
 	virtual bool isArithmetic() const { return false; }
 	virtual size_t getSizeOverride() const { return 0; }
 
-	static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
-	static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos);
+	static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, common::TextPosition pos);
+	static Ptr<Type> subtract(Ptr<Type> &a, Ptr<Type> &b, common::TextPosition pos);
 
 	static bool canCompare(const Type &a, const Type &b, bool broad = false);
 
@@ -214,7 +215,7 @@ struct DeclarationRef : TypePair {
 	DeclarationRef() { lvalue = true; }
 
 	bool isDefined = false;
-	lexer::TextPosition pos;
+	common::TextPosition pos;
 };
 
 class ArithmeticType : public Type {
@@ -248,8 +249,8 @@ class NullPointerType : public ArithmeticType {
 public:
 	virtual bool isCompatible(const Type &other) const;
 
-	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
-		throw AnalyzerError("cannot dereference null pointer", pos);
+	virtual Ptr<Type> dereference(common::TextPosition pos) const {
+		AnalyzerError("cannot dereference null pointer", pos).raise();
 	}
 
 	virtual std::string name() const { return "nullptr"; }
@@ -264,7 +265,7 @@ public:
 	std::string name;
 	bool hasTag() const { return !name.empty(); }
 
-	lexer::TextPosition pos;
+	common::TextPosition pos;
 	lexer::Token::Keyword kind;
 
 	std::vector<Member> members; // @todo hashmap
@@ -272,21 +273,21 @@ public:
 	virtual bool isScalar() const { return false; }
 	virtual bool isCompatible(const Type &other) const { return this == &other; }
 
-	virtual const Member &getMember(std::string name, lexer::TextPosition pos) const {
+	virtual const Member &getMember(std::string name, common::TextPosition pos) const {
 		if (!isComplete())
-			throw AnalyzerError("member access into incomplete type", pos);
+			AnalyzerError("member access into incomplete type", pos).raise();
 
 		for (auto &member : members) // @todo not efficient
 			if (member.name == name)
 				return member;
 
-		throw AnalyzerError("no member named '" + name + "' in '" + describe() + "'", pos);
+		AnalyzerError("no member named '" + name + "' in '" + describe() + "'", pos).raise();
 	}
 
-	void addMember(std::string name, Ptr<Type> type, lexer::TextPosition pos) {
+	void addMember(std::string name, Ptr<Type> type, common::TextPosition pos) {
 		for (auto &member : members)
 			if (member.name == name)
-				throw AnalyzerError("member " + name + " redefined", pos);
+				AnalyzerError("member " + name + " redefined", pos).raise();
 
 		Member m;
 		m.index = (int)members.size();
@@ -295,13 +296,13 @@ public:
 		members.push_back(m);
 	}
 
-	void addAnonymousStructure(Ptr<Type> type, lexer::TextPosition pos) {
+	void addAnonymousStructure(Ptr<Type> type, common::TextPosition pos) {
 		auto &ct = dynamic_cast<ComposedType &>(*type);
 		for (auto &member : ct.members) {
 			// @todo correct error position
 			for (auto &m : members)
 				if (m.name == member.name)
-					throw AnalyzerError("member " + m.name + " redefined", pos);
+					AnalyzerError("member " + m.name + " redefined", pos).raise();
 
 			Member m = member;
 			m.index = (int)members.size();
@@ -335,27 +336,27 @@ public:
 
 	virtual bool isCompatible(const Type &other) const;
 
-	virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
+	virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, common::TextPosition pos) const {
 		if (isVariadic ? (argTypes.size() < parameters.size()) : (argTypes.size() != parameters.size())) {
 			std::string q = argTypes.size() > parameters.size() ? "many" : "few"; // @todo message for variadic
-			throw AnalyzerError(
+			AnalyzerError(
 				"too " + q + " arguments to function call, expected " +
 				std::to_string(parameters.size()) + ", have " +
 				std::to_string(argTypes.size())
-			, pos);
+			, pos).raise();
 		}
 
 		for (size_t i = 0; i < parameters.size(); ++i) {
 			if (!parameters[i]->isComplete())
-				throw AnalyzerError(
+				AnalyzerError(
 					"argument type '" + parameters[i]->describe() + "' is incomplete"
-				, pos);
+				, pos).raise();
 
 			if (!Type::canCompare(*parameters[i], *argTypes[i], true))
-				throw AnalyzerError(
+				AnalyzerError(
 					"passing '" + argTypes[i]->describe() + "' to parameter of " +
 					"incompatible type '" + parameters[i]->describe() + "'"
-				, pos);
+				, pos).raise();
 		}
 
 		return returnType;
@@ -394,13 +395,13 @@ public:
 	virtual bool isScalar() const { return true; }
 	virtual bool isCompatible(const Type &other) const;
 
-	virtual Ptr<Type> dereference(lexer::TextPosition pos) const {
+	virtual Ptr<Type> dereference(common::TextPosition pos) const {
 		if (!base->isComplete())
-			throw AnalyzerError("incomplete type '" + base->describe() + "' where a complete type is required", pos);
+			AnalyzerError("incomplete type '" + base->describe() + "' where a complete type is required", pos).raise();
 		return base;
 	}
 
-	virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, lexer::TextPosition pos) const {
+	virtual Ptr<Type> call(ast::PtrVector<Type> argTypes, common::TextPosition pos) const {
 		return base->call(argTypes, pos);
 	}
 
@@ -437,7 +438,6 @@ public:
 };
 
 class Analyzer : public Visitor, public Stream<ast::Ptr<ast::External>, ast::Ptr<ast::External>> {
-protected:
 	ScopeStack scopes;
 
 	void inspect(Node &node) {
@@ -451,7 +451,7 @@ protected:
 	}
 
 	[[noreturn]] void error(std::string message, Node &node) {
-		throw AnalyzerError(message, node.pos);
+		AnalyzerError(message, node.pos).raise();
 	}
 
 	TypePair &exprType(Expression &expr) { // @todo assert stack size
@@ -531,5 +531,7 @@ protected:
 	virtual void visit(SizeofExpressionTypeName &node);
 	virtual void visit(SizeofExpressionUnary &node);
 };
+
+}
 
 #endif /* Analyzer_h */

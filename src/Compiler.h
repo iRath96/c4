@@ -23,8 +23,6 @@ namespace llvm {
 	class Module;
 };
 
-using namespace ast;
-
 class Compiler;
 struct CompilerResult { // @todo put into Compiler
 	Compiler *compiler;
@@ -34,14 +32,14 @@ struct CompilerResult { // @todo put into Compiler
 	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}
 };
 
-class Compiler : public Visitor, public Stream<Ptr<External>, CompilerResult> {
+class Compiler : public ast::Visitor, public Stream<ast::Ptr<ast::External>, CompilerResult> {
 protected:
-	void inspect(Node &node) {
+	void inspect(ast::Node &node) {
 		node.accept(*this);
 	}
 
 	template<typename T>
-	void inspect(Ptr<T> &node) { // @todo not DRY
+	void inspect(ast::Ptr<T> &node) { // @todo not DRY
 		if (node.get()) node->accept(*this);
 	}
 
@@ -70,61 +68,61 @@ protected:
 
 	CompilerResult cres = CompilerResult(this);
 
-	std::map<const DeclarationRef *, llvm::Value *> values;
-	std::map<const Type *, llvm::Type *> types;
+	std::map<const ast::DeclarationRef *, llvm::Value *> values;
+	std::map<const ast::Type *, llvm::Type *> types;
 
 	Loop loop;
 	std::map<std::string, llvm::BasicBlock *> labels;
 	std::map<std::string, std::vector<llvm::BranchInst *>> labelRefs;
 
 public:
-	Compiler(Source<Ptr<ast::External>> *source, std::string moduleName);
+	Compiler(Source<ast::Ptr<ast::External>> *source, std::string moduleName);
 	virtual bool next(CompilerResult *result);
 
 protected:
-	llvm::Type *createType(const Type *type);
-	llvm::Value *getValue(Expression &expr, bool load = true, bool logical = false);
+	llvm::Type *createType(const ast::Type *type);
+	llvm::Value *getValue(ast::Expression &expr, bool load = true, bool logical = false);
 	llvm::Value *matchType(llvm::Value *value, llvm::Type *type);
 
 	llvm::Value *performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name = "add");
 	llvm::Value *performSub(llvm::Value *lhs, llvm::Value *rhs, std::string name = "sub");
 
-	void createLabels(const PtrVector<Label> &labels);
+	void createLabels(const ast::PtrVector<ast::Label> &labels);
 	void createDeadBlock();
 
 	llvm::PHINode *createLogicalPHI(llvm::BasicBlock *&post);
-	void createLogicalAnd(BinaryExpression &node);
-	void createLogicalOr(BinaryExpression &node);
-	void createLogicalNot(UnaryExpression &node);
+	void createLogicalAnd(ast::BinaryExpression &node);
+	void createLogicalOr(ast::BinaryExpression &node);
+	void createLogicalNot(ast::UnaryExpression &node);
 
-	virtual void visit(REPLStatement &node);
-	virtual void visit(CompoundStatement &node);
-	virtual void visit(IterationStatement &node);
-	virtual void visit(SelectionStatement &node);
-	virtual void visit(ReturnStatement &node);
-	virtual void visit(GotoStatement &node);
-	virtual void visit(ContinueStatement &node);
-	virtual void visit(ExpressionStatement &node);
+	virtual void visit(ast::REPLStatement &node);
+	virtual void visit(ast::CompoundStatement &node);
+	virtual void visit(ast::IterationStatement &node);
+	virtual void visit(ast::SelectionStatement &node);
+	virtual void visit(ast::ReturnStatement &node);
+	virtual void visit(ast::GotoStatement &node);
+	virtual void visit(ast::ContinueStatement &node);
+	virtual void visit(ast::ExpressionStatement &node);
 
-	void declaration(Declaration &node, bool isGlobal);
-	void visit(Declaration &node);
-	virtual void visit(GlobalVariable &node);
-	virtual void visit(Function &node);
+	void declaration(ast::Declaration &node, bool isGlobal);
+	void visit(ast::Declaration &node);
+	virtual void visit(ast::GlobalVariable &node);
+	virtual void visit(ast::Function &node);
 
-	virtual void visit(IdentifierExpression &node);
-	virtual void visit(Constant &node);
-	virtual void visit(StringLiteral &node);
-	virtual void visit(UnaryExpression &node);
-	virtual void visit(BinaryExpression &node);
-	virtual void visit(ConditionalExpression &);
-	virtual void visit(ExpressionList &node);
-	virtual void visit(CallExpression &node);
-	virtual void visit(CastExpression &node);
-	virtual void visit(SubscriptExpression &node);
-	virtual void visit(MemberExpression &node);
-	virtual void visit(PostExpression &node);
-	virtual void visit(SizeofExpressionTypeName &node);
-	virtual void visit(SizeofExpressionUnary &node);
+	virtual void visit(ast::IdentifierExpression &node);
+	virtual void visit(ast::Constant &node);
+	virtual void visit(ast::StringLiteral &node);
+	virtual void visit(ast::UnaryExpression &node);
+	virtual void visit(ast::BinaryExpression &node);
+	virtual void visit(ast::ConditionalExpression &);
+	virtual void visit(ast::ExpressionList &node);
+	virtual void visit(ast::CallExpression &node);
+	virtual void visit(ast::CastExpression &node);
+	virtual void visit(ast::SubscriptExpression &node);
+	virtual void visit(ast::MemberExpression &node);
+	virtual void visit(ast::PostExpression &node);
+	virtual void visit(ast::SizeofExpressionTypeName &node);
+	virtual void visit(ast::SizeofExpressionUnary &node);
 };
 
 #endif
