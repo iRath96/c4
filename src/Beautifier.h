@@ -6,7 +6,7 @@
 
 using namespace ast;
 
-class Beautifier : public Visitor, public Sink<ast::Ptr<ast::External>> {
+class Beautifier : public Visitor, public streams::Sink<ast::Ptr<ast::External>> {
 protected:
 	std::string indent = "";
 	bool isFirst = true;

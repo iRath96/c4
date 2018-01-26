@@ -16,6 +16,8 @@
 #include "Optimizer.h"
 
 
+using namespace streams;
+
 bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;

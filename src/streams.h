@@ -4,27 +4,68 @@
 #include <stddef.h>
 #include <vector>
 
+/**
+ * Streams allow different units to be connected seamlessly.
+ * Important concepts are _pipelines_, _nodes_ and _fragments_.
+ * Pipelines are networks of nodes, which solve a given task
+ * (e. g. InputFile -> Lexer -> Parser -> Compiler -> OutputFile).
+ * Nodes describe the units within the network. These can generate fragments
+ * and/or accept fragments. And lastly, a fragment is essentially a packet of
+ * data.
+ */
+namespace streams {
+
+/**
+ * Represents a node in a pipeline which generates fragments on request.
+ * It has no inputs and exactly one `Stream` should be connected to it.
+ * @tparam P The output fraagment data type.
+ */
 template<typename P>
 class Source {
 public:
 	typedef P Output;
-	virtual bool next(Output *) = 0;
+
+	/**
+	 * Queries this node for the next fragment.
+	 * @param[out] fragment
+	 *   A pointer to where the resulting fragment should be written.
+	 *   This will be left untouched in case of failure.
+	 * @return `true` if the operation was succesful, `false` if no new fragment is available.
+	 */
+	virtual bool next(Output *fragment) = 0;
+
 	virtual ~Source() {}
 };
 
+/**
+ * Represents a node in a pipeline which accepts fragments from a source and generates
+ * new fragments in a stateful manner. When asked to generate a fragment this
+ * node should ask the source it is connected to for one or more fragment which are then
+ * operated on. During process it is allowed to generate one or more fragments based on
+ * the input fragments.
+ * @tparam P The input fragment data type.
+ * @tparam Q The output fragment data type.
+ */
 template<typename P, typename Q>
 class Stream : public Source<Q> {
 protected:
 	Source<P> *source;
 public:
 	typedef P Input;
+
 	Stream(Source<P> *source) : source(source) {}
+
 	void drain() {
 		P output;
 		while (this->next(&output));
 	}
 };
 
+/**
+ * Represents a node in a pipeline which performs operations on fragments but does
+ * not generate new fragments.
+ * @tparam P The input fragment data type.
+ */
 template<typename P>
 class Sink : public Stream<P, void> {
 public:
@@ -34,6 +75,11 @@ public:
 template<typename P>
 class Buffer;
 
+/**
+ * Used by `Buffer` to allow multiple streams to be connected to the
+ * same source. Use a `Buffer` to create instances of this.
+ * @see Buffer
+ */
 template<typename P>
 class BufferChild : public Source<P> {
 protected:
@@ -47,6 +93,13 @@ public:
 	virtual bool next(P *);
 };
 
+/**
+ * Allows multiple streams to be connected to the same source.
+ * For this to work, a buffer can spwan several `BufferChild`ren
+ * which can then be used as sources for other streams.
+ * @tparam P The input fragment data type.
+ * @see BufferChild
+ */
 template<typename P>
 class Buffer : public Sink<P> {
 protected:
@@ -97,6 +150,8 @@ BufferChild<P> *Buffer<P>::createChild() {
 template<typename P>
 bool BufferChild<P>::next(P *output) {
 	return parent->get(index++, output);
+}
+
 }
 
 #endif /* streams_h */

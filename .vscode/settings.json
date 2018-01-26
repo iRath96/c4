@@ -6,6 +6,8 @@
     "set": "c",
     "string": "c",
     "unordered_map": "c",
-    "vector": "c"
+    "vector": "c",
+    "algorithm": "c",
+    "random": "c"
   }
 }

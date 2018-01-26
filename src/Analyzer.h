@@ -437,7 +437,7 @@ public:
 	TypePair &top() { return stack.top(); }
 };
 
-class Analyzer : public Visitor, public Stream<ast::Ptr<ast::External>, ast::Ptr<ast::External>> {
+class Analyzer : public Visitor, public streams::Stream<ast::Ptr<ast::External>, ast::Ptr<ast::External>> {
 	ScopeStack scopes;
 
 	void inspect(Node &node) {

@@ -11,7 +11,7 @@ namespace llvm {
 
 class Compiler;
 struct CompilerResult;
-class FileSink : public Stream<CompilerResult, void> {
+class FileSink : public streams::Stream<CompilerResult, void> {
 protected:
 	llvm::Module *mod;
 public:

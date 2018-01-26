@@ -17,7 +17,7 @@ extern bool experimentalOpt;
 
 class Compiler;
 struct CompilerResult;
-class Optimizer : public Stream<CompilerResult, CompilerResult> {
+class Optimizer : public streams::Stream<CompilerResult, CompilerResult> {
 protected:
 	llvm::legacy::FunctionPassManager fpm;
 public:

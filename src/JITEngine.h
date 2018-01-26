@@ -10,7 +10,7 @@ namespace llvm {
 
 class Compiler;
 struct CompilerResult;
-class JITEngine : public Stream<CompilerResult, void> {
+class JITEngine : public streams::Stream<CompilerResult, void> {
 protected:
 	llvm::ExecutionEngine *engine;
 public:

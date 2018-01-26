@@ -32,7 +32,7 @@ struct CompilerResult { // @todo put into Compiler
 	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}
 };
 
-class Compiler : public ast::Visitor, public Stream<ast::Ptr<ast::External>, CompilerResult> {
+class Compiler : public ast::Visitor, public streams::Stream<ast::Ptr<ast::External>, CompilerResult> {
 protected:
 	void inspect(ast::Node &node) {
 		node.accept(*this);
@@ -76,7 +76,7 @@ protected:
 	std::map<std::string, std::vector<llvm::BranchInst *>> labelRefs;
 
 public:
-	Compiler(Source<ast::Ptr<ast::External>> *source, std::string moduleName);
+	Compiler(streams::Source<ast::Ptr<ast::External>> *source, std::string moduleName);
 	virtual bool next(CompilerResult *result);
 
 protected:

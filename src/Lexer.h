@@ -148,7 +148,7 @@ public:
 	[[noreturn]] virtual void raise() { throw *this; }
 };
 
-class Lexer : public Stream<std::string, Token> {
+class Lexer : public streams::Stream<std::string, Token> {
 public:
 	Lexer(Source<std::string> *source) : Stream<std::string, Token>(source) {}
 	virtual bool next(Token *);

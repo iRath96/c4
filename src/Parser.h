@@ -142,7 +142,7 @@ public:
 
 const char *operator_name(Token::Punctuator punctuator);
 
-class Parser : public Stream<Token, Ptr<External>> {
+class Parser : public streams::Stream<Token, Ptr<External>> {
 	DebugTree dbg_tree_root;
 	DebugTree *dbg_tree_current = &dbg_tree_root;
 public:
