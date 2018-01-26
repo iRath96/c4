@@ -15,7 +15,7 @@ int main(void) {
 	printf("\n");
 	printf("sizeof((char)0):     %d\n", sizeof((char)0));
 	printf("sizeof(((char)0)+0): %d\n", sizeof(((char)0)+0));
-	printf("sizeof('a'+'b'):     %d\n", sizeof(((char)0)+0));
+	printf("sizeof('a'+'b'):     %d\n", sizeof('a'+'b'));
 	printf("sizeof('a'*'b'):     %d\n", sizeof('a'*'b'));
 	printf("\n");
 

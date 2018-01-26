@@ -161,12 +161,7 @@ Ptr<Type> Type::add(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
 	auto arA = dynamic_cast<ArithmeticType *>(a.get());
 	auto arB = dynamic_cast<ArithmeticType *>(b.get());
 
-	if (arA && arB) {
-		auto size = ArithmeticType::max(arA->size, arB->size);
-		if (arA->size == size) return a;
-		if (arB->size == size) return b;
-		return std::make_shared<ArithmeticType>(size);
-	}
+	if (arA && arB) return std::make_shared<ArithmeticType>();
 
 	auto ptrA = dynamic_cast<PointerType *>(a.get());
 	auto ptrB = dynamic_cast<PointerType *>(b.get());
@@ -181,12 +176,7 @@ Ptr<Type> Type::subtract(Ptr<Type> &a, Ptr<Type> &b, lexer::TextPosition pos) {
 	auto arA = dynamic_cast<ArithmeticType *>(a.get());
 	auto arB = dynamic_cast<ArithmeticType *>(b.get());
 
-	if (arA && arB) { // @todo not DRY
-		auto size = ArithmeticType::max(arA->size, arB->size);
-		if (arA->size == size) return a;
-		if (arB->size == size) return b;
-		return std::make_shared<ArithmeticType>(size);
-	}
+	if (arA && arB) return std::make_shared<ArithmeticType>();
 
 	auto ptrA = dynamic_cast<PointerType *>(a.get());
 	auto ptrB = dynamic_cast<PointerType *>(b.get());
@@ -487,7 +477,7 @@ void Analyzer::visit(BinaryExpression &node) {
 					"' and '" + rhs.type->describe() + "')",
 					node
 				);
-			node.annotate(new TypePair(false, lhs.type)); // @todo?
+			node.annotate(intType); // @todo?
 			break;
 		}
 
