@@ -55,6 +55,10 @@ public:
 
 	Stream(Source<P> *source) : source(source) {}
 
+	/**
+	 * Requests fragments from the source and transforms these until no more fragments
+	 * are available from the source.
+	 */
 	void drain() {
 		P output;
 		while (this->next(&output));
@@ -130,8 +134,22 @@ public:
 		for (const auto &child : children) delete child;
 	}
 
+	/**
+	 * Returns a new BufferChild that can be used as Source.
+	 * The first fragment that this child returns will be the first fragment
+	 * that was fetched from the Buffer's source. If the BufferChild is
+	 * asked for the next fragment, it will first look into the buffer of its
+	 * parent. If no next fragment is available in the buffer, the source
+	 * will be queried for a new fragment. If the source returns false,
+	 * the BufferChild will also return false.
+	 * @return A new BufferChild connected to this Buffer.
+	 */
 	Child *createChild();
 
+	/**
+	 * This method exists so that drain can be used on a Buffer.
+	 * This will then drain the source of this Buffer.
+	 */
 	virtual bool next(void *) {
 		P item;
 		if (!this->source->next(&item)) return false;
