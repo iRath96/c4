@@ -439,8 +439,10 @@ void Compiler::visit(ConditionalExpression &) {
 }
 
 void Compiler::visit(ExpressionList &node) {
-	for (auto &child : node.children)
-		getValue(*child, true, logical.needed && (&child == &node.children.back()));
+	for (auto &child : node.children) {
+		bool isLast = &child == &node.children.back();
+		getValue(*child, isLast ? shouldLoad : true, isLast ? logical.needed : false);
+	}
 	
 	logical.needed = logical.prevLN;
 }
