@@ -39,6 +39,11 @@ const char *token_kind_name(Token::Kind kind) {
 	return "unknown";
 }
 
+/**
+ * When first requested to yield a fragment, reads the entire file
+ * and returns its contents. Subsequent fragment requests will return
+ * failure.
+ */
 class FileSource : public Source<std::string> {
 protected:
 	std::string filename;
@@ -72,6 +77,9 @@ public:
 	}
 };
 
+/**
+ * When asked to yield a fragment, reads a line from stdin and returns it.
+ */
 class REPLSource : public Source<std::string> {
 public:
 	Parser *parser;

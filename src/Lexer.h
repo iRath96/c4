@@ -148,6 +148,13 @@ public:
 	[[noreturn]] virtual void raise() { throw *this; }
 };
 
+/**
+ * When asked for a fragment, requests data from its source and tries to extract
+ * a single token from it. The remaining data (not part of the token) is buffered.
+ * @note It would be more elegant to request single characters from the source and
+ *       have some rewind functionality -- but sadly, this would also be a bit less
+ *       efficient.
+ */
 class Lexer : public streams::Stream<std::string, Token> {
 public:
 	Lexer(Source<std::string> *source) : Stream<std::string, Token>(source) {}

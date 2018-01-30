@@ -81,10 +81,17 @@ struct Visitor {
 
 #define ACCEPT virtual void accept(Visitor &v) { v.visit(*this); }
 
+/**
+ * Information attached to an AST node, typically as a result of a form of analysis.
+ * @see Analyzer
+ */
 struct Annotation {
 	virtual ~Annotation() {}
 };
 
+/**
+ * A node in the AST tree.
+ */
 struct Node {
 	Ptr<Annotation> annotation;
 	void annotate(Annotation *a) { annotation.reset(a); }

@@ -30,6 +30,11 @@ public:
 	: message(message), pos(pos) {}
 
 	virtual ~Error() {}
+
+	/**
+	 * Used to re-throw this error after it has been catched
+	 * polymorphically.
+	 */
 	virtual void raise() { throw *this; }
 };
 

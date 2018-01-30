@@ -6,6 +6,10 @@
 
 using namespace ast;
 
+/**
+ * Reads external AST from its source and outputs these in a human-readable format
+ * to stdout.
+ */
 class Beautifier : public Visitor, public streams::Sink<ast::Ptr<ast::External>> {
 protected:
 	std::string indent = "";

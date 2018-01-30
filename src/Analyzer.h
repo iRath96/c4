@@ -22,15 +22,34 @@ public:
 	[[noreturn]] virtual void raise() { throw *this; }
 };
 
+/**
+ * Stores information that is only locally accessible within the program
+ * for a limited lifetime.
+ * @todo might want to use con-/destructor instead of open/close.
+ */
 class Scope {
 public:
+	/**
+	 * Executed when this scope is entered.
+	 * This can be used to initialize data relevant for this scope.
+	 */
+
 	virtual void open() {};
+
+	/**
+	 * Executed when this scope is left.
+	 * This can be used to throw errors (for example when tentative
+	 * declarations have uncompleted types).
+	 */
 	virtual void close() {};
 };
 
 class Type;
 struct DeclarationRef;
 
+/**
+ * A scope that stores declarations of variables and structures.
+ */
 class BlockScope : public Scope {
 public:
 	std::map<std::string, Ptr<DeclarationRef>> variables;
@@ -53,12 +72,20 @@ public:
 	}
 };
 
+/**
+ * A scope encapsulating the entire program. This scope makes sure that types of tentative
+ * declarations are resolved.
+ */
 class FileScope : public BlockScope {
 public:
 	std::vector<std::pair<Ptr<Type>, common::TextPosition>> unresolvedTentative;
 	virtual void close();
 };
 
+/**
+ * A scope encapsulating the body of a function. This stores information about labels and
+ * reports an error when a label could not be resolved.
+ */
 class FunctionScope : public BlockScope {
 public:
 	Ptr<Type> returnType;
@@ -93,10 +120,19 @@ class SwitchScope : public Scope {
 public:
 };
 
+/**
+ * A scope encapsulating the body of loops. This is used to make sure that
+ * break/continue cannot be called from outside of loops.
+ * @todo might want to use this as Annotation of break/continue to simplify
+ *       loop resolution in the Compiler
+ */
 class IterationScope : public Scope {
 public:
 };
 
+/**
+ *
+ */
 class ScopeStack {
 public:
 	std::vector<ast::Ptr<Scope>> stack;
