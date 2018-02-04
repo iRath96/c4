@@ -535,9 +535,7 @@ struct OptimizerPass : public FunctionPass {
 		}
 	}
 
-	void mergeBlock(BasicBlock *block, BasicBlock *replacement) {
-		hasChanged = true;
-
+	bool mergeBlock(BasicBlock *block, BasicBlock *replacement) {
 		if (debug_mode) {
 			cerr << "merge block " << block->getName().str()
 				<< " into " << replacement->getName().str() << endl;
@@ -545,6 +543,24 @@ struct OptimizerPass : public FunctionPass {
 
 		// fix all phi usages
 		auto &edges = blocks[block].edges;
+		for (auto &v : values)
+			if (auto phi = dyn_cast<PHINode>(v.first)) { // @todo not dry!!!
+				if (find(phi->blocks().begin(), phi->blocks().end(), block) == phi->blocks().end())
+					continue;
+
+				auto phiValue = phi->getIncomingValueForBlock(block);
+				for (const auto &edge : edges)
+					if (blocks[edge.first].reachable)
+						for (const auto &b : phi->blocks())
+							if (b == edge.first)
+								if (phi->getIncomingValueForBlock(b) != phiValue) {
+									debug_print("  merge aborted because of PHI conflict: ", phi);
+									return false;
+								}
+			}
+
+		hasChanged = true;
+
 		for (auto &v : values)
 			if (auto phi = dyn_cast<PHINode>(v.first)) {
 				debug_print("  found phi", phi);
@@ -554,7 +570,16 @@ struct OptimizerPass : public FunctionPass {
 
 				auto phiValue = phi->removeIncomingValue(block, false);
 				for (const auto &edge : edges)
-					if (blocks[edge.first].reachable) phi->addIncoming(phiValue, edge.first);
+					if (blocks[edge.first].reachable) {
+						bool exists = false;
+						for (const auto &b : phi->blocks())
+							if (b == edge.first) {
+								exists = true;
+								break;
+							}
+						
+						if (!exists) phi->addIncoming(phiValue, edge.first);
+					}
 
 				debug_print("  changed phi", phi);
 			}
@@ -581,6 +606,8 @@ struct OptimizerPass : public FunctionPass {
 			func->getBasicBlockList().remove(replacement);
 			func->getBasicBlockList().push_front(replacement);
 		}
+
+		return true;
 	}
 
 	void removeBlock(BasicBlock *block) {
@@ -597,7 +624,7 @@ struct OptimizerPass : public FunctionPass {
 
 		vector<Instruction *> instr; // @todo better copy method?
 		for (auto &i : block->getInstList()) instr.push_back(&i);
-		for (auto &i : instr) removeInstruction(i, false); // @todo why is efp=false needed?
+		for (auto &i : instr) removeInstruction(i);
 
 		for (auto &b : blocks) b.second.removeEdge(block);
 		blocks.erase(block);
@@ -605,7 +632,7 @@ struct OptimizerPass : public FunctionPass {
 		block->removeFromParent(); // @todo what about eraseFromParent?
 	}
 
-	void removeInstruction(Instruction *instr, bool efp = true) {
+	void removeInstruction(Instruction *instr) {
 		debug_print("removing instruction", instr, false);
 
 		for (auto &b : blocks)
@@ -614,7 +641,9 @@ struct OptimizerPass : public FunctionPass {
 
 		valueBlacklist.insert(instr);
 		values.erase(instr);
-		if (efp) instr->eraseFromParent();
+
+		instr->replaceAllUsesWith(UndefValue::get(instr->getType()));
+		instr->eraseFromParent();
 	}
 
 	set<Value *> valueBlacklist;
@@ -962,7 +991,10 @@ struct OptimizerPass : public FunctionPass {
 	bool runOnFunction(llvm::Function &func) override {
 		initialize(func);
 
-		//if (debug_mode) dumpAnalysis();
+		if (debug_mode) {
+			dumpAnalysis();
+			func.print(errs());
+		}
 
 		int it = 0;
 		while (true) {
