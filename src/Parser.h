@@ -55,6 +55,10 @@ public:
 	void dump(Parser *parser, std::string indent = "");
 };
 
+/**
+ * Used internally for methods that make use of #OPTION.
+ * This will notify the parse tree that we are leaving a method.
+ */
 #define _DEBUG_RETURN(x) { \
 	--depth; \
 	if (debug_mode) \
@@ -62,15 +66,35 @@ public:
 	return x; \
 }
 
+/**
+ * Aborts the current production and backtracks.
+ */
 #define FAIL goto deny;
+
+/**
+ * Breaks out of the current production if no terminals have been read
+ * in this production.
+ * @see #FAIL
+ */
 #define FAIL_IF_EMPTY \
 	if (i == _initial_i) \
 		FAIL
 
+/**
+ * Used internally as prologue for productions.
+ */
 #define _OPTION_PREFIX \
 	{ \
 		__label__ deny;
 
+/**
+ * Used internally as epilogue for productions.
+ * A production will by default always succeed, unless there has been a
+ * #FAIL statement (including #NON_OPTIONAL, #FAIL_IF_EMPTY, ...) that
+ * caused the current production to fail.
+ * At the end of a production (whether succesful or not), the error reporting
+ * mode will be restored to what it was previously when beginning the production.
+ */
 #define _OPTION_SUFFIX \
 		error_flag = _initial_ef; \
 		_DEBUG_RETURN(true) \
@@ -79,6 +103,11 @@ public:
 		error_flag = _initial_ef; \
 	}
 
+/**
+ * Starts a set of productions. Write this at the start of a method.
+ * This will take care of notifing the debug tree that we've entered a method.
+ * @see #_OPTION_SUFFIX
+ */
 #define OPTION { \
 	if (debug_mode) { \
 		/* printf("%d: %s\n", i, __PRETTY_FUNCTION__); */ \
@@ -89,17 +118,34 @@ public:
 	bool _initial_ef = error_flag; \
 	_OPTION_PREFIX;
 
+/**
+ * Adds an alternative production to the set of already provided productions.
+ * If the preceeding production fails, then this one will be attempted next.
+ * @see #_OPTION_SUFFIX
+ */
 #define ELSE_OPTION  \
 	_OPTION_SUFFIX \
 	_OPTION_PREFIX
 
+/**
+ * Ends the set of productions. Write this at the end of a method.
+ * This will only be reached if all productions have failed, and this
+ * will therefore cause the method to return false.
+ */
 #define END_OPTION \
 	_OPTION_SUFFIX \
 	_DEBUG_RETURN(false) \
 }
 
+/**
+ * Throws an error with the given message if error reporting is enabled.
+ */
 #define ERROR(error_message) if (error_flag) error(error_message);
 
+/**
+ * Ends the set of productions (similarly to #END_OPTION), but will throw an
+ * error with the given message if error reporting is enabled.
+ */
 #define OTHERWISE_FAIL(error_message) \
 	_OPTION_SUFFIX \
 	ERROR(error_message) \
@@ -107,31 +153,67 @@ public:
 	_DEBUG_RETURN(false) \
 }
 
-#define ALLOW_FAILURE(stmt) \
+/**
+ * Temporarily disables error reporting if necessary, but causes the current production to
+ * fail if the provided expression evaluates to false.
+ * @see #NON_OPTIONAL
+ */
+#define ALLOW_FAILURE(expr) \
 	{ \
 		bool _prev_ef = error_flag; \
 		error_flag = false; \
-		if (!(stmt)) \
+		if (!(expr)) \
 			FAIL \
 		error_flag = _prev_ef; \
 	}
 
-#define NON_OPTIONAL(stmt) \
-	if (!(stmt)) \
+/**
+ * Causes the current production to fail if the provided expression evaluates to
+ * false.
+ * @see ALLOW_FAILURE
+ */
+#define NON_OPTIONAL(expr) \
+	if (!(expr)) \
 		FAIL;
 
+/**
+ * Enables error reporting, which means that parsing will be stopped as soon as an
+ * error is encountered. This is used in passages of the grammar where we can guarantee
+ * that the current parse tree is the only parse tree for the prefix we've read so far.
+ * Example: Assume we're inside the `if-statement` production of the `statement` non-terminal and
+ * the next token in the queue is a `WHILE`-keyword. We try to read an `IF`-keyword, which will error -
+ * but we may not abort parsing at this point because there are alternative productions we can still
+ * try (namely the `while-statement` production). This is why error reporting would at this point
+ * be turned off and the error will cause the current production to silently fail.
+ * If, on the other hand, we had already read an `IF`-keyword, we can guarantee that the `if-statement`
+ * production will be the only valid production at this point (we know that all alternative parse trees
+ * will fail earlier than our current parse tree) so if we now fail to read the `(` that must succeed
+ * the `IF`-keyword, we can abort parsing as soon as an error is encountered (error reporting will be
+ * turned on after successfully reading the `IF`-keyword).
+ */
 #define UNIQUE \
 	error_flag = true;
 
+/**
+ * Disables error reporting.
+ * @see #UNIQUE
+ */
 #define NON_UNIQUE \
 	error_flag = false;
 
-#define BEGIN_UNIQUE(stmt) \
+/**
+ * Disables error reporting, causes the current production to fail if the provided expression
+ * evaluates to false or alternatively enables error reporting if it evaluates to true.
+ */
+#define BEGIN_UNIQUE(expr) \
 	NON_UNIQUE \
-	if (!(stmt)) \
+	if (!(expr)) \
 		FAIL \
 	else UNIQUE
 
+/**
+ * Disables error reporting temporarily if necessary and executes the provided statement.
+ */
 #define OPTIONAL(stmt) \
 	{ \
 		bool _prev_ef = error_flag; \
@@ -142,6 +224,9 @@ public:
 
 const char *operator_name(Token::Punctuator punctuator);
 
+/**
+ * Uses recursive-descent parsing to transform tokens into external AST nodes.
+ */
 class Parser : public streams::Stream<Token, Ptr<External>> {
 	DebugTree dbg_tree_root;
 	DebugTree *dbg_tree_current = &dbg_tree_root;
@@ -198,7 +283,12 @@ public:
 
 protected:
 	int i = 0;
-	bool error_flag = true; // whether errors will be thrown
+
+	/**
+	 * Whether production failures cause the parsing to be aborted.
+	 * See #UNIQUE for details on error reporting.
+	 */
+	bool error_flag = true;
 
 	bool shift(bool condition = true) {
 		i += condition ? 1 : 0;
