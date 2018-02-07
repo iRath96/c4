@@ -1089,9 +1089,9 @@ void OptimizerPass::dumpAnalysis() {
 
 	for (auto &v : values) {
 		auto &vd = v.second;
-		if (!v.first->hasName()) continue;
-
-		cout << "value " << string(v.first->getName()) << ": " << vd << endl;
+		cout << "value ";
+		v.first->print(outs());
+		cout << ": " << vd << endl;
 		//v.first->print(errs());
 	}
 }
@@ -1149,18 +1149,23 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 			vd.isBottom = false;
 
 			switch (add->getOpcode()) {
-			case Instruction::Add:
+			case Instruction::Add: {
 				if (lhs.isTop() || rhs.isTop()) {
 					vd = ValueDomain::top(false);
 					break;
 				}
 
-				vd.min = lhs.min + rhs.min;
-				vd.max = lhs.max + rhs.max;
+				bool overflow = false;
+				overflow = __builtin_add_overflow(lhs.min, rhs.min, &vd.min) || overflow;
+				overflow = __builtin_add_overflow(lhs.max, rhs.max, &vd.max) || overflow;
+
+				if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+					vd = ValueDomain::top(false);
 
 				// @todo test if one side is zero! (also test predicates?) -- also for sub, mul!
 
 				break;
+			}
 
 			case Instruction::Sub: {
 				auto epred = blocks[block].cs.get(add->getOperand(0), add->getOperand(1));
@@ -1168,8 +1173,12 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 				if (lhs.isTop() || rhs.isTop())
 					vd = ValueDomain::top(false);
 				else {
-					vd.min = lhs.min - rhs.max;
-					vd.max = lhs.max - rhs.min;
+					bool overflow = false;
+					overflow = __builtin_sub_overflow(lhs.min, rhs.min, &vd.min) || overflow;
+					overflow = __builtin_sub_overflow(lhs.max, rhs.max, &vd.max) || overflow;
+
+					if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+						vd = ValueDomain::top(false);
 				}
 
 				switch (epred) {
@@ -1184,23 +1193,27 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 				break;
 			}
 
-			case Instruction::Mul:
+			case Instruction::Mul: {
 				if (lhs.isTop() || rhs.isTop()) {
 					vd = ValueDomain::top(false);
 					break;
 				}
 
-				// @todo overflow protection
-				if (lhs.contains(0) || rhs.contains(0)) vd.min = 0;
-				else
-					vd.min = (lhs.min > 0 && rhs.min < 0 ? lhs.max : lhs.min) * (lhs.min < 0 && rhs.min > 0 ? rhs.max : rhs.min);
+				bool overflow = false;
+				int a = 0, b = 0, c = 0, d = 0;
+				overflow = __builtin_mul_overflow(lhs.min, rhs.min, &a) || overflow;
+				overflow = __builtin_mul_overflow(lhs.min, rhs.max, &b) || overflow;
+				overflow = __builtin_mul_overflow(lhs.max, rhs.min, &c) || overflow;
+				overflow = __builtin_mul_overflow(lhs.max, rhs.max, &d) || overflow;
 
-				vd.max = max(
-					max(lhs.min * rhs.min, lhs.min * rhs.max),
-					max(lhs.max * rhs.min, lhs.max * rhs.max)
-				);
+				vd.min = min({ a, b, c, d });
+				vd.max = max({ a, b, c, d });
+
+				if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+					vd = ValueDomain::top(false);
 
 				break;
+			}
 
 			default:
 				if (debug_mode) cerr << "unsupported binary operation" << endl;
