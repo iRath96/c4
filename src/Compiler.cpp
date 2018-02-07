@@ -520,6 +520,8 @@ void Compiler::visit(PostExpression &node) {
 
 void Compiler::visit(ExpressionStatement &node) {
 	createLabels(node.labels);
+
+	shouldLoad = true;
 	visit(node.expressions);
 }
 
