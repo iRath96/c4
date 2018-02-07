@@ -270,6 +270,8 @@ struct OptimizerPass : public FunctionPass {
 			if (debug_mode) cerr << "bd created" << endl;
 		}
 
+		float heat = 0.f;
+
 		set<BasicBlock *> dominators;
 		map<BasicBlock *, Condition> edges;
 		ConstraintSet cs;
@@ -336,6 +338,8 @@ struct OptimizerPass : public FunctionPass {
 	bool hasChanged;
 
 	void dumpAnalysis();
+
+	bool hasSideEffect(Value *v);
 	bool trackValue(Value *v, BasicBlock *block);
 
 	void iterate(llvm::Function &func) {
@@ -757,6 +761,28 @@ struct OptimizerPass : public FunctionPass {
 			if (!hasChanged) break;
 		}
 
+		for (int i = 0; i < 32; ++i) {
+			for (auto &b : blocks) {
+				auto &bd = b.second;
+				if (bd.isEntry) {
+					bd.heat = 1.f;
+					continue;
+				}
+
+				bd.heat = 0.f;
+				for (auto &pre : bd.edges) {
+					float mul = pre.second.cond ?
+						(pre.second.condV ? .8f : .2f)
+					: 1.f;
+					bd.heat += blocks[pre.first].heat * mul;
+				}
+			}
+		}
+
+		if (debug_mode)
+			for (auto &b : blocks)
+				cout << b.first->getName().str() << " has heat " << b.second.heat << endl;
+
 		//cerr << "  ...done" << endl;
 	}
 
@@ -1011,6 +1037,82 @@ struct OptimizerPass : public FunctionPass {
 		}
 	}
 
+	bool reschedule(llvm::Function &func) {
+		struct Result {
+			Instruction *instr;
+			BasicBlock *newBB;
+		};
+
+		vector<Result> results;
+
+		for (auto &block : func.getBasicBlockList()) {
+			for (auto &instr : block.getInstList()) {
+				if (hasSideEffect(&instr)) continue;
+				if (isa<PHINode>(&instr)) continue;
+
+				auto instrParent = instr.getParent();
+
+				set<BasicBlock *> dominators;
+				bool isFirst = true;
+
+				for (auto user : instr.users()) {
+					auto block = dyn_cast<Instruction>(user)->getParent();
+					if (isFirst) {
+						dominators = blocks[block].dominators;
+						isFirst = false;
+					} else {
+						auto a = dominators, b = blocks[block].dominators;
+						set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::inserter(dominators, dominators.begin()));
+					}
+				}
+
+				for (auto &op : instr.operands()) {
+					auto instrRef = dyn_cast<Instruction>(op.get());
+					if (!instrRef) continue;
+
+					auto opParent = instrRef->getParent();
+					for (auto &d : blocks[opParent].dominators) {
+						if (d == opParent) continue;
+						dominators.erase(d);
+					}
+				}
+
+				if (isFirst) continue;
+
+				auto lowestHeatBB = *min_element(dominators.begin(), dominators.end(), [&](BasicBlock *a, BasicBlock *b) {
+					return blocks[a].heat < blocks[b].heat;
+				});
+
+				/*
+				instr.print(outs());
+				for (auto &dom : dominators) {
+					cout << "- " << dom->getName().str() << endl;
+				}
+				*/
+
+				if (instrParent != lowestHeatBB) {
+					Result result;
+					result.instr = &instr;
+					result.newBB = lowestHeatBB;
+					results.push_back(result);
+				}
+			}
+		}
+
+		for (auto &result : results) {
+			if (debug_mode) {
+				cout << "reschedule ";
+				result.instr->print(outs());
+				cout << " into " << result.newBB->getName().str() << endl;
+			}
+
+			result.instr->removeFromParent();
+			result.instr->insertBefore(result.newBB->getTerminator());
+		}
+
+		return !results.empty();
+	}
+
 	bool runOnFunction(llvm::Function &func) override {
 		initialize(func);
 
@@ -1050,6 +1152,8 @@ struct OptimizerPass : public FunctionPass {
 				return false;
 			}
 		}
+
+		while (reschedule(func));
 
 		if (debug_mode) {
 			cout << endl << "fixpoint:" << endl;
@@ -1119,22 +1223,24 @@ void OptimizerPass::dumpAnalysis() {
 	}
 }
 
+bool OptimizerPass::hasSideEffect(Value *v) {
+	return !(
+		dyn_cast<Constant>(v) ||
+		dyn_cast<BinaryOperator>(v) || // we can optimize this, div-by-zero is undefined behavior!
+		dyn_cast<ICmpInst>(v) ||
+		dyn_cast<PHINode>(v) ||
+		dyn_cast<SelectInst>(v)
+	);
+}
+
 bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	auto prevVd = getGlobalVD(v);
 	auto &vd = getGlobalVD(v);
 
 	vd.isDead = true;
 	if (blocks[block].reachable) {
-		bool hasSideEffect = !(
-			dyn_cast<Constant>(v) ||
-			dyn_cast<BinaryOperator>(v) ||
-			dyn_cast<ICmpInst>(v) || // we can optimize this, div-by-zero is undefined behavior!
-			dyn_cast<PHINode>(v) ||
-			dyn_cast<SelectInst>(v)
-		);
-
 		//v->print(errs()); cerr << " " << (hasSideEffect ? "se" : "ne") << endl;
-		if (hasSideEffect) vd.isDead = false;
+		if (hasSideEffect(v)) vd.isDead = false;
 		else { // check if we're referenced
 			for (auto &use : v->uses()) {
 				//cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
