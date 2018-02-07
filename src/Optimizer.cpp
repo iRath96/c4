@@ -56,7 +56,7 @@ struct OptimizerPass : public FunctionPass {
 		bool condV;
 	};
 
-	struct ValueDomain { // @warning overflow behavior not yet taken into account
+	struct ValueDomain {
 		bool isBottom = false;
 		bool isDead = false;
 		int min = INT_MIN, max = INT_MAX;
@@ -1038,6 +1038,10 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	bool reschedule(llvm::Function &func) {
+		// @todo explain this as Markov process
+		// @todo calculate heat directly before starting the rescheduling
+		// @todo (not here) how about making the results of the function analysis (return interval) available globally?
+
 		struct Result {
 			Instruction *instr;
 			BasicBlock *newBB;
