@@ -506,6 +506,8 @@ struct OptimizerPass : public FunctionPass {
 	}
 
 	void replaceBranch(BasicBlock *origin, BranchInst *branch, BranchInst *newBranch) {
+		hasChanged = true;
+
 		if (debug_mode) {
 			cerr << "replacing "; branch->print(errs());
 			cerr << " with "; newBranch->print(errs());
@@ -551,6 +553,9 @@ struct OptimizerPass : public FunctionPass {
 				if (auto c = dyn_cast<ConstantInt>(branch->getCondition())) {
 					auto newBranch = BranchInst::Create(branch->getSuccessor(c->isZero() ? 1 : 0));
 					replaceBranch(&block, branch, newBranch);
+
+					// no need to remove the edge from the unreachable successor here,
+					// replaceBranch does this for us.
 				} else if (branch->getSuccessor(0) == branch->getSuccessor(1)) {
 					auto newBranch = BranchInst::Create(branch->getSuccessor(0));
 					replaceBranch(&block, branch, newBranch);
