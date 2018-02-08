@@ -502,6 +502,8 @@ struct OptimizerPass : public FunctionPass {
 				Value *newValue = llvm::ConstantInt::get(r.usee->getType(), r.value);
 				r.user->replaceUsesOfWith(r.usee, newValue);
 			}
+
+			if (!constants.empty()) hasChanged = true;
 		}
 	}
 
