@@ -57,7 +57,7 @@ struct OptimizerPass : public FunctionPass {
 	};
 
 	struct ValueDomain {
-		bool isBottom = false;
+		bool isBottom = true;//false;
 		bool isDead = false;
 		int min = INT_MIN, max = INT_MAX;
 
@@ -199,17 +199,38 @@ struct OptimizerPass : public FunctionPass {
 				auto a = get(lhs, rhs);
 				auto b = pred.second;
 
-				if (entails(a, b)) addSingle(lhs, rhs, b);
+				if (a == b) continue;
+
+				if (conflict(a, b)) predicates.erase(make_pair(lhs, rhs));
+				else if (entails(a, b)) addSingle(lhs, rhs, b);
 				else if (entails(b, a)) addSingle(lhs, rhs, a);
 			}
 		}
 
-		void removeInstruction(Instruction *instr) {
-			vector<pair<Value *, Value *>> pairs;
+		void removeInstruction(Instruction *instr, Value *replacement = nullptr) {
+			struct Entry {
+				pair<Value *, Value *> key;
+				CmpInst::Predicate pred;
+			};
+
+			vector<Entry> pairs;
 			for (auto &p : predicates)
-				if (p.first.first == instr || p.first.second == instr)
-					pairs.push_back(p.first);
-			for (auto &p : pairs) predicates.erase(p);
+				if (p.first.first == instr || p.first.second == instr) {
+					Entry e;
+					e.key = p.first;
+					e.pred = p.second;
+					pairs.push_back(e);
+				}
+
+			for (auto &p : pairs) {
+				predicates.erase(p.key);
+
+				if (replacement) {
+					if (p.key.first == instr) p.key.first = replacement;
+					if (p.key.second == instr) p.key.second = replacement;
+					addSingle(p.key.first, p.key.second, p.pred);
+				}
+			}
 		}
 
 		CmpInst::Predicate get(Value *lhs, Value *rhs) {
@@ -278,7 +299,7 @@ struct OptimizerPass : public FunctionPass {
 
 		void propagateConstraints(map<BasicBlock *, BlockDomain> &blocks) {
 			cs = ConstraintSet();
-			cs.isBottom = true;
+			cs.isBottom = !isEntry;
 
 			for (auto &edge : edges) {
 				ConstraintSet edgeCS = blocks[edge.first].cs;
@@ -326,7 +347,7 @@ struct OptimizerPass : public FunctionPass {
 			return true;
 		}
 
-		bool isEntry = false, reachable = true;
+		bool isEntry = false, reachable = false;
 
 		bool operator==(const BlockDomain &other) {
 			return other.isEntry == isEntry && other.reachable == reachable;
@@ -359,7 +380,9 @@ struct OptimizerPass : public FunctionPass {
 
 				for (auto &edge : bd.edges) {
 					if (!blocks[edge.first].reachable) continue;
-					if (!edge.second.cond || getGlobalVD(edge.second.cond).contains(edge.second.condV)) {
+					if (!edge.second.cond ||
+						getGlobalVD(edge.second.cond).contains(edge.second.condV) ||
+						getGlobalVD(edge.second.cond).isBottom) {
 						bd.reachable = true;
 						updated = true;
 						break;
@@ -443,9 +466,7 @@ struct OptimizerPass : public FunctionPass {
 
 				if (isSingular) {
 					debug_print("replacing singular phi", phi);
-
-					phi->replaceAllUsesWith(v);
-					removeInstruction(phi);
+					removeInstruction(phi, v);
 				}
 			}
 		}
@@ -453,17 +474,33 @@ struct OptimizerPass : public FunctionPass {
 
 	void fixConstants(llvm::Function &func) {
 		for (auto &block : func.getBasicBlockList()) {
-			vector<Instruction *> constants;
-			for (auto &inst : block.getInstList())
-				if (getGlobalVD(&inst).isConstant()) constants.push_back(&inst);
+			struct Replacement {
+				Instruction *user, *usee;
+				int value;
+			};
 
-			for (auto &constant : constants) {
-				debug_print("replacing singular value", constant);
+			vector<Replacement> constants;
+			for (auto &inst : block.getInstList()) {
+				for (auto user : inst.users()) {
+					auto i = dyn_cast<Instruction>(user);
+					if (!i) continue;
 
-				Value *newValue = llvm::ConstantInt::get(constant->getType(), getGlobalVD(constant).min);
-				constant->replaceAllUsesWith(newValue);
-				values.erase(constant);
-				constant->eraseFromParent();
+					auto vd = getVD(&inst, i->getParent());
+					if (!vd.isConstant()) continue;
+
+					Replacement r;
+					r.user = i;
+					r.usee = &inst;
+					r.value = vd.min;
+					constants.push_back(r);
+				}
+			}
+
+			for (auto &r : constants) {
+				debug_print("replacing singular value", r.usee);
+
+				Value *newValue = llvm::ConstantInt::get(r.usee->getType(), r.value);
+				r.user->replaceUsesOfWith(r.usee, newValue);
 			}
 		}
 	}
@@ -483,7 +520,7 @@ struct OptimizerPass : public FunctionPass {
 			if (find(s.begin(), s.end(), succ) != s.end()) continue;
 
 			// deleted path
-			for (auto &phi : succ->phis()) phi.removeIncomingValue(origin);
+			for (auto &phi : succ->phis()) phi.removeIncomingValue(origin, false);
 		}
 		
 		newBranch->insertBefore(branch);
@@ -558,6 +595,12 @@ struct OptimizerPass : public FunctionPass {
 				continue;
 			}
 
+			if (block == replacement) {
+				// this can happen in case of infinite loops
+				// ... let's just ignore this, okay? :-)
+				continue;
+			}
+
 			mergeBlock(block, replacement);
 		}
 	}
@@ -617,6 +660,7 @@ struct OptimizerPass : public FunctionPass {
 		for (auto &i : instr) i->moveBefore(insertionPoint);
 
 		// @todo merge constraintSet?
+
 		// dominators stay the same (@todo really?)
 		blocks[replacement].isEntry = blocks[block].isEntry;
 		for (auto &edge : blocks[block].edges) blocks[replacement].edges.insert(edge);
@@ -659,17 +703,21 @@ struct OptimizerPass : public FunctionPass {
 		block->removeFromParent(); // @todo what about eraseFromParent?
 	}
 
-	void removeInstruction(Instruction *instr) {
-		debug_print("removing instruction", instr, false);
+	void removeInstruction(Instruction *instr, Value *replacement = nullptr) {
+		debug_print("removing instruction", instr);
 
 		for (auto &b : blocks)
 			// @todo would it suffice to only update blocks[block] here?
-			b.second.cs.removeInstruction(instr);
+			b.second.cs.removeInstruction(instr, replacement);
 
 		valueBlacklist.insert(instr);
 		values.erase(instr);
 
-		instr->replaceAllUsesWith(UndefValue::get(instr->getType()));
+		instr->replaceAllUsesWith(
+			replacement ?
+				replacement :
+				UndefValue::get(instr->getType())
+		);
 		instr->eraseFromParent();
 	}
 
@@ -683,7 +731,7 @@ struct OptimizerPass : public FunctionPass {
 
 	// @todo @important CSE analysis
 	// @todo use block info for constraints?
-	ValueDomain getVD(Value *value, BasicBlock *) {
+	ValueDomain getVD(Value *value, BasicBlock *block) {
 		if (auto ci = dyn_cast<llvm::ConstantInt>(value)) {
 			int intVal = (int)*ci->getValue().getRawData();
 
@@ -694,7 +742,42 @@ struct OptimizerPass : public FunctionPass {
 			return vd;
 		}
 
-		return getGlobalVD(value);
+		debug_print("getting ", value);
+
+		auto vd = getGlobalVD(value);
+		for (auto &c : blocks[block].cs.predicates) {
+			if (c.first.first != value) continue;
+			if (c.first.second == value) continue;
+
+			debug_print("compare ", c.first.second);
+
+			auto rhsVD = getVD(c.first.second, block);
+			if (rhsVD.isTop() || rhsVD.isBottom) continue;
+
+			switch (c.second) {
+			case CmpInst::ICMP_EQ:
+				vd.min = max(vd.min, rhsVD.min);
+				vd.max = min(vd.max, rhsVD.max);
+				break;
+
+			case CmpInst::ICMP_SLT:
+				--rhsVD.max;
+			case CmpInst::ICMP_SLE:
+				vd.max = min(vd.max, rhsVD.max);
+				break;
+
+			case CmpInst::ICMP_SGT:
+				++rhsVD.min;
+			case CmpInst::ICMP_SGE:
+				vd.min = max(vd.min, rhsVD.min);
+				break;
+
+			default:
+				break;
+			}
+		}
+
+		return vd;
 	}
 
 	void initialize(llvm::Function &func) {
@@ -1136,11 +1219,15 @@ struct OptimizerPass : public FunctionPass {
 
 			iterate(func);
 
-			fixPHINodes(func);
-			fixConstants(func);
-			fixBranches(func);
-			removeDeadCode(func);
-			removeUnreachableCode(func);
+			if (!hasChanged) {
+				// domain analysis has finished
+
+				fixPHINodes(func);
+				fixConstants(func);
+				fixBranches(func);
+				removeDeadCode(func);
+				removeUnreachableCode(func);
+			}
 
 			if (debug_mode && hasChanged) func.print(errs());
 
@@ -1243,12 +1330,13 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 
 	vd.isDead = true;
 	if (blocks[block].reachable) {
-		//v->print(errs()); cerr << " " << (hasSideEffect ? "se" : "ne") << endl;
+		v->print(errs()); cerr << " " << (hasSideEffect(v) ? "se" : "ne") << endl;
 		if (hasSideEffect(v)) vd.isDead = false;
 		else { // check if we're referenced
 			for (auto &use : v->uses()) {
-				//cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
-				if (!getGlobalVD(use.getUser()).isDead) {
+				cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
+				auto &x = getGlobalVD(use.getUser());
+				if (!x.isDead) {
 					vd.isDead = false;
 					break;
 				}
@@ -1406,11 +1494,6 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		debug_print("unsupported instruction", v);
 		vd = ValueDomain::top(false);
 	}
-
-	if (vd.isConstant())
-		// the value domain has become singular, we don't need this instruction
-		// (will be replaced with a constant)
-		vd.isDead = true;
 
 	if (prevVd == vd) return false;
 
