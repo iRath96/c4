@@ -7,7 +7,7 @@ Dir.mkdir(".test") rescue nil
 Dir.chdir(".test")
 test = "../#{test}"
 
-arguments = [ $BIN, "/Users/alex/Desktop/test.c" ].compact
+arguments = [ $BIN, "--optimize", "/Users/alex/Desktop/test.c" ].compact
 stdout, stderr, status = Open3.capture3(*arguments)
 puts status.inspect
 if status.exitstatus > 0
