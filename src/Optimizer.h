@@ -20,8 +20,9 @@ struct CompilerResult;
 class Optimizer : public streams::Stream<CompilerResult, CompilerResult> {
 protected:
 	llvm::legacy::FunctionPassManager fpm;
+	llvm::Module *module;
 public:
-	Optimizer(Source<CompilerResult> *source, llvm::Module *mod);
+	Optimizer(Source<CompilerResult> *source, llvm::Module *module);
 	virtual bool next(CompilerResult *);
 };
 

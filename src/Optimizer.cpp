@@ -5,6 +5,7 @@
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #include <llvm/Pass.h>
 #include <llvm/Transforms/Scalar.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
@@ -749,14 +750,14 @@ struct OptimizerPass : public FunctionPass {
 		applyConstraintSetToDomain(value, vd, cs, block);
 	}
 
-	void applyConstraintSetToDomain(Value *value, ValueDomain &vd, const ConstraintSet &cs, BasicBlock *block) {
+	void applyConstraintSetToDomain(Value *value, ValueDomain &vd, const ConstraintSet &cs, BasicBlock *block, int max_depth = 4) {
 		for (auto &c : cs.predicates) {
 			if (c.first.first != value) continue;
 			if (c.first.second == value) continue;
 
 			debug_print("compare ", c.first.second);
 
-			auto rhsVD = getVD(c.first.second, block);
+			auto rhsVD = getVD(c.first.second, block, max_depth);
 			if (rhsVD.isTop() || rhsVD.isBottom) continue;
 
 			switch (c.second) {
@@ -785,7 +786,7 @@ struct OptimizerPass : public FunctionPass {
 
 	// @todo @important CSE analysis
 	// @todo use block info for constraints?
-	ValueDomain getVD(Value *value, BasicBlock *block) {
+	ValueDomain getVD(Value *value, BasicBlock *block, int max_depth = 4) {
 		if (auto ci = dyn_cast<llvm::ConstantInt>(value)) {
 			int intVal = (int)*ci->getValue().getRawData();
 
@@ -799,7 +800,8 @@ struct OptimizerPass : public FunctionPass {
 		debug_print("getting ", value);
 
 		auto vd = getGlobalVD(value);
-		applyConstraintSetToDomain(value, vd, blocks[block].cs, block);
+		if (max_depth > 0)
+			applyConstraintSetToDomain(value, vd, blocks[block].cs, block, max_depth - 1);
 
 		return vd;
 	}
@@ -1541,6 +1543,98 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 
 char OptimizerPass::ID = 0;
 
+struct InlinePass : public ModulePass {
+	static char ID;
+	InlinePass() : ModulePass(ID) {}
+
+	void processCall(CallInst *call, set<Function *> &dirtyFns) {
+		auto block = call->getParent();
+		auto caller = call->getFunction();
+		auto callee = dyn_cast<Function>(call->getCalledValue());
+		if (!callee || callee->isDeclaration()) return;
+
+		auto retBlock = block->splitBasicBlock(call, "inline-ret");
+		block->getTerminator()->eraseFromParent();
+
+		auto retPHI = PHINode::Create(call->getType(), 0);
+		retPHI->insertBefore(call);
+
+		map<Value *, Value *> vmap;
+
+		auto arg = callee->args().begin();
+		for (auto &param : call->arg_operands()) {
+			vmap[arg] = param.get();
+			++arg;
+		}
+
+		for (auto &cblock : callee->getBasicBlockList()) {
+			auto newBB =
+				&cblock == &callee->getEntryBlock() ?
+					block :
+					BasicBlock::Create(block->getContext(), cblock.getName().str() + "-" + callee->getName().str(), caller)
+			;
+
+			vmap[&cblock] = newBB;
+			
+			for (auto &inst : cblock.getInstList()) {
+				if (auto ret = dyn_cast<ReturnInst>(&inst)) { // @todo not DRY
+					auto clone = BranchInst::Create(retBlock);
+					vmap[&inst] = clone;
+					newBB->getInstList().push_back(clone);
+
+					retPHI->addIncoming(ret->getReturnValue(), newBB);
+				} else {
+					auto clone = inst.clone();
+					vmap[&inst] = clone;
+					newBB->getInstList().push_back(clone);
+				}
+			}
+		}
+
+		vmap[retPHI] = retPHI; // so we fix operands here as well
+
+		for (auto &v : vmap) {
+			auto inst = dyn_cast<Instruction>(v.second);
+			if (!inst) continue;
+
+			for (auto &op : inst->operands()) {
+				if (vmap.find(op.get()) == vmap.end())
+					// no replacement available, must be a global reference
+					continue;
+
+				op.set(vmap[op.get()]);
+			}
+		}
+
+		call->replaceAllUsesWith(retPHI);
+		call->eraseFromParent();
+
+		dirtyFns.insert(caller);
+	}
+
+	bool runOnModule(Module &module) override {
+		vector<CallInst *> calls;
+
+		for (auto &func : module.functions())
+			for (auto &block : func.getBasicBlockList())
+				for (auto &inst : block.getInstList())
+					if (auto call = dyn_cast<CallInst>(&inst))
+						calls.push_back(call);
+
+		set<Function *> dirtyFns;
+		for (auto &call : calls)
+			processCall(call, dirtyFns);
+
+		for (auto &dirtyFn : dirtyFns)
+			OptimizerPass().runOnFunction(*dirtyFn);
+
+		return true;
+	}
+};
+
+char InlinePass::ID = 1;
+
+
 struct CompilerResult { // @todo @fixme @important not DRY
 	Compiler *compiler;
 	vector<llvm::GlobalValue *> values;
@@ -1549,8 +1643,8 @@ struct CompilerResult { // @todo @fixme @important not DRY
 	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}
 };
 
-Optimizer::Optimizer(Source<CompilerResult> *source, Module *mod)
-: Stream<CompilerResult, CompilerResult>(source), fpm(mod) {
+Optimizer::Optimizer(Source<CompilerResult> *source, Module *module)
+: Stream<CompilerResult, CompilerResult>(source), fpm(module), module(module) {
 	fpm.add(createPromoteMemoryToRegisterPass());
 	fpm.add(new OptimizerPass());
 }
@@ -1560,6 +1654,10 @@ bool Optimizer::next(CompilerResult *result) {
 		for (auto &value : result->values)
 			if (isa<llvm::Function>(value)) fpm.run(*cast<llvm::Function>(value));
 		return true;
-	} else
+	} else {
+		InlinePass ip;
+		ip.runOnModule(*module);
+
 		return false;
+	}
 }
