@@ -738,7 +738,7 @@ struct OptimizerPass : public FunctionPass {
 
 	void applyConditionToDomain(Value *value, ValueDomain &vd, const Condition &cond, BasicBlock *block) {
 		if (!cond.cond) return;
-		
+
 		ConstraintSet cs;
 		cs.add( // @todo not DRY!
 			cond.cond,
@@ -1471,7 +1471,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 			auto inBB = phi->getIncomingBlock(i);
 			if (blocks[inBB].reachable) {
 				auto inV = phi->getIncomingValue(i);
-				auto inVd = getVD(inV, block);
+				auto inVd = getVD(inV, inBB);
 				applyConditionToDomain(inV, inVd, blocks[block].edges[inBB], inBB); // @todo instead of inBB, block?
 				vd = ValueDomain::join(vd, inVd);
 			}
