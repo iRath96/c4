@@ -736,23 +736,21 @@ struct OptimizerPass : public FunctionPass {
 		return values[value];
 	}
 
-	// @todo @important CSE analysis
-	// @todo use block info for constraints?
-	ValueDomain getVD(Value *value, BasicBlock *block) {
-		if (auto ci = dyn_cast<llvm::ConstantInt>(value)) {
-			int intVal = (int)*ci->getValue().getRawData();
+	void applyConditionToDomain(Value *value, ValueDomain &vd, const Condition &cond, BasicBlock *block) {
+		if (!cond.cond) return;
+		
+		ConstraintSet cs;
+		cs.add( // @todo not DRY!
+			cond.cond,
+			ConstantInt::get(cond.cond->getType(), 0),
+			cond.condV ? ICmpInst::ICMP_NE : ICmpInst::ICMP_EQ
+		);
 
-			ValueDomain vd;
-			vd.isBottom = false;
-			vd.min = intVal;
-			vd.max = intVal;
-			return vd;
-		}
+		applyConstraintSetToDomain(value, vd, cs, block);
+	}
 
-		debug_print("getting ", value);
-
-		auto vd = getGlobalVD(value);
-		for (auto &c : blocks[block].cs.predicates) {
+	void applyConstraintSetToDomain(Value *value, ValueDomain &vd, const ConstraintSet &cs, BasicBlock *block) {
+		for (auto &c : cs.predicates) {
 			if (c.first.first != value) continue;
 			if (c.first.second == value) continue;
 
@@ -783,6 +781,25 @@ struct OptimizerPass : public FunctionPass {
 				break;
 			}
 		}
+	}
+
+	// @todo @important CSE analysis
+	// @todo use block info for constraints?
+	ValueDomain getVD(Value *value, BasicBlock *block) {
+		if (auto ci = dyn_cast<llvm::ConstantInt>(value)) {
+			int intVal = (int)*ci->getValue().getRawData();
+
+			ValueDomain vd;
+			vd.isBottom = false;
+			vd.min = intVal;
+			vd.max = intVal;
+			return vd;
+		}
+
+		debug_print("getting ", value);
+
+		auto vd = getGlobalVD(value);
+		applyConstraintSetToDomain(value, vd, blocks[block].cs, block);
 
 		return vd;
 	}
@@ -1450,11 +1467,15 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		}
 	} else if (auto phi = dyn_cast<PHINode>(v)) {
 		vd.isBottom = true;
-		for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i)
-			if (blocks[phi->getIncomingBlock(i)].reachable) {
-				auto inVd = getVD(phi->getIncomingValue(i), block);
+		for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i) {
+			auto inBB = phi->getIncomingBlock(i);
+			if (blocks[inBB].reachable) {
+				auto inV = phi->getIncomingValue(i);
+				auto inVd = getVD(inV, block);
+				applyConditionToDomain(inV, inVd, blocks[block].edges[inBB], inBB); // @todo instead of inBB, block?
 				vd = ValueDomain::join(vd, inVd);
 			}
+		}
 	} else if (auto cmp = dyn_cast<ICmpInst>(v)) {
 		auto lhs = getVD(cmp->getOperand(0), block);
 		auto rhs = getVD(cmp->getOperand(1), block);
