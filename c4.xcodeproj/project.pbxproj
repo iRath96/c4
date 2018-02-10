@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		FA2C09C71FD5A6BA00C891A5 /* Analyzer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */; };
+		FA332576202EEE1C008BE8A5 /* InlinePass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA332574202EEE1C008BE8A5 /* InlinePass.cpp */; };
+		FA33257A202EEF8B008BE8A5 /* OptimizerPass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA332578202EEF8B008BE8A5 /* OptimizerPass.cpp */; };
+		FA33257D202EF5A3008BE8A5 /* OptimizerUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA33257B202EF5A3008BE8A5 /* OptimizerUtils.cpp */; };
 		FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA6431861FAD924D00ABFB9D /* Parser.cpp */; };
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
@@ -31,6 +34,12 @@
 
 /* Begin PBXFileReference section */
 		FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Analyzer.cpp; sourceTree = "<group>"; };
+		FA332574202EEE1C008BE8A5 /* InlinePass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = InlinePass.cpp; sourceTree = "<group>"; };
+		FA332575202EEE1C008BE8A5 /* InlinePass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = InlinePass.h; sourceTree = "<group>"; };
+		FA332578202EEF8B008BE8A5 /* OptimizerPass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OptimizerPass.cpp; sourceTree = "<group>"; };
+		FA332579202EEF8B008BE8A5 /* OptimizerPass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OptimizerPass.h; sourceTree = "<group>"; };
+		FA33257B202EF5A3008BE8A5 /* OptimizerUtils.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = OptimizerUtils.cpp; sourceTree = "<group>"; };
+		FA33257C202EF5A3008BE8A5 /* OptimizerUtils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OptimizerUtils.h; sourceTree = "<group>"; };
 		FA3574B4201B7E0700CE955E /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = common.h; sourceTree = "<group>"; };
 		FA6431861FAD924D00ABFB9D /* Parser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Parser.cpp; sourceTree = "<group>"; usesTabs = 1; };
 		FA6431871FAD924D00ABFB9D /* Parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parser.h; sourceTree = "<group>"; };
@@ -63,6 +72,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FA332577202EEE25008BE8A5 /* optimizer */ = {
+			isa = PBXGroup;
+			children = (
+				FA332575202EEE1C008BE8A5 /* InlinePass.h */,
+				FA332574202EEE1C008BE8A5 /* InlinePass.cpp */,
+				FA332579202EEF8B008BE8A5 /* OptimizerPass.h */,
+				FA332578202EEF8B008BE8A5 /* OptimizerPass.cpp */,
+				FA33257C202EF5A3008BE8A5 /* OptimizerUtils.h */,
+				FA33257B202EF5A3008BE8A5 /* OptimizerUtils.cpp */,
+				FAEF05C81FEBDEB60076EB37 /* Optimizer.h */,
+				FAEF05C71FEBDEB60076EB37 /* Optimizer.cpp */,
+			);
+			name = optimizer;
+			sourceTree = "<group>";
+		};
 		FA6431891FAD925400ABFB9D /* parser */ = {
 			isa = PBXGroup;
 			children = (
@@ -93,6 +117,7 @@
 		FA74D4FB1FA2579300D7CA2E /* src */ = {
 			isa = PBXGroup;
 			children = (
+				FA332577202EEE25008BE8A5 /* optimizer */,
 				FAEF05BA1FE7BDAD0076EB37 /* compiler */,
 				FA6431891FAD925400ABFB9D /* parser */,
 				FA74D4FC1FA2579300D7CA2E /* lexer */,
@@ -119,8 +144,6 @@
 				FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */,
 				FAEF05BC1FE7BDC40076EB37 /* Compiler.h */,
 				FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */,
-				FAEF05C81FEBDEB60076EB37 /* Optimizer.h */,
-				FAEF05C71FEBDEB60076EB37 /* Optimizer.cpp */,
 				FAEF05C51FEBC35A0076EB37 /* FileSink.h */,
 				FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */,
 				FAEF05C21FEBC2600076EB37 /* JITEngine.h */,
@@ -188,12 +211,15 @@
 			files = (
 				FA2C09C71FD5A6BA00C891A5 /* Analyzer.cpp in Sources */,
 				FAEF05C91FEBDEB60076EB37 /* Optimizer.cpp in Sources */,
+				FA33257A202EEF8B008BE8A5 /* OptimizerPass.cpp in Sources */,
 				FAEF05C31FEBC2600076EB37 /* JITEngine.cpp in Sources */,
+				FA332576202EEE1C008BE8A5 /* InlinePass.cpp in Sources */,
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
 				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,
 				FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */,
 				FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
+				FA33257D202EF5A3008BE8A5 /* OptimizerUtils.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -74,13 +74,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "src/Optimizer.cpp"
-            timestampString = "539803337.354074"
+            timestampString = "539948837.590557"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1413"
-            endingLineNumber = "1413"
-            landmarkName = "OptimizerPass::trackValue(Value *v, BasicBlock *block)"
-            landmarkType = "7">
+            startingLineNumber = "22"
+            endingLineNumber = "22">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
