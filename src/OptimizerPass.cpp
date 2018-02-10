@@ -182,7 +182,7 @@ void ConstraintSet::removeInstruction(Instruction *instr, Value *replacement) {
 	}
 }
 
-Predicate ConstraintSet::get(llvm::Value *lhs, llvm::Value *rhs) {
+Predicate ConstraintSet::get(Value *lhs, Value *rhs) {
 	if (lhs == rhs) return ICmpInst::ICMP_EQ;
 	auto it = predicates.find(make_pair(lhs, rhs));
 	if (it == predicates.end()) return CmpInst::BAD_ICMP_PREDICATE;
@@ -290,7 +290,7 @@ bool BlockDomain::operator==(const BlockDomain &other) {
 	return other.isEntry == isEntry && other.reachable == reachable;
 }
 
-void OptimizerPass::iterate(llvm::Function &func) {
+void OptimizerPass::iterate(Function &func) {
 	// update reachability
 	// @todo topology?
 	// @important isDirty all the things!
@@ -324,7 +324,7 @@ void OptimizerPass::iterate(llvm::Function &func) {
 			hasChanged = hasChanged || trackValue(&inst, &block);
 }
 
-void OptimizerPass::fixPHINodes(llvm::Function &func) {
+void OptimizerPass::fixPHINodes(Function &func) {
 	for (auto &block : func.getBasicBlockList()) {
 		vector<PHINode *> phiNodes;
 		for (auto &inst : block.getInstList())
@@ -399,7 +399,7 @@ void OptimizerPass::fixPHINodes(llvm::Function &func) {
 	}
 }
 
-void OptimizerPass::fixConstants(llvm::Function &func) {
+void OptimizerPass::fixConstants(Function &func) {
 	for (auto &block : func.getBasicBlockList()) {
 		struct Replacement {
 			Instruction *user, *usee;
@@ -426,7 +426,7 @@ void OptimizerPass::fixConstants(llvm::Function &func) {
 		for (auto &r : constants) {
 			debug_print("replacing singular value", r.usee);
 
-			Value *newValue = llvm::ConstantInt::get(r.usee->getType(), r.value);
+			Value *newValue = ConstantInt::get(r.usee->getType(), r.value);
 			r.user->replaceUsesOfWith(r.usee, newValue);
 		}
 
@@ -471,7 +471,7 @@ void OptimizerPass::replaceBranch(BasicBlock *origin, BranchInst *branch, Branch
 	}
 }
 
-void OptimizerPass::fixBranches(llvm::Function &func) { // @todo invalidates dead-code analysis?
+void OptimizerPass::fixBranches(Function &func) { // @todo invalidates dead-code analysis?
 	for (auto &block : func.getBasicBlockList()) {
 		vector<BranchInst *> branches; // conditional branches
 		for (auto &inst : block.getInstList())
@@ -493,7 +493,7 @@ void OptimizerPass::fixBranches(llvm::Function &func) { // @todo invalidates dea
 	}
 }
 
-void OptimizerPass::removeDeadCode(llvm::Function &func) {
+void OptimizerPass::removeDeadCode(Function &func) {
 	for (auto &block : func.getBasicBlockList()) {
 		vector<Instruction *> dead;
 		for (auto &inst : block.getInstList())
@@ -503,7 +503,7 @@ void OptimizerPass::removeDeadCode(llvm::Function &func) {
 	}
 }
 
-void OptimizerPass::removeUnreachableCode(llvm::Function &func) { // @todo name simplifyCFG
+void OptimizerPass::removeUnreachableCode(Function &func) { // @todo name simplifyCFG
 	vector<BasicBlock *> bl;
 	for (auto &block : func.getBasicBlockList()) bl.push_back(&block);
 
@@ -710,7 +710,7 @@ void OptimizerPass::applyConstraintSetToDomain(Value *value, ValueDomain &vd, co
 }
 
 ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth) {
-	if (auto ci = dyn_cast<llvm::ConstantInt>(value)) {
+	if (auto ci = dyn_cast<ConstantInt>(value)) {
 		int intVal = (int)*ci->getValue().getRawData();
 
 		ValueDomain vd;
@@ -729,7 +729,7 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 	return vd;
 }
 
-void OptimizerPass::initialize(llvm::Function &func) {
+void OptimizerPass::initialize(Function &func) {
 	blocks.clear();
 	values.clear();
 
@@ -764,7 +764,7 @@ void OptimizerPass::initialize(llvm::Function &func) {
 	propagateConstraintSets();
 }
 
-void OptimizerPass::findDominators() { // fixpoint approach
+void OptimizerPass::findDominators() {
 	for (auto &bd : blocks) {
 		auto &dom = bd.second.dominators;
 		dom.clear();
@@ -773,10 +773,7 @@ void OptimizerPass::findDominators() { // fixpoint approach
 		else for (auto &bd2 : blocks) dom.insert(bd2.first);
 	}
 
-	//cerr << "finding dominators" << endl;
 	while (true) {
-		//cerr << "  step" << endl;
-
 		bool hasChanged = false;
 		for (auto &bd : blocks) {
 			if (bd.second.edges.size() == 0) continue;
@@ -848,7 +845,7 @@ bool OptimizerPass::shouldInstantiateBlock(BasicBlock *block) {
 
 	for (auto &phi : block->phis())
 		for (auto &value : phi.incoming_values())
-			if (dyn_cast<llvm::ConstantInt>(value))
+			if (dyn_cast<ConstantInt>(value))
 				return true;
 
 	// no promising phi node found
@@ -892,7 +889,7 @@ Value *OptimizerPass::vmapLookup(BasicBlock *block, Instruction *value, VMap &vm
 	return vmap[value][block];
 }
 
-void OptimizerPass::instantiateBlock(llvm::Function *func, BasicBlock *block) {
+void OptimizerPass::instantiateBlock(Function *func, BasicBlock *block) {
 	VMap vmap;
 	int i = 0;
 
@@ -1055,7 +1052,7 @@ void OptimizerPass::instantiateBlock(llvm::Function *func, BasicBlock *block) {
 	removeBlock(block);
 }
 
-void OptimizerPass::instantiateBlocks(llvm::Function &func) {
+void OptimizerPass::instantiateBlocks(Function &func) {
 	vector<BasicBlock *> blocks;
 	for (auto &b : func.getBasicBlockList())
 		if (shouldInstantiateBlock(&b))
@@ -1067,7 +1064,7 @@ void OptimizerPass::instantiateBlocks(llvm::Function &func) {
 	}
 }
 
-bool OptimizerPass::reschedule(llvm::Function &func) {
+bool OptimizerPass::reschedule(Function &func) {
 	// @todo explain this as Markov process
 	// @todo calculate heat directly before starting the rescheduling
 	// @todo (not here) how about making the results of the function analysis (return interval) available globally?
@@ -1147,11 +1144,38 @@ bool OptimizerPass::reschedule(llvm::Function &func) {
 	return !results.empty();
 }
 
-bool OptimizerPass::runOnFunction(llvm::Function &func) {
+vector<BasicBlock *> OptimizerPass::buildTopology() {
+	// @todo would be more efficient with a priority queue
+	// and some counter based approach
+
+	vector<BasicBlock *> topology;
+	set<BasicBlock *> remainder;
+
+	for (auto &b : blocks) remainder.insert(b.first);
+
+	while (!remainder.empty()) {
+		for (auto &b : remainder) {
+			for (auto &dom : blocks[b].dominators)
+				if (dom != b && remainder.find(dom) != remainder.end())
+					goto invalid;
+
+			topology.push_back(b);
+			remainder.erase(b);
+			break;
+
+			invalid:
+			continue;
+		}
+	}
+
+	return topology;
+}
+
+bool OptimizerPass::runOnFunction(Function &func) {
 	initialize(func);
 
 	if (debug_mode) {
-		dumpAnalysis();
+		print(outs(), nullptr);
 		func.print(errs());
 	}
 
@@ -1195,23 +1219,10 @@ bool OptimizerPass::runOnFunction(llvm::Function &func) {
 
 	if (debug_mode) {
 		cout << endl << "fixpoint:" << endl;
-		dumpAnalysis();
+		print(outs(), nullptr);
 	}
 
 	return true;
-}
-
-void OptimizerPass::dumpAnalysis() {
-	for (auto &bd : blocks)
-		cout << "block: " << string(bd.first->getName()) << bd.second;
-
-	for (auto &v : values) {
-		auto &vd = v.second;
-		cout << "value ";
-		v.first->print(outs());
-		cout << ": " << vd << endl;
-		//v.first->print(errs());
-	}
 }
 
 bool OptimizerPass::hasSideEffect(Value *v) {
@@ -1250,7 +1261,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	} else if (!isa<User>(v) || isa<TerminatorInst>(v)) {
 		// cannot be referenced, do not analyse
 	} else if (auto bc = dyn_cast<BitCastInst>(v)) {
-		vd = getVD(bc->llvm::User::getOperand(0), block); // @todo
+		vd = getVD(bc->User::getOperand(0), block); // @todo
 	} else if (
 		dyn_cast<GetElementPtrInst>(v) ||
 		dyn_cast<LoadInst>(v) ||
@@ -1415,5 +1426,19 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	return true;
 }
 
-char OptimizerPass::ID = 0;
+void OptimizerPass::print(raw_ostream &out, const Module *module) const {
+	// @todo @bug output to specified stream, not cout!
 
+	for (auto &bd : blocks)
+		cout << "block: " << string(bd.first->getName()) << bd.second;
+
+	for (auto &v : values) {
+		auto &vd = v.second;
+		cout << "value ";
+		v.first->print(outs());
+		cout << ": " << vd << endl;
+		//v.first->print(errs());
+	}
+}
+
+char OptimizerPass::ID = 0;

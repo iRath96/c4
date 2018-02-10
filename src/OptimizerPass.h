@@ -101,8 +101,6 @@ struct OptimizerPass : public llvm::FunctionPass {
 
 	bool hasChanged;
 
-	void dumpAnalysis();
-
 	bool hasSideEffect(llvm::Value *v);
 	bool trackValue(llvm::Value *v, llvm::BasicBlock *block);
 
@@ -142,8 +140,10 @@ struct OptimizerPass : public llvm::FunctionPass {
 	void instantiateBlocks(llvm::Function &func);
 
 	bool reschedule(llvm::Function &func);
+	std::vector<llvm::BasicBlock *> buildTopology();
 
 	bool runOnFunction(llvm::Function &func) override;
+	void print(llvm::raw_ostream &out, const llvm::Module *module) const override;
 };
 
 #endif /* OptimizerPass_h */

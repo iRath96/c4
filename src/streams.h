@@ -77,6 +77,21 @@ public:
 };
 
 template<typename P>
+class VectorSource : public Source<P> {
+public:
+	std::vector<P> data;
+	size_t index = 0;
+
+	VectorSource() {}
+
+	virtual bool next(P *output) {
+		if (index >= data.size()) return false;
+		*output = data[index++];
+		return true;
+	}
+};
+
+template<typename P>
 class Buffer;
 
 /**

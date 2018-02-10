@@ -222,8 +222,6 @@ public:
 		error_flag = _prev_ef; \
 	}
 
-const char *operator_name(Token::Punctuator punctuator);
-
 /**
  * Uses recursive-descent parsing to transform tokens into external AST nodes.
  */
@@ -326,7 +324,7 @@ protected:
 	OPTION
 		NON_OPTIONAL(peek().punctuator == punctuator)
 		shift();
-	OTHERWISE_FAIL(std::string(operator_name(punctuator)) + " expected")
+	OTHERWISE_FAIL(std::string(Token::operatorName(punctuator)) + " expected")
 
 	bool read_keyword(Token::Keyword keyword)
 	OPTION

@@ -177,7 +177,7 @@ protected:
 
 	virtual void visit(UnaryExpression &node) {
 		std::cout << "(";
-		std::cout << operator_name(node.op);
+		std::cout << lexer::Token::operatorName(node.op);
 		inspect(node.operand);
 		std::cout << ")";
 	}
@@ -185,7 +185,7 @@ protected:
 	virtual void visit(BinaryExpression &node) {
 		std::cout << "(";
 		inspect(node.lhs);
-		std::cout << " " << operator_name(node.op) << " ";
+		std::cout << " " << lexer::Token::operatorName(node.op) << " ";
 		inspect(node.rhs);
 		std::cout << ")";
 	}
@@ -230,7 +230,7 @@ protected:
 	virtual void visit(PostExpression &node) {
 		std::cout << "(";
 		inspect(node.base);
-		std::cout << operator_name(node.op);
+		std::cout << lexer::Token::operatorName(node.op);
 		std::cout << ")";
 	}
 

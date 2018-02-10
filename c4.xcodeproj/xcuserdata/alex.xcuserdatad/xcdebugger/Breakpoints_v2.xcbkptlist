@@ -10,11 +10,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "src/Parser.h"
-            timestampString = "539772469.2107739"
+            timestampString = "539959226.7376961"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "806"
-            endingLineNumber = "806"
+            startingLineNumber = "804"
+            endingLineNumber = "804"
             landmarkName = "unknown"
             landmarkType = "0">
          </BreakpointContent>
@@ -26,11 +26,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "src/Parser.h"
-            timestampString = "539772469.210867"
+            timestampString = "539959226.737766"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "598"
-            endingLineNumber = "598"
+            startingLineNumber = "596"
+            endingLineNumber = "596"
             landmarkName = "unknown"
             landmarkType = "0">
          </BreakpointContent>
@@ -42,11 +42,11 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "src/Parser.h"
-            timestampString = "539772469.210923"
+            timestampString = "539959226.73782"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1010"
-            endingLineNumber = "1010"
+            startingLineNumber = "1008"
+            endingLineNumber = "1008"
             landmarkName = "unknown"
             landmarkType = "0">
          </BreakpointContent>
@@ -58,27 +58,13 @@
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "src/Lexer.cpp"
-            timestampString = "538858194.19415"
+            timestampString = "539959226.737872"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "375"
             endingLineNumber = "375"
             landmarkName = "Lexer::consume(int length)"
             landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "src/Optimizer.cpp"
-            timestampString = "539948837.590557"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "22"
-            endingLineNumber = "22">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

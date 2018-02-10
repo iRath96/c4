@@ -103,6 +103,8 @@ struct Token {
 	};
 #undef ID
 
+	static const char *operatorName(Punctuator punctuator);
+
 	static inline Precedence precedence(Punctuator punctuator) {
 		return (Precedence)(char)punctuator;
 	}

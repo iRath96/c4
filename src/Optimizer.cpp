@@ -2,6 +2,7 @@
 
 #include "InlinePass.h"
 #include "OptimizerPass.h"
+#include "DecompilerPass.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -33,6 +34,7 @@ Optimizer::Optimizer(Source<CompilerResult> *source, Module *module)
 : Stream<CompilerResult, CompilerResult>(source), fpm(module), module(module) {
 	fpm.add(createPromoteMemoryToRegisterPass());
 	fpm.add(new OptimizerPass());
+	fpm.add(new DecompilerPass());
 }
 
 bool Optimizer::next(CompilerResult *result) {
@@ -46,6 +48,4 @@ bool Optimizer::next(CompilerResult *result) {
 
 		return false;
 	}
-
-	// @todo decompile?
 }
