@@ -9,6 +9,7 @@
 #include <llvm/IR/LegacyPassManager.h>
 #pragma GCC diagnostic pop
 
+
 namespace llvm {
 	class Module;
 }
