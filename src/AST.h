@@ -168,7 +168,7 @@ struct TypeName : Node {
 #pragma mark - Expressions
 
 struct IdentifierExpression : Expression {
-	IdentifierExpression() {}
+	IdentifierExpression() : text("") {}
 	IdentifierExpression(const std::string &text) : text(text) {}
 
 	std::string text;
@@ -176,7 +176,7 @@ struct IdentifierExpression : Expression {
 };
 
 struct Constant : Expression {
-	Constant() {}
+	Constant() : text(""), value(0), isChar(false) {}
 	Constant(const std::string &text, int value, bool isChar)
 	: text(text), value(value), isChar(isChar) {}
 
@@ -187,7 +187,7 @@ struct Constant : Expression {
 };
 
 struct StringLiteral : Expression {
-	StringLiteral() {}
+	StringLiteral() : text(""), value("") {}
 	StringLiteral(const std::string &text) : text(text), value(text) {}
 	
 	std::string text;

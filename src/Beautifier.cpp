@@ -4,67 +4,67 @@ using namespace ast;
 using namespace std;
 
 void Beautifier::visit(CaseLabel &node) {
-	std::cout << "case ";
+	cout << "case ";
 	inspect(*node.expression);
-	std::cout << ":";
+	cout << ":";
 }
 
-void Beautifier::visit(DefaultLabel &) { std::cout << "default:"; }
-void Beautifier::visit(IdentifierLabel &node) { std::cout << node.id << ":"; }
-void Beautifier::visit(Identifier &node) { std::cout << node.id; }
-void Beautifier::visit(NamedTypeSpecifier &node) { std::cout << node.id; }
+void Beautifier::visit(DefaultLabel &) { cout << "default:"; }
+void Beautifier::visit(IdentifierLabel &node) { cout << node.id << ":"; }
+void Beautifier::visit(Identifier &node) { cout << node.id; }
+void Beautifier::visit(NamedTypeSpecifier &node) { cout << node.id; }
 void Beautifier::visit(ContinueStatement &node) {
-	std::cout << (node.keyword == lexer::Token::Keyword::CONTINUE ? "continue;" : "break;");
+	cout << (node.keyword == lexer::Token::Keyword::CONTINUE ? "continue;" : "break;");
 }
 
 void Beautifier::visit(CompoundStatement &node) {
-	std::cout << "{";
+	cout << "{";
 
-	std::string prev_indent = indent;
+	string prev_indent = indent;
 	indent += "\t";
 
 	for (auto &child : node.items) {
-		std::cout << std::endl;
+		cout << endl;
 
 		Statement *stmt;
 		if ((stmt = dynamic_cast<Statement *>(child.get())))
 			join(stmt->labels, "\n", "\n");
 
-		std::cout << indent;
+		cout << indent;
 		inspect(child);
 	}
 
 	indent = prev_indent;
-	std::cout << std::endl << indent << "}";
+	cout << endl << indent << "}";
 }
 
-void Beautifier::visit(DeclaratorPointer &) { std::cout << "*"; }
+void Beautifier::visit(DeclaratorPointer &) { cout << "*"; }
 
 void Beautifier::visit(DeclaratorParameterList &node) { // @todo variadic
-	std::cout << "(";
-	if (node.removedVoid) std::cout << "void";
+	cout << "(";
+	if (node.removedVoid) cout << "void";
 	else join(node.parameters, ", ");
-	std::cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(Declarator &node) {
 	for (auto &mod : node.modifiers) {
-		std::cout << "(";
+		cout << "(";
 		if (dynamic_cast<DeclaratorPointer *>(mod.get())) // @todo DeclaratorPrefix class?
 			inspect(mod);
 	}
 
 	if (!node.isAbstract())
-		std::cout << node.name;
+		cout << node.name;
 
 	for (auto it = node.modifiers.rbegin(); it != node.modifiers.rend(); ++it) {
 		if (!dynamic_cast<DeclaratorPointer *>(it->get()))
 			inspect(*it);
-		std::cout << ")";
+		cout << ")";
 	}
 
 	if (node.initializer.get()) {
-		std::cout << " = ";
+		cout << " = ";
 		inspect(node.initializer);
 	}
 }
@@ -72,12 +72,12 @@ void Beautifier::visit(Declarator &node) {
 void Beautifier::visit(Declaration &node) {
 	join(node.specifiers, " ", node.declarators.empty() ? "" : " ");
 	join(node.declarators, ", ");
-	std::cout << ";";
+	cout << ";";
 }
 
 void Beautifier::visit(GlobalVariable &node) {
 	visit(node.declaration);
-	std::cout << std::endl;
+	cout << endl;
 }
 
 void Beautifier::visit(Function &node) {
@@ -87,7 +87,7 @@ void Beautifier::visit(Function &node) {
 	separate_lines(node.declarations, true);
 
 	inspect(node.body);
-	std::cout << std::endl;
+	cout << endl;
 }
 
 bool Beautifier::isDeclaratorEmpty(ast::Declarator &decl) const {
@@ -99,86 +99,86 @@ void Beautifier::visit(ParameterDeclaration &node) {
 	inspect(node.declarator);
 }
 
-void Beautifier::visit(IdentifierExpression &node) { std::cout << node.text; }
-void Beautifier::visit(Constant &node) { std::cout << node.text; }
-void Beautifier::visit(StringLiteral &node) { std::cout << node.text; }
+void Beautifier::visit(IdentifierExpression &node) { cout << node.text; }
+void Beautifier::visit(Constant &node) { cout << node.text; }
+void Beautifier::visit(StringLiteral &node) { cout << node.text; }
 
 void Beautifier::visit(CastExpression &node) {
-	std::cout << "((";
+	cout << "((";
 	inspect(node.type);
-	std::cout << ")";
+	cout << ")";
 	inspect(node.expression);
-	std::cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(UnaryExpression &node) {
-	std::cout << "(";
-	std::cout << lexer::Token::operatorName(node.op);
+	cout << "(";
+	cout << lexer::Token::operatorName(node.op);
 	inspect(node.operand);
-	std::cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(BinaryExpression &node) {
-	std::cout << "(";
+	cout << "(";
 	inspect(node.lhs);
-	std::cout << " " << lexer::Token::operatorName(node.op) << " ";
+	cout << " " << lexer::Token::operatorName(node.op) << " ";
 	inspect(node.rhs);
-	std::cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(ConditionalExpression &node) {
-	std::cout << "(";
+	cout << "(";
 	inspect(node.condition);
-	std::cout << " ? ";
+	cout << " ? ";
 	inspect(node.when_true);
-	std::cout << " : ";
+	cout << " : ";
 	inspect(node.when_false);
-	std::cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(ExpressionList &node) { join(node.children, ", "); }
 
 void Beautifier::visit(CallExpression &node) {
-	std::cout << "(";
+	cout << "(";
 	inspect(node.function);
-	std::cout << "(";
+	cout << "(";
 	join(node.arguments, ", ");
-	std::cout << ")";
-	std::cout << ")";
+	cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(SubscriptExpression &node) {
-	std::cout << "(";
+	cout << "(";
 	inspect(node.base);
-	std::cout << "[";
+	cout << "[";
 	inspect(node.subscript);
-	std::cout << "]";
-	std::cout << ")";
+	cout << "]";
+	cout << ")";
 }
 
 void Beautifier::visit(MemberExpression &node) {
-	std::cout << "(";
+	cout << "(";
 	inspect(node.base);
-	std::cout << (node.dereference ? "->" : ".") << node.id;
-	std::cout << ")";
+	cout << (node.dereference ? "->" : ".") << node.id;
+	cout << ")";
 }
 
 void Beautifier::visit(PostExpression &node) {
-	std::cout << "(";
+	cout << "(";
 	inspect(node.base);
-	std::cout << lexer::Token::operatorName(node.op);
-	std::cout << ")";
+	cout << lexer::Token::operatorName(node.op);
+	cout << ")";
 }
 
 void Beautifier::visit(ExpressionStatement &node) {
 	inspect(node.expressions);
-	std::cout << ";";
+	cout << ";";
 }
 
 void Beautifier::visit(SizeofExpressionUnary &node) {
-	std::cout << "(sizeof ";
+	cout << "(sizeof ";
 	inspect(node.expression);
-	std::cout << ")";
+	cout << ")";
 }
 
 void Beautifier::visit(TypeName &node) {
@@ -187,26 +187,26 @@ void Beautifier::visit(TypeName &node) {
 }
 
 void Beautifier::visit(ComposedTypeSpecifier &node) {
-	std::cout << "struct";
-	if (node.isNamed()) std::cout << " " << node.name;
+	cout << "struct";
+	if (node.isNamed()) cout << " " << node.name;
 
 	if (!node.declarations.empty()) {
-		std::cout << std::endl << indent << "{";
+		cout << endl << indent << "{";
 		separate_lines(node.declarations);
-		std::cout << "}";
+		cout << "}";
 	}
 }
 
 void Beautifier::visit(SizeofExpressionTypeName &node) {
-	std::cout << "(sizeof(";
+	cout << "(sizeof(";
 	inspect(node.type);
-	std::cout << "))";
+	cout << "))";
 }
 
 void Beautifier::visit(IterationStatement &node) {
-	std::cout << "while (";
+	cout << "while (";
 	inspect(node.condition);
-	std::cout << ")";
+	cout << ")";
 
 	inline_inspect(node.body.get());
 }
@@ -221,53 +221,53 @@ bool Beautifier::inline_if(Statement *node, bool afterElse) {
 }
 
 void Beautifier::inline_inspect(Statement *node, bool suffix, bool afterElse) {
-	std::string pi = indent;
+	string pi = indent;
 
 	if (inline_if(node, afterElse)) {
 		if (node->labels.empty())
-			std::cout << " ";
+			cout << " ";
 		else { // has labels, can't inline this easily.
-			std::cout << std::endl;
+			cout << endl;
 			join(node->labels, "\n", "\n"); // @todo not DRY
-			std::cout << indent;
+			cout << indent;
 		}
 	} else {
 		indent += "\t";
 
-		std::cout << std::endl;
+		cout << endl;
 		join(node->labels, "\n", "\n");
-		std::cout << indent;
+		cout << indent;
 	}
 
 	inspect(*node);
 	indent = pi;
 
 	if (suffix) {
-		if (inline_if(node, afterElse)) std::cout << " ";
-		else std::cout << std::endl << indent;
+		if (inline_if(node, afterElse)) cout << " ";
+		else cout << endl << indent;
 	}
 }
 
 void Beautifier::visit(SelectionStatement &node) {
-	std::cout << "if (";
+	cout << "if (";
 	inspect(node.condition);
-	std::cout << ")";
+	cout << ")";
 
 	inline_inspect(node.when_true.get(), node.when_false.get() != NULL);
 
 	if (node.when_false.get()) {
-		std::cout << "else";
+		cout << "else";
 		inline_inspect(node.when_false.get(), false, true);
 	}
 }
 
 void Beautifier::visit(GotoStatement &node) {
-	std::cout << "goto " << node.target << ";";
+	cout << "goto " << node.target << ";";
 }
 
 void Beautifier::visit(ReturnStatement &node) {
-	std::cout << "return";
-	if (!node.expressions.children.empty()) std::cout << " ";
+	cout << "return";
+	if (!node.expressions.children.empty()) cout << " ";
 	inspect(node.expressions);
-	std::cout << ";";
+	cout << ";";
 }
