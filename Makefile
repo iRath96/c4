@@ -29,7 +29,11 @@ CFLAGS   := $(LLVM_CFLAGS) -Wall -W $(CFLAGS)
 CXXFLAGS += $(CFLAGS) -std=c++11
 LDFLAGS  += $(LLVM_LDFLAGS)
 
-optimizer = Optimizer InlinePass OptimizerPass OptimizerUtils DecompilerPass
+CFLAGS-Optimizer.o += -fno-rtti
+CFLAGS-InlinePass.o += -fno-rtti
+CFLAGS-OptimizerPass.o += -fno-rtti
+CFLAGS-OptimizerUtils.o += -fno-rtti
+CFLAGS-DecompilerPass.o += -fno-rtti
 
 DUMMY := $(shell mkdir -p $(sort $(dir $(OBJ))))
 
@@ -50,9 +54,6 @@ $(BIN): $(OBJ)
 # Urgh… #fml
 # the LLVM used by my build system is compiled with RTTI disabled,
 # which is why we need to disable it, too -- but only for one file
-$(BINDIR)/$(optimizer).o: $(BINDIR)/%.o: $(SRCDIR)/%.cpp
-	$(Q)$(CXX) $(CXXFLAGS) -fno-rtti -MMD -c -o $@ $<
-
 $(BINDIR)/%.o: $(SRCDIR)/%.cpp
-	@echo "===> CXX $<"
-	$(Q)$(CXX) $(CXXFLAGS) -MMD -c -o $@ $<
+	@echo "===> CXX $(CFLAGS-$(notdir $@)) $<"
+	$(Q)$(CXX) $(CXXFLAGS) $(CFLAGS-$(notdir $@)) -MMD -c -o $@ $<

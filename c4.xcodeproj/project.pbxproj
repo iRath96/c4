@@ -12,6 +12,7 @@
 		FA33257A202EEF8B008BE8A5 /* OptimizerPass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA332578202EEF8B008BE8A5 /* OptimizerPass.cpp */; };
 		FA33257D202EF5A3008BE8A5 /* OptimizerUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA33257B202EF5A3008BE8A5 /* OptimizerUtils.cpp */; };
 		FA332580202EF8D3008BE8A5 /* DecompilerPass.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA33257E202EF8D3008BE8A5 /* DecompilerPass.cpp */; };
+		FA332582203046D0008BE8A5 /* Beautifier.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA332581203046D0008BE8A5 /* Beautifier.cpp */; };
 		FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA6431861FAD924D00ABFB9D /* Parser.cpp */; };
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
@@ -43,6 +44,7 @@
 		FA33257C202EF5A3008BE8A5 /* OptimizerUtils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OptimizerUtils.h; sourceTree = "<group>"; };
 		FA33257E202EF8D3008BE8A5 /* DecompilerPass.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = DecompilerPass.cpp; sourceTree = "<group>"; };
 		FA33257F202EF8D3008BE8A5 /* DecompilerPass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DecompilerPass.h; sourceTree = "<group>"; };
+		FA332581203046D0008BE8A5 /* Beautifier.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Beautifier.cpp; sourceTree = "<group>"; };
 		FA3574B4201B7E0700CE955E /* common.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = common.h; sourceTree = "<group>"; };
 		FA6431861FAD924D00ABFB9D /* Parser.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Parser.cpp; sourceTree = "<group>"; usesTabs = 1; };
 		FA6431871FAD924D00ABFB9D /* Parser.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Parser.h; sourceTree = "<group>"; };
@@ -99,6 +101,7 @@
 				FA6431871FAD924D00ABFB9D /* Parser.h */,
 				FA6431861FAD924D00ABFB9D /* Parser.cpp */,
 				FA87A23E1FB8E3A00023DB3F /* Beautifier.h */,
+				FA332581203046D0008BE8A5 /* Beautifier.cpp */,
 			);
 			name = parser;
 			sourceTree = "<group>";
@@ -224,6 +227,7 @@
 				FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */,
 				FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
+				FA332582203046D0008BE8A5 /* Beautifier.cpp in Sources */,
 				FA33257D202EF5A3008BE8A5 /* OptimizerUtils.cpp in Sources */,
 				FA332580202EF8D3008BE8A5 /* DecompilerPass.cpp in Sources */,
 			);
