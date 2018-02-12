@@ -5,7 +5,7 @@ test:
   image: irath96/llvm
   stage: test
   script:
-    - export PATH="/llvm:$PATH"
+    - export PATH="/llvm/install/bin/:$PATH"
     - make
     - ruby test.rb
     - ruby fuzzy/main.rb
