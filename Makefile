@@ -19,11 +19,7 @@ DEP    := $(OBJ:%.o=%.d)
 ifneq ("$(wildcard llvm/install/bin/llvm-config)","")
 	LLVM_CONFIG  ?= llvm/install/bin/llvm-config
 else
-	ifneq ("$(wildcard /llvm/install/bin/llvm-config)","")
-		LLVM_CONFIG  ?= /llvm/install/bin/llvm-config
-	else
-		LLVM_CONFIG  ?= llvm-config
-	endif
+	LLVM_CONFIG  ?= llvm-config
 endif
 
 LLVM_CFLAGS  := $(shell $(LLVM_CONFIG) --cppflags)
