@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <set>
 
 #include "AST.h"
 
@@ -29,16 +30,28 @@ struct DecompilerPass : public llvm::FunctionPass {
 	bool runOnFunction(llvm::Function &func) override;
 
 	std::map<llvm::Instruction *, bool> ignoreInst;
-	std::map<llvm::BasicBlock *, std::string> labels;
 	std::map<llvm::BasicBlock *, std::vector<llvm::PHINode *>> phiRefs;
-	std::map<llvm::BasicBlock *, ast::Ptr<ast::CompoundStatement>> bmap;
 	std::map<llvm::Value *, ast::Ptr<ast::Expression>> vmap;
+
+	std::map<llvm::Value *, std::string> names;
+	std::map<std::string, llvm::Value *> namesReverse; // @todo not elegant
+
+	int nameCounter = 0;
+
+	std::string resolveName(llvm::Value *value);
 
 	ast::Ptr<ast::Expression> resolve(llvm::Value *value);
 
-	void decompileBlock(llvm::BasicBlock *block);
-	llvm::BasicBlock *findFirstDominator(llvm::BasicBlock *block);
-	void resolvePHIRefs(llvm::BasicBlock *block);
+	llvm::BasicBlock *findFirstDominator(llvm::BasicBlock &block);
+
+	bool isLoop(llvm::BasicBlock *header, llvm::BasicBlock *body);
+
+	void bindBlock(llvm::BasicBlock &block, ast::CompoundStatement &compound, std::set<llvm::BasicBlock *> &join);
+	void decompileBlock(llvm::BasicBlock &block, ast::CompoundStatement &compound);
+	void resolvePHIRefs(llvm::BasicBlock &block, ast::CompoundStatement &compound);
+
+	void fixGotos(ast::Statement *body, std::set<std::string> &refs, ast::IdentifierLabel *follow = nullptr);
+	void fixLabels(ast::Statement *body, const std::set<std::string> &refs);
 };
 
 #endif /* Decompiler_h */

@@ -1,6 +1,7 @@
 #include "InlinePass.h"
 #include "OptimizerPass.h"
 #include "OptimizerUtils.h"
+#include "DecompilerPass.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -81,6 +82,10 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 }
 
 bool InlinePass::runOnModule(Module &module) {
+	legacy::FunctionPassManager fpm(&module);
+	fpm.add(new OptimizerPass());
+	fpm.add(new DecompilerPass());
+
 	vector<CallInst *> calls;
 
 	for (auto &func : module.functions())
@@ -94,7 +99,7 @@ bool InlinePass::runOnModule(Module &module) {
 		processCall(call, dirtyFns);
 
 	for (auto &dirtyFn : dirtyFns)
-		OptimizerPass().runOnFunction(*dirtyFn);
+		fpm.run(*dirtyFn);
 
 	return true;
 }

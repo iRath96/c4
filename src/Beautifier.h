@@ -13,7 +13,24 @@ class Beautifier : public ast::Visitor, public streams::Sink<ast::Ptr<ast::Exter
 protected:
 	std::string indent = "";
 	bool isFirst = true;
+public:
+	bool lispMode = true;
 
+	Beautifier(Source<ast::Ptr<ast::External>> *source) : Sink<ast::Ptr<ast::External>>(source) {}
+
+	virtual bool next(void *) {
+		ast::Ptr<ast::External> result;
+		if (this->source->next(&result)) {
+			if (isFirst) isFirst = false;
+			else std::cout << std::endl;
+
+			inspect(*result);
+			return true;
+		} else
+			return false;
+	}
+
+protected:
 	void inspect(ast::Node &node) { node.accept(*this); }
 	void inspect(const char *str) { std::cout << str; }
 
@@ -50,22 +67,6 @@ protected:
 		std::cout << std::endl << indent;
 	}
 
-public:
-	Beautifier(Source<ast::Ptr<ast::External>> *source) : Sink<ast::Ptr<ast::External>>(source) {}
-
-	virtual bool next(void *) {
-		ast::Ptr<ast::External> result;
-		if (this->source->next(&result)) {
-			if (isFirst) isFirst = false;
-			else std::cout << std::endl;
-
-			inspect(*result);
-			return true;
-		} else
-			return false;
-	}
-
-protected:
 	bool isDeclaratorEmpty(ast::Declarator &decl) const;
 
 	static bool inline_if(ast::Statement *node, bool afterElse = false);

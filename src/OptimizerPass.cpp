@@ -1241,11 +1241,11 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 
 	vd.isDead = true;
 	if (blocks[block].reachable) {
-		v->print(errs()); cerr << " " << (hasSideEffect(v) ? "se" : "ne") << endl;
+		//v->print(errs()); cerr << " " << (hasSideEffect(v) ? "se" : "ne") << endl;
 		if (hasSideEffect(v)) vd.isDead = false;
 		else { // check if we're referenced
 			for (auto &use : v->uses()) {
-				cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
+				//cerr << "used by "; use.getUser()->print(errs()); cerr << endl;
 				auto &x = getGlobalVD(use.getUser());
 				if (!x.isDead) {
 					vd.isDead = false;

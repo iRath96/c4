@@ -130,6 +130,9 @@ struct DefaultLabel : Label {
 };
 
 struct IdentifierLabel : Label {
+	IdentifierLabel() : id("") {}
+	IdentifierLabel(const std::string &id) : id(id) {}
+	
 	std::string id;
 	ACCEPT
 };
@@ -208,7 +211,12 @@ struct UnaryExpression : Expression {
 };
 
 struct BinaryExpression : Expression {
-public:
+	BinaryExpression()
+	: lhs(nullptr), rhs(nullptr), op(lexer::Token::Punctuator::NOT_A_PUNCTUATOR) {}
+
+	BinaryExpression(Ptr<Expression> &lhs, Ptr<Expression> &rhs, lexer::Token::Punctuator op)
+	: lhs(lhs), rhs(rhs), op(op) {}
+
 	Ptr<Expression> lhs, rhs;
 	lexer::Token::Punctuator op;
 	ACCEPT

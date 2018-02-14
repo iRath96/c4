@@ -7,6 +7,7 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #include <llvm/Pass.h>
+#include <llvm/IR/LegacyPassManager.h>
 #pragma GCC diagnostic pop
 
 

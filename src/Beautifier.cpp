@@ -49,7 +49,7 @@ void Beautifier::visit(DeclaratorParameterList &node) { // @todo variadic
 
 void Beautifier::visit(Declarator &node) {
 	for (auto &mod : node.modifiers) {
-		cout << "(";
+		if (lispMode) cout << "(";
 		if (dynamic_cast<DeclaratorPointer *>(mod.get())) // @todo DeclaratorPrefix class?
 			inspect(mod);
 	}
@@ -60,7 +60,7 @@ void Beautifier::visit(Declarator &node) {
 	for (auto it = node.modifiers.rbegin(); it != node.modifiers.rend(); ++it) {
 		if (!dynamic_cast<DeclaratorPointer *>(it->get()))
 			inspect(*it);
-		cout << ")";
+		if (lispMode) cout << ")";
 	}
 
 	if (node.initializer.get()) {
@@ -104,70 +104,71 @@ void Beautifier::visit(Constant &node) { cout << node.text; }
 void Beautifier::visit(StringLiteral &node) { cout << node.text; }
 
 void Beautifier::visit(CastExpression &node) {
-	cout << "((";
+	if (lispMode) cout << "(";
+	cout << "(";
 	inspect(node.type);
 	cout << ")";
 	inspect(node.expression);
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(UnaryExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	cout << lexer::Token::operatorName(node.op);
 	inspect(node.operand);
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(BinaryExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	inspect(node.lhs);
 	cout << " " << lexer::Token::operatorName(node.op) << " ";
 	inspect(node.rhs);
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(ConditionalExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	inspect(node.condition);
 	cout << " ? ";
 	inspect(node.when_true);
 	cout << " : ";
 	inspect(node.when_false);
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(ExpressionList &node) { join(node.children, ", "); }
 
 void Beautifier::visit(CallExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	inspect(node.function);
 	cout << "(";
 	join(node.arguments, ", ");
 	cout << ")";
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(SubscriptExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	inspect(node.base);
 	cout << "[";
 	inspect(node.subscript);
 	cout << "]";
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(MemberExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	inspect(node.base);
 	cout << (node.dereference ? "->" : ".") << node.id;
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(PostExpression &node) {
-	cout << "(";
+	if (lispMode) cout << "(";
 	inspect(node.base);
 	cout << lexer::Token::operatorName(node.op);
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(ExpressionStatement &node) {
@@ -176,9 +177,10 @@ void Beautifier::visit(ExpressionStatement &node) {
 }
 
 void Beautifier::visit(SizeofExpressionUnary &node) {
-	cout << "(sizeof ";
+	if (lispMode) cout << "(";
+	cout << "sizeof ";
 	inspect(node.expression);
-	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(TypeName &node) {
@@ -198,9 +200,11 @@ void Beautifier::visit(ComposedTypeSpecifier &node) {
 }
 
 void Beautifier::visit(SizeofExpressionTypeName &node) {
-	cout << "(sizeof(";
+	if (lispMode) cout << "(";
+	cout << "sizeof(";
 	inspect(node.type);
-	cout << "))";
+	cout << ")";
+	if (lispMode) cout << ")";
 }
 
 void Beautifier::visit(IterationStatement &node) {
