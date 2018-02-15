@@ -351,6 +351,7 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 			using Punct = lexer::Token::Punctuator;
 			switch (bin->getOpcode()) {
 				case Instruction::Sub: be->op = Punct::MINUS; break;
+				case Instruction::Add: be->op = Punct::PLUS; break;
 				default: be->op = Punct::NOT_A_PUNCTUATOR;
 			}
 
@@ -366,6 +367,14 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 		}
 
 		bool needsStore = opt.hasSideEffect(&inst) || inst.getNumUses() > 1;
+		if (!needsStore && inst.getNumUses() == 1) {
+			auto &use = *inst.uses().begin();
+			auto i = dyn_cast<Instruction>(use.getUser());
+
+			if (i && i->getParent() != &block)
+				needsStore = true;
+		}
+
 		if (needsStore) { // @todo not DRY
 			assert(!bi.get());
 

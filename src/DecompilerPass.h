@@ -12,6 +12,7 @@
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #include <llvm/Pass.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/Support/raw_ostream.h>
 #pragma GCC diagnostic pop
 
 
