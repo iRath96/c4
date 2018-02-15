@@ -21,6 +21,10 @@ using namespace streams;
 bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;
+
+bool hasOpt = false;
+Optimizer::Options opt;
+
 enum {
 	TOKENIZE, PARSE, PRINT_AST, COMPILE, OPTIMIZE
 } mode = COMPILE;
@@ -95,7 +99,7 @@ public:
 
 void parse(const char *filename) {
 	bool do_optimize = false;
-	if (mode == OPTIMIZE) {
+	if (mode == OPTIMIZE || hasOpt) {
 		mode = COMPILE;
 		do_optimize = true;
 	}
@@ -120,6 +124,9 @@ void parse(const char *filename) {
 		llPath,
 		debug_mode
 	);
+
+	if (hasOpt)
+		optimizer.options = opt;
 
 	try {
 		if (mode == COMPILE) output.drain();
@@ -171,6 +178,12 @@ void repl() {
 }
 
 int main(int argc, const char *argv[]) {
+	opt.inl = false;
+	opt.cse = false;
+	opt.licm = false;
+	opt.symex = false;
+	opt.decom = false;
+
 	for (int i = 1; i < argc; ++i) {
 		if      (!strcmp(argv[i], "--tokenize" )) mode = TOKENIZE;
 		else if (!strcmp(argv[i], "--debug"    )) debug_mode = true;
@@ -181,6 +194,13 @@ int main(int argc, const char *argv[]) {
 		else if (!strcmp(argv[i], "--repl"     )) repl();
 		else if (!strcmp(argv[i], "--compile"  )) mode = COMPILE;
 		else if (!strcmp(argv[i], "--optimize" )) mode = OPTIMIZE;
+
+		else if (!strcmp(argv[i], "--opt-inl"  )) opt.inl   = hasOpt = true;
+		else if (!strcmp(argv[i], "--opt-cse"  )) opt.cse   = hasOpt = true;
+		else if (!strcmp(argv[i], "--opt-licm" )) opt.licm  = hasOpt = true;
+		else if (!strcmp(argv[i], "--opt-symex")) opt.symex = hasOpt = true;
+		else if (!strcmp(argv[i], "--opt-decom")) opt.decom = hasOpt = true;
+
 		else parse(argv[i]);
 	}
 }

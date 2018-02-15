@@ -1240,7 +1240,8 @@ bool OptimizerPass::runOnFunction(Function &func) {
 		if (debug_mode && hasChanged) func.print(errs());
 
 		if (!hasChanged) {
-			if (experimentalOpt) instantiateBlocks(func); // @todo CLI options (also for inlining)
+			if (optimizer->options.symex)
+				instantiateBlocks(func); // @todo CLI options
 			if (debug_mode) func.print(errs());
 			if (!hasChanged) break;
 		}
@@ -1252,7 +1253,8 @@ bool OptimizerPass::runOnFunction(Function &func) {
 		}
 	}
 
-	while (reschedule(func));
+	if (optimizer->options.licm)
+		while (reschedule(func));
 
 	if (debug_mode) {
 		cout << endl << "fixpoint:" << endl;

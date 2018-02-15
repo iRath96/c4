@@ -83,8 +83,8 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 
 bool InlinePass::runOnModule(Module &module) {
 	legacy::FunctionPassManager fpm(&module);
-	fpm.add(new OptimizerPass());
-	fpm.add(new DecompilerPass());
+	fpm.add(new OptimizerPass(optimizer));
+	fpm.add(new DecompilerPass(optimizer));
 
 	vector<CallInst *> calls;
 

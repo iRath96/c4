@@ -19,8 +19,6 @@
 using namespace std;
 using namespace llvm;
 
-bool experimentalOpt = false;
-
 
 struct CompilerResult { // @todo @fixme @important not DRY
 	Compiler *compiler;
@@ -33,8 +31,8 @@ struct CompilerResult { // @todo @fixme @important not DRY
 Optimizer::Optimizer(Source<CompilerResult> *source, Module *module)
 : Stream<CompilerResult, CompilerResult>(source), fpm(module), module(module) {
 	fpm.add(createPromoteMemoryToRegisterPass());
-	fpm.add(new OptimizerPass());
-	fpm.add(new DecompilerPass());
+	fpm.add(new OptimizerPass(this));
+	fpm.add(new DecompilerPass(this));
 }
 
 bool Optimizer::next(CompilerResult *result) {
@@ -43,8 +41,10 @@ bool Optimizer::next(CompilerResult *result) {
 			if (isa<llvm::Function>(value)) fpm.run(*cast<llvm::Function>(value));
 		return true;
 	} else {
-		InlinePass ip;
-		ip.runOnModule(*module);
+		if (options.inl) {
+			InlinePass ip(this);
+			ip.runOnModule(*module);
+		}
 
 		return false;
 	}

@@ -14,7 +14,6 @@ namespace llvm {
 	class Module;
 }
 
-extern bool experimentalOpt;
 
 class Compiler;
 struct CompilerResult;
@@ -23,6 +22,14 @@ protected:
 	llvm::legacy::FunctionPassManager fpm;
 	llvm::Module *module;
 public:
+	struct Options {
+		bool inl   = true;
+		bool licm  = true;
+		bool cse   = true; // @todo
+		bool symex = false; // @todo
+		bool decom = false;
+	} options;
+
 	Optimizer(Source<CompilerResult> *source, llvm::Module *module);
 	virtual bool next(CompilerResult *);
 };

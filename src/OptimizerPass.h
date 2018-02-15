@@ -1,6 +1,8 @@
 #ifndef OptimizerPass_h
 #define OptimizerPass_h
 
+#include "Optimizer.h"
+
 #include <set>
 #include <map>
 
@@ -22,8 +24,11 @@ namespace llvm {
 using Predicate = llvm::CmpInst::Predicate;
 
 struct OptimizerPass : public llvm::FunctionPass {
+	const Optimizer *optimizer;
+
 	static char ID;
-	OptimizerPass() : FunctionPass(ID) {}
+	OptimizerPass(const Optimizer *optimizer)
+	: FunctionPass(ID), optimizer(optimizer) {}
 
 	struct Condition {
 		llvm::Value *cond = nullptr;

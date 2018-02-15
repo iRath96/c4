@@ -1,11 +1,12 @@
 #ifndef Decompiler_h
 #define Decompiler_h
 
+#include "AST.h"
+#include "Optimizer.h"
+
 #include <map>
 #include <vector>
 #include <set>
-
-#include "AST.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -23,9 +24,13 @@ namespace llvm {
 	class Instruction;
 }
 
+
 struct DecompilerPass : public llvm::FunctionPass {
+	const Optimizer *optimizer;
+
 	static char ID;
-	DecompilerPass() : FunctionPass(ID) {}
+	DecompilerPass(const Optimizer *optimizer)
+	: FunctionPass(ID), optimizer(optimizer) {}
 
 	void getAnalysisUsage(llvm::AnalysisUsage &info) const override;
 	bool runOnFunction(llvm::Function &func) override;

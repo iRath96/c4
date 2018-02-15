@@ -1,6 +1,8 @@
 #ifndef InlinePass_h
 #define InlinePass_h
 
+#include "Optimizer.h"
+
 #include <set>
 
 #pragma GCC diagnostic push
@@ -18,8 +20,11 @@ namespace llvm {
 }
 
 struct InlinePass : public llvm::ModulePass {
+	const Optimizer *optimizer;
+
 	static char ID;
-	InlinePass() : ModulePass(ID) {}
+	InlinePass(const Optimizer *optimizer)
+	: ModulePass(ID), optimizer(optimizer) {}
 
 	void processCall(llvm::CallInst *call, std::set<llvm::Function *> &dirtyFns);
 	bool runOnModule(llvm::Module &module) override;

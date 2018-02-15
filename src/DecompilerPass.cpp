@@ -216,6 +216,9 @@ void DecompilerPass::fixLabels(ast::Statement *body, const std::set<std::string>
 }
 
 bool DecompilerPass::runOnFunction(llvm::Function &func) {
+	if (!optimizer->options.decom)
+		return false;
+	
 	auto &opt = getAnalysis<OptimizerPass>();
 
 	auto topology = opt.buildTopology();
