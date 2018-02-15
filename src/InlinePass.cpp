@@ -22,6 +22,10 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 	auto callee = dyn_cast<Function>(call->getCalledValue());
 	if (!callee || callee->isDeclaration()) return;
 
+	if (caller == callee)
+		// we don't support inlining recursion yet
+		return;
+
 	auto retBlock = block->splitBasicBlock(call, "inline-ret");
 	block->getTerminator()->eraseFromParent();
 
