@@ -1359,8 +1359,8 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 					vd = ValueDomain::top(false);
 				else {
 					bool overflow = false;
-					overflow = __builtin_sub_overflow(lhs.min, rhs.min, &vd.min) || overflow;
-					overflow = __builtin_sub_overflow(lhs.max, rhs.max, &vd.max) || overflow;
+					overflow = __builtin_sub_overflow(lhs.min, rhs.max, &vd.min) || overflow;
+					overflow = __builtin_sub_overflow(lhs.max, rhs.min, &vd.max) || overflow;
 
 					if (overflow && !(lhs.isConstant() && rhs.isConstant()))
 						vd = ValueDomain::top(false);
