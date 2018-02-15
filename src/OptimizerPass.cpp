@@ -1064,6 +1064,21 @@ void OptimizerPass::instantiateBlocks(Function &func) {
 	}
 }
 
+bool instructionIsEarlier(Instruction *a, Instruction *b) {
+	// @todo there might be a smarter / more efficient way to achieve this
+
+	if (a == nullptr) return false;
+	if (b == nullptr) return true;
+
+	for (auto &i : a->getParent()->getInstList()) {
+		if (&i == a) return true;
+		if (&i == b) return false;
+	}
+
+	assert(false);
+	return false;
+}
+
 bool OptimizerPass::reschedule(Function &func) {
 	// @todo explain this as Markov process
 	// @todo calculate heat directly before starting the rescheduling
@@ -1072,6 +1087,8 @@ bool OptimizerPass::reschedule(Function &func) {
 	struct Result {
 		Instruction *instr;
 		BasicBlock *newBB;
+
+		Instruction *usage;
 	};
 
 	vector<Result> results;
@@ -1083,18 +1100,28 @@ bool OptimizerPass::reschedule(Function &func) {
 
 			auto instrParent = instr.getParent();
 
+			map<BasicBlock *, Instruction *> usage;
 			set<BasicBlock *> dominators;
-			bool isFirst = true;
+			bool isFirst = true; // @todo not elegant
 
 			for (auto user : instr.users()) {
-				auto block = dyn_cast<Instruction>(user)->getParent();
+				auto useInstr = dyn_cast<Instruction>(user);
+				auto useBlock = useInstr->getParent();
+
+				if (instructionIsEarlier(useInstr, usage[useBlock]))
+					usage[useBlock] = useInstr;
+
 				if (isFirst) {
-					dominators = blocks[block].dominators;
+					dominators = blocks[useBlock].dominators;
 					isFirst = false;
 				} else {
-					auto a = dominators, b = blocks[block].dominators;
+					auto a = dominators, b = blocks[useBlock].dominators;
 					set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::inserter(dominators, dominators.begin()));
 				}
+
+				if (dyn_cast<PHINode>(useInstr))
+					// we can't schedule an instruction into a block with a PHI node that depends on it
+					dominators.erase(useBlock);
 			}
 
 			for (auto &op : instr.operands()) {
@@ -1108,7 +1135,9 @@ bool OptimizerPass::reschedule(Function &func) {
 				}
 			}
 
-			if (isFirst) continue;
+			if (dominators.empty())
+				// no use found
+				continue;
 
 			auto lowestHeatBB = *min_element(dominators.begin(), dominators.end(), [&](BasicBlock *a, BasicBlock *b) {
 				return blocks[a].heat < blocks[b].heat;
@@ -1125,6 +1154,7 @@ bool OptimizerPass::reschedule(Function &func) {
 				Result result;
 				result.instr = &instr;
 				result.newBB = lowestHeatBB;
+				result.usage = usage[result.newBB];
 				results.push_back(result);
 			}
 		}
@@ -1138,7 +1168,14 @@ bool OptimizerPass::reschedule(Function &func) {
 		}
 
 		result.instr->removeFromParent();
-		result.instr->insertBefore(result.newBB->getTerminator());
+
+		if (result.usage) {
+			// insert before first usage
+			result.instr->insertBefore(result.usage);
+		} else {
+			// ensure we're inserted after all dependencies
+			result.instr->insertBefore(result.newBB->getTerminator());
+		}
 	}
 
 	return !results.empty();
