@@ -658,7 +658,15 @@ void OptimizerPass::removeInstruction(Instruction *instr, Value *replacement) {
 }
 
 ValueDomain &OptimizerPass::getGlobalVD(Value *value) {
-	assert(valueBlacklist.find(value) == valueBlacklist.end());
+	/*if (valueBlacklist.find(value) != valueBlacklist.end()) {
+		cout << "accessing deleted value " << endl;
+		value->print(outs(), true);
+		auto i = dyn_cast<Instruction>(value);
+		i->getParent()->print(outs());
+		i->getFunction()->print(outs());
+		assert(false);
+	}*/
+
 	if (values.find(value) == values.end())
 		if (debug_mode) cerr << "creating VD for " << value << endl;
 	return values[value];
@@ -732,8 +740,10 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 }
 
 void OptimizerPass::initialize(Function &func) {
+	// @todo not elegant
 	blocks.clear();
 	values.clear();
+	valueBlacklist.clear();
 
 	// mark entry block
 	auto &entry = blocks[&func.getEntryBlock()];
@@ -1469,7 +1479,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	return true;
 }
 
-void OptimizerPass::print(raw_ostream &out, const Module *module) const {
+void OptimizerPass::print(raw_ostream &, const Module *) const {
 	// @todo @bug output to specified stream, not cout!
 
 	for (auto &bd : blocks)
