@@ -50,7 +50,7 @@ $tests.each do |test|
     test = "../#{test}"
   end
   
-  arguments = [ $BIN, argument, "#{test}/input.c" ].compact
+  arguments = [ $BIN, (argument or "--optimize"), "#{test}/input.c" ].compact
   #puts arguments * " "
 
   test_start_time = Time.now
