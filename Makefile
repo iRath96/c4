@@ -25,7 +25,7 @@ endif
 LLVM_CFLAGS  := $(shell $(LLVM_CONFIG) --cppflags)
 LLVM_LDFLAGS := $(shell $(LLVM_CONFIG) --ldflags --libs --system-libs)
 
-CFLAGS   := $(LLVM_CFLAGS) -Wall -W $(CFLAGS)
+CFLAGS   := $(LLVM_CFLAGS) -Wall -Wextra -W $(CFLAGS)
 CXXFLAGS += $(CFLAGS) -std=c++11
 LDFLAGS  += $(LLVM_LDFLAGS)
 
