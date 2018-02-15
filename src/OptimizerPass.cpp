@@ -634,10 +634,12 @@ void OptimizerPass::removeBlock(BasicBlock *block) {
 	for (auto &b : blocks) b.second.removeEdge(block);
 	blocks.erase(block);
 
-	block->removeFromParent(); // @todo what about eraseFromParent?
+	block->eraseFromParent();
 }
 
 void OptimizerPass::removeInstruction(Instruction *instr, Value *replacement) {
+	assert(instr != replacement);
+
 	debug_print("removing instruction", instr);
 
 	for (auto &b : blocks)
@@ -1116,11 +1118,13 @@ bool OptimizerPass::reschedule(Function &func) {
 					isFirst = false;
 				} else {
 					auto a = dominators, b = blocks[useBlock].dominators;
+					dominators.clear();
 					set_intersection(a.begin(), a.end(), b.begin(), b.end(), std::inserter(dominators, dominators.begin()));
 				}
 
 				if (dyn_cast<PHINode>(useInstr))
 					// we can't schedule an instruction into a block with a PHI node that depends on it
+					// (@todo implement this)
 					dominators.erase(useBlock);
 			}
 
