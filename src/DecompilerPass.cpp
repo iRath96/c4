@@ -218,6 +218,13 @@ void DecompilerPass::fixLabels(ast::Statement *body, const std::set<std::string>
 bool DecompilerPass::runOnFunction(llvm::Function &func) {
 	if (!optimizer->options.decom)
 		return false;
+
+	ignoreInst.clear();
+	phiRefs.clear();
+	vmap.clear();
+	names.clear();
+	namesReverse.clear();
+	nameCounter = 0;
 	
 	auto &opt = getAnalysis<OptimizerPass>();
 
@@ -355,6 +362,8 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 			switch (bin->getOpcode()) {
 				case Instruction::Sub: be->op = Punct::MINUS; break;
 				case Instruction::Add: be->op = Punct::PLUS; break;
+				case Instruction::Mul: be->op = Punct::ASTERISK; break;
+				case Instruction::SDiv: be->op = Punct::SLASH; break;
 				default: be->op = Punct::NOT_A_PUNCTUATOR;
 			}
 
