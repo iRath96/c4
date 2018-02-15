@@ -25,8 +25,11 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 	auto retBlock = block->splitBasicBlock(call, "inline-ret");
 	block->getTerminator()->eraseFromParent();
 
-	auto retPHI = PHINode::Create(call->getType(), 0);
-	retPHI->insertBefore(call);
+	PHINode *retPHI = nullptr;
+	if (!call->getType()->isVoidTy()) {
+		retPHI = PHINode::Create(call->getType(), 0);
+		retPHI->insertBefore(call);
+	}
 
 	map<Value *, Value *> vmap;
 
@@ -51,7 +54,8 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 				vmap[&inst] = clone;
 				newBB->getInstList().push_back(clone);
 
-				retPHI->addIncoming(ret->getReturnValue(), newBB);
+				if (retPHI)
+					retPHI->addIncoming(ret->getReturnValue(), newBB);
 			} else {
 				auto clone = inst.clone();
 				vmap[&inst] = clone;
@@ -60,7 +64,10 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 		}
 	}
 
-	vmap[retPHI] = retPHI; // so we fix operands here as well
+	vmap[retPHI] = retPHI ?
+		(Value *)retPHI :
+		(Value *)UndefValue::get(call->getType())
+	; // so we fix operands here as well
 
 	for (auto &v : vmap) {
 		auto inst = dyn_cast<Instruction>(v.second);
@@ -75,7 +82,7 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 		}
 	}
 
-	call->replaceAllUsesWith(retPHI);
+	call->replaceAllUsesWith(vmap[retPHI]);
 	call->eraseFromParent();
 
 	dirtyFns.insert(caller);
