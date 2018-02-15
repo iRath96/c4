@@ -77,6 +77,8 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 		auto inst = dyn_cast<Instruction>(v.second);
 		if (!inst) continue;
 
+		// @todo surprise, surprise! as with apparently all of my code, this is not elegant…
+
 		for (auto &op : inst->operands()) {
 			if (vmap.find(op.get()) == vmap.end())
 				// no replacement available, must be a global reference
@@ -84,6 +86,12 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 
 			op.set(vmap[op.get()]);
 		}
+
+		if (auto phi = dyn_cast<PHINode>(inst))
+			// update block references for phi nodes
+			for (auto &b : phi->blocks())
+				if (vmap.find(b) != vmap.end())
+					b = (BasicBlock *)vmap[b];
 	}
 
 	call->replaceAllUsesWith(vmap[retPHI]);
