@@ -82,6 +82,7 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 				ast::Ptr<ast::Statement> stmt;
 				if (owned[i]) {
 					auto c = make_shared<ast::CompoundStatement>();
+					//cout << "cond " << resolveName(succ) << " into " << resolveName(&block) << endl;
 					bindBlock(*succ, *c, subJoin);
 					stmt = c;
 				} else {
@@ -101,17 +102,23 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 
 			// both owned false => we dominate no blocks
 
+			for (int i = 0; i < 2; ++i)
+				subJoin.erase(branch->getSuccessor(i));
+
+			//cout << "sub-join " << resolveName(&block) << endl;
 			for (auto &b : subJoin) {
-				if (opt.blocks[b].isDominatedBy(&block) && &block != b)
+				if (opt.blocks[b].isDominatedBy(&block) && &block != b) {
 					// we need to bind this
+					//cout << "* binding " << resolveName(b) << " into " << resolveName(&block) << endl;
 					bindBlock(*b, compound, join);
-				else
+				} else
 					// not our job
 					join.insert(b);
 			}
 		} else {
 			auto succ = branch->getSuccessor(0);
 			if (opt.blocks[succ].isDominatedBy(&block) && &block != succ) {
+				cout << "uncond " << resolveName(succ) << " into " << resolveName(&block) << endl;
 				bindBlock(*succ, compound, join);
 
 				// every block we dominate is also dominated by succ,
@@ -179,7 +186,7 @@ void DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::Iden
 	}
 
 	if (auto gs = dynamic_cast<ast::GotoStatement *>(compound->items.back().get())) {
-		if (gs->target == follow->id)
+		if (follow && gs->target == follow->id)
 			compound->items.pop_back();
 		else
 			refs.insert(gs->target);
