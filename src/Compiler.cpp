@@ -33,7 +33,7 @@ llvm::Type *Compiler::createType(const Type *type) {
 		std::vector<llvm::Type *> argTypes;
 		for (const auto &param : fn->parameters) argTypes.push_back(createType(param.get()));
 		result = llvm::FunctionType::get(createType(fn->returnType.get()), argTypes, fn->isVariadic);
-	} else if (auto v = dynamic_cast<const VoidType *>(type)) {
+	} else if (dynamic_cast<const VoidType *>(type)) {
 		result = builder.getVoidTy();
 	} else if (auto ct = dynamic_cast<const ComposedType *>(type)) {
 		if (ct->kind == lexer::Token::Keyword::UNION)
@@ -154,7 +154,7 @@ void Compiler::declaration(Declaration &node, bool isGlobal) {
 	for (const auto &decl : node.declarators) {
 		auto dr = (DeclarationRef *)decl.annotation.get();
 		if (values.find(dr) == values.end()) {
-			if (auto fn = dynamic_cast<FunctionType *>(dr->type.get())) {
+			if (dynamic_cast<FunctionType *>(dr->type.get())) {
 				auto type = (llvm::FunctionType *)createType(dr->type.get());
 				auto func = llvm::Function::Create(
 					type, llvm::GlobalValue::ExternalLinkage, decl.name, mod

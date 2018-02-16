@@ -17,6 +17,8 @@
 
 
 using namespace streams;
+using namespace std;
+
 
 bool debug_mode = false;
 bool enable_output = true;
@@ -47,21 +49,22 @@ const char *token_kind_name(Token::Kind kind) {
  * When first requested to yield a fragment, reads the entire file
  * and returns its contents. Subsequent fragment requests will return
  * failure.
+ * @todo This should be changed so that the file is read in chunks.
  */
-class FileSource : public Source<std::string> {
+class FileSource : public Source<string> {
 protected:
-	std::string filename;
+	string filename;
 	bool hasFinished = false;
 
 public:
-	FileSource(std::string filename) : filename(filename) {}
+	FileSource(string filename) : filename(filename) {}
 
-	virtual bool next(std::string *output) {
+	virtual bool next(string *output) {
 		if (hasFinished) return false;
 
 		FILE *f = fopen(filename.c_str(), "rb"); // @todo use fstream
 		if (!f) {
-			std::cout << "Could not open " << filename << " for reading." << std::endl;
+			cerr << "Could not open " << filename << " for reading." << endl;
 			exit(1);
 		}
 
@@ -70,10 +73,15 @@ public:
 
 		char *buffer = (char *)malloc(length);
 		fseek(f, 0, SEEK_SET);
-		fread(buffer, length, 1, f);
+
+		if (length && fread(buffer, length, 1, f) != 1) {
+			cerr << "fread for " << filename << " failed." << endl;
+			exit(1);
+		}
+
 		fclose(f);
 
-		*output = std::string(buffer, length);
+		*output = string(buffer, length);
 		free(buffer);
 
 		hasFinished = true;
@@ -84,15 +92,15 @@ public:
 /**
  * When asked to yield a fragment, reads a line from stdin and returns it.
  */
-class REPLSource : public Source<std::string> {
+class REPLSource : public Source<string> {
 public:
 	Parser *parser;
 	
 	REPLSource() {}
 
-	virtual bool next(std::string *output) {
-		std::cout << ((parser && parser->depth > 1) ? "... " : ">>> ") << std::flush;
-		std::getline(std::cin, *output);
+	virtual bool next(string *output) {
+		cout << ((parser && parser->depth > 1) ? "... " : ">>> ") << flush;
+		getline(cin, *output);
 		return !output->empty();
 	}
 };
@@ -104,9 +112,9 @@ void parse(const char *filename) {
 		do_optimize = true;
 	}
 
-	std::string name(filename);
+	string name(filename);
 	size_t i = name.rfind('/') + 1, j = name.rfind('.');
-	std::string llPath = name.substr(i, j - i) + ".ll";
+	string llPath = name.substr(i, j - i) + ".ll";
 	name = name.substr(i);
 
 	FileSource source(filename);

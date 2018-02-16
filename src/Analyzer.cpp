@@ -139,7 +139,7 @@ Ptr<Type> Type::applyDeclarator(Declarator decl, ScopeStack &scopes) {
 	Ptr<Type> result = shared_from_this();
 
 	for (auto &mod : decl.modifiers) {
-		if (auto pt = dynamic_cast<DeclaratorPointer *>(mod.get())) {
+		if (dynamic_cast<DeclaratorPointer *>(mod.get())) {
 			auto p = std::make_shared<PointerType>();
 			p->base = result;
 			result = p;

@@ -1255,9 +1255,10 @@ bool OptimizerPass::runOnFunction(Function &func) {
 
 		if (!hasChanged) {
 			if (optimizer->options.symex)
-				instantiateBlocks(func); // @todo CLI options
+				instantiateBlocks(func);
 			if (debug_mode) func.print(errs());
-			if (!hasChanged) break;
+			if (!hasChanged)
+				break;
 		}
 
 		if (++it > 1000) {
@@ -1290,6 +1291,9 @@ bool OptimizerPass::hasSideEffect(Value *v) {
 
 bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	auto prevVd = getGlobalVD(v);
+	if (prevVd.isTop())
+		return false;
+
 	auto &vd = getGlobalVD(v);
 
 	vd.isDead = true;

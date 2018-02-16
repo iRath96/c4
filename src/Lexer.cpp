@@ -127,7 +127,7 @@ int Lexer::read_string(std::string &str) {
 
 	int i = 1;
 	while (!eof(i)) {
-		int output, c = peek(i);
+		int output = 0, c = peek(i);
 		if (c == '"') return i + 1;
 		i = read_escape_seq(i, output);
 		str += (char)output; // @todo inefficient
