@@ -527,19 +527,19 @@ void Compiler::visit(ExpressionStatement &node) {
 	visit(node.expressions);
 }
 
-void Compiler::visit(SizeofExpressionTypeName &node) {
-	auto &type = ((TypePair *)node.type.annotation.get())->type;
+void Compiler::createSizeof(ast::Node &node) {
+	auto &type = ((TypePair *)node.annotation.get())->type;
 	size_t size = type->getSizeOverride();
 	if (!size) size = dataLayout.getTypeAllocSize(createType(type.get()));
 	value = builder.getInt32((uint32_t)size);
 }
 
+void Compiler::visit(SizeofExpressionTypeName &node) {
+	createSizeof(node.type);
+}
+
 void Compiler::visit(SizeofExpressionUnary &node) {
-	// @todo not DRY
-	auto &type = ((TypePair *)node.expression->annotation.get())->type;
-	size_t size = type->getSizeOverride();
-	if (!size) size = dataLayout.getTypeAllocSize(createType(type.get()));
-	value = builder.getInt32((uint32_t)size);
+	createSizeof(*node.expression);
 }
 
 void Compiler::visit(IterationStatement &node) {

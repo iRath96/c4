@@ -39,7 +39,10 @@ string DecompilerPass::resolveName(Value *value) {
 			return test;
 		}
 
-		test = 'a' + (nameCounter++); // @todo breaks for >= 26 unnamed entities (or earlier…)
+		if (nameCounter < 26)
+			test = 'a' + (nameCounter++);
+		else
+			test = "_" + std::to_string(nameCounter++);
 	}
 }
 

@@ -27,7 +27,7 @@ public:
 		bool inl   = true;
 		bool licm  = true;
 		bool cse   = true; // @todo
-		bool symex = false; // @todo
+		bool symex = false;
 		bool decom = false;
 	} options;
 

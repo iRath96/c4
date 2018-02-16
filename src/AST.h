@@ -266,7 +266,7 @@ struct SizeofExpressionUnary : SizeofExpression {
 	ACCEPT
 };
 
-struct SizeofExpressionTypeName : SizeofExpression { // @todo wtf?
+struct SizeofExpressionTypeName : SizeofExpression {
 	TypeName type;
 	ACCEPT
 };
@@ -315,7 +315,7 @@ struct ReturnStatement : JumpStatement {
 #pragma mark - Declarations
 
 struct Declaration : BlockItem {
-	bool isExternal; // @todo storage class
+	bool isExternal;
 
 	PtrVector<TypeSpecifier> specifiers;
 	Vector<Declarator> declarators;

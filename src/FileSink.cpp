@@ -11,6 +11,7 @@
 #include <llvm/Support/raw_ostream.h>
 #pragma GCC diagnostic pop
 
+
 FileSink::FileSink(Source<CompilerResult> *source, llvm::Module *mod, std::string outPath, bool print)
 : Stream<CompilerResult, void>(source), mod(mod), outPath(outPath), print(print) {}
 

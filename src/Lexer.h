@@ -103,8 +103,6 @@ struct Token {
 	};
 #undef ID
 
-	static const char *operatorName(Punctuator punctuator);
-
 	static inline Precedence precedence(Punctuator punctuator) {
 		return (Precedence)(char)punctuator;
 	}
@@ -123,6 +121,9 @@ struct Token {
 		_GENERIC, _IMAGINARY, _NORETURN, _STATIC_ASSERT, _THREAD_LOCAL
 	};
 
+	static const char *operatorName(Punctuator punctuator);
+	static const char *keywordName(Keyword keyword);
+
 	enum class Kind : uint8_t {
 		KEYWORD, IDENTIFIER, CONSTANT, STRING_LITERAL, PUNCTUATOR,
 		END
@@ -136,7 +137,7 @@ struct Token {
 	Keyword keyword = Keyword::NOT_A_KEYWORD;
 	Punctuator punctuator = Punctuator::NOT_A_PUNCTUATOR;
 
-	// @todo not optimal
+	// @todo not elegant
 	std::string stringValue;
 	int intValue;
 	bool isChar = false;

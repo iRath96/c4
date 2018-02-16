@@ -44,6 +44,7 @@ void Beautifier::visit(DeclaratorParameterList &node) { // @todo variadic
 	cout << "(";
 	if (node.removedVoid) cout << "void";
 	else join(node.parameters, ", ");
+	if (node.isVariadic) cout << ", ...";
 	cout << ")";
 }
 

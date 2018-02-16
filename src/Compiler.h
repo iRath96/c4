@@ -17,12 +17,14 @@
 #include <llvm/IR/DataLayout.h>
 #pragma GCC diagnostic pop
 
+
 namespace llvm {
 	class Value;
 	class PHINode;
 	class Type;
 	class Module;
 };
+
 
 class Compiler;
 struct CompilerResult { // @todo put into Compiler
@@ -122,6 +124,8 @@ protected:
 	virtual void visit(ast::SubscriptExpression &node);
 	virtual void visit(ast::MemberExpression &node);
 	virtual void visit(ast::PostExpression &node);
+
+	void createSizeof(ast::Node &node);
 	virtual void visit(ast::SizeofExpressionTypeName &node);
 	virtual void visit(ast::SizeofExpressionUnary &node);
 };

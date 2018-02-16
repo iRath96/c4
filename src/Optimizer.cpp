@@ -1,4 +1,5 @@
 #include "Optimizer.h"
+#include "Compiler.h"
 
 #include "InlinePass.h"
 #include "OptimizerPass.h"
@@ -20,14 +21,6 @@
 using namespace std;
 using namespace llvm;
 
-
-struct CompilerResult { // @todo @fixme @important not DRY
-	Compiler *compiler;
-	vector<llvm::GlobalValue *> values;
-	bool shouldExecute;
-
-	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}
-};
 
 Optimizer::Optimizer(Source<CompilerResult> *source, Module *module)
 : Stream<CompilerResult, CompilerResult>(source), fpm(module), module(module) {

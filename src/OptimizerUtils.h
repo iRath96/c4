@@ -8,7 +8,6 @@
 
 
 extern bool debug_mode;
-extern bool experimentalOpt; // @todo replace this with CLI arguments
 
 
 void debug_print(std::string prefix, llvm::Value *value, bool printValue = true);

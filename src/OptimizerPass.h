@@ -54,7 +54,7 @@ struct OptimizerPass : public llvm::FunctionPass {
 	};
 
 	struct ConstraintSet {
-		std::map<std::pair<llvm::Value *, llvm::Value *>, Predicate> predicates; // @todo asymmetric store?
+		std::map<std::pair<llvm::Value *, llvm::Value *>, Predicate> predicates;
 
 		bool isBottom = false; // bottom <=> can never become true
 		bool isTop() const { return !isBottom && predicates.empty(); }
@@ -72,7 +72,7 @@ struct OptimizerPass : public llvm::FunctionPass {
 		static Predicate join(Predicate a, Predicate b); // a "and" b
 
 		void add(llvm::Value *lhs, llvm::Value *rhs, Predicate pred);
-		void inherit(const ConstraintSet &cs);
+		void join(const ConstraintSet &cs);
 		void removeInstruction(llvm::Instruction *instr, llvm::Value *replacement = nullptr);
 
 		Predicate get(llvm::Value *lhs, llvm::Value *rhs);

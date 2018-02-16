@@ -134,7 +134,7 @@ void ConstraintSet::add(Value *lhs, Value *rhs, Predicate pred) {
 	addSingle(rhs, lhs, swappedPredicate(pred));
 }
 
-void ConstraintSet::inherit(const ConstraintSet &cs) {
+void ConstraintSet::join(const ConstraintSet &cs) {
 	if (isBottom) {
 		isBottom = false;
 		predicates = cs.predicates;
@@ -264,7 +264,7 @@ void BlockDomain::propagateConstraints(map<BasicBlock *, BlockDomain> &blocks) {
 			}
 		}
 
-		cs.inherit(edgeCS); // @todo name this "join"?
+		cs.join(edgeCS);
 	}
 }
 
@@ -292,9 +292,8 @@ bool BlockDomain::operator==(const BlockDomain &other) {
 }
 
 void OptimizerPass::iterate(Function &func) {
+	// @todo @important isDirty all the things!
 	// update reachability
-	// @todo topology?
-	// @important isDirty all the things!
 
 	for (auto &b : blocks)
 		b.second.reachable = b.second.isEntry;
@@ -1093,9 +1092,7 @@ bool instructionIsEarlier(Instruction *a, Instruction *b) {
 }
 
 bool OptimizerPass::reschedule(Function &func) {
-	// @todo explain this as Markov process
 	// @todo calculate heat directly before starting the rescheduling
-	// @todo (not here) how about making the results of the function analysis (return interval) available globally?
 
 	struct Result {
 		Instruction *instr;
@@ -1197,8 +1194,7 @@ bool OptimizerPass::reschedule(Function &func) {
 }
 
 vector<BasicBlock *> OptimizerPass::buildTopology() {
-	// @todo would be more efficient with a priority queue
-	// and some counter based approach
+	// @todo would be more efficient with a priority queue and some counter based approach
 
 	vector<BasicBlock *> topology;
 	set<BasicBlock *> remainder;

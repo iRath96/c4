@@ -248,7 +248,7 @@ public:
 
 		depth = 0;
 		if (allowTLS) {
-			try { // @todo not DRY
+			try {
 				Ptr<ExternalDeclaration> decl;
 				read_external_declaration(decl);
 				*result = decl;
@@ -330,7 +330,7 @@ protected:
 	OPTION
 		NON_OPTIONAL(peek().keyword == keyword)
 		shift();
-	OTHERWISE_FAIL("keyword (@todo) expected");
+	OTHERWISE_FAIL("keyword " + std::string(Token::keywordName(keyword)) + " expected");
 
 	bool read_unary_operator(Token::Punctuator &op)
 	OPTION
@@ -1045,8 +1045,8 @@ protected:
 
 	bool read_expression_with_precedence(Token::Precedence left_precedence, Ptr<Expression> &node)
 	OPTION
-		Ptr<Expression> root; // @todo rename this to lhs
-		BEGIN_UNIQUE(read_cast_expression(root))
+		Ptr<Expression> lhs;
+		BEGIN_UNIQUE(read_cast_expression(lhs))
 
 		while (!eof()) {
 			Token::Punctuator op = peek().punctuator;
@@ -1062,9 +1062,9 @@ protected:
 				// conditional operator
 
 				auto tree = std::make_shared<ConditionalExpression>();
-				tree->condition = root;
+				tree->condition = lhs;
 				tree->pos = peek().pos;
-				root = tree;
+				lhs = tree;
 
 				shift();
 
@@ -1079,7 +1079,7 @@ protected:
 				// ordinary operator
 
 				if (Token::precedence(peek().punctuator) == Token::Precedence::ASSIGNMENT &&
-					dynamic_cast<BinaryExpression *>(root.get())
+					dynamic_cast<BinaryExpression *>(lhs.get())
 					) {
 					UNIQUE
 					error("expression is not assignable");
@@ -1088,8 +1088,8 @@ protected:
 				auto tree = std::make_shared<BinaryExpression>();
 				tree->op = peek().punctuator;
 				tree->pos = peek().pos;
-				tree->lhs = root;
-				root = tree;
+				tree->lhs = lhs;
+				lhs = tree;
 
 				shift();
 
@@ -1097,7 +1097,7 @@ protected:
 			}
 		}
 
-		node = root;
+		node = lhs;
 	OTHERWISE_FAIL("expression expected")
 
 	bool read_assignment_expression(Ptr<Expression> &node)

@@ -388,6 +388,7 @@ void Lexer::consume(int length) {
 
 const char *Token::operatorName(Token::Punctuator punctuator) {
 	using P = Token::Punctuator;
+	// @todo somehow get these from the Punctuator enum
 
 	switch (punctuator) {
 		case P::NOT_A_PUNCTUATOR: return "(nap)";
@@ -454,6 +455,59 @@ const char *Token::operatorName(Token::Punctuator punctuator) {
 	}
 
 	return "(error)";
+}
+
+const char *Token::keywordName(Token::Keyword keyword) {
+	using K = Token::Keyword;
+	// @todo somehow get these from the Keyword enum
+
+	switch (keyword) {
+		case K::NOT_A_KEYWORD: return "(nak)";
+		case K::AUTO: return "auto";
+		case K::BREAK: return "break";
+		case K::CASE: return "case";
+		case K::CHAR: return "char";
+		case K::CONST: return "const";
+		case K::CONTINUE: return "continue";
+		case K::DEFAULT: return "default";
+		case K::DO: return "do";
+		case K::DOUBLE: return "double";
+		case K::ELSE: return "else";
+		case K::ENUM: return "enum";
+		case K::EXTERN: return "extern";
+		case K::FLOAT: return "float";
+		case K::FOR: return "for";
+		case K::GOTO: return "goto";
+		case K::IF: return "if";
+		case K::INLINE: return "inline";
+		case K::INT: return "int";
+		case K::LONG: return "long";
+		case K::REGISTER: return "register";
+		case K::RESTRICT: return "restrict";
+		case K::RETURN: return "return";
+		case K::SHORT: return "short";
+		case K::SIGNED: return "signed";
+		case K::SIZEOF: return "sizeof";
+		case K::STATIC: return "static";
+		case K::STRUCT: return "struct";
+		case K::SWITCH: return "switch";
+		case K::TYPEDEF: return "typedef";
+		case K::UNION: return "union";
+		case K::UNSIGNED: return "unsigned";
+		case K::VOID: return "void";
+		case K::VOLATILE: return "volatile";
+		case K::WHILE: return "while";
+		case K::_ALIGNAS: return "_alignas";
+		case K::_ALIGNOF: return "_alignof";
+		case K::_ATOMIC: return "_atomic";
+		case K::_BOOL: return "_bool";
+		case K::_COMPLEX: return "_complex";
+		case K::_GENERIC: return "_generic";
+		case K::_IMAGINARY: return "_imaginary";
+		case K::_NORETURN: return "_noreturn";
+		case K::_STATIC_ASSERT: return "_static_assert";
+		case K::_THREAD_LOCAL: return "_thread_local";
+	}
 }
 
 }
