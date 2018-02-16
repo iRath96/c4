@@ -11,6 +11,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wconversion"
 #include <llvm/Pass.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/Support/raw_ostream.h>

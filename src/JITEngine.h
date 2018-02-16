@@ -3,10 +3,12 @@
 
 #include "streams.h"
 
+
 namespace llvm {
 	class GlobalValue;
 	class ExecutionEngine;
 }
+
 
 class Compiler;
 struct CompilerResult;
