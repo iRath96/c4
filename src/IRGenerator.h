@@ -1,5 +1,5 @@
-#ifndef Compiler_h
-#define Compiler_h
+#ifndef IRGenerator_h
+#define IRGenerator_h
 
 #include "AST.h"
 #include "Analyzer.h"
@@ -26,16 +26,18 @@ namespace llvm {
 };
 
 
-class Compiler;
-struct CompilerResult { // @todo put into Compiler
-	Compiler *compiler;
+namespace compiler {
+
+class IRGenerator;
+struct IRFragment { // @todo put into IRGenerator
+	IRGenerator *compiler;
 	std::vector<llvm::GlobalValue *> values;
 	bool shouldExecute;
 
-	CompilerResult(Compiler *compiler = nullptr) : compiler(compiler) {}
+	IRFragment(IRGenerator *compiler = nullptr) : compiler(compiler) {}
 };
 
-class Compiler : public ast::Visitor, public streams::Stream<ast::Ptr<ast::External>, CompilerResult> {
+class IRGenerator : public ast::Visitor, public streams::Stream<ast::Ptr<ast::External>, IRFragment> {
 protected:
 	void inspect(ast::Node &node) {
 		node.accept(*this);
@@ -69,21 +71,21 @@ protected:
 	llvm::Value *value;
 	llvm::Function *func;
 
-	CompilerResult cres = CompilerResult(this);
+	IRFragment cres = IRFragment(this);
 
-	std::map<const ast::DeclarationRef *, llvm::Value *> values;
-	std::map<const ast::Type *, llvm::Type *> types;
+	std::map<const DeclarationRef *, llvm::Value *> values;
+	std::map<const Type *, llvm::Type *> types;
 
 	Loop loop;
 	std::map<std::string, llvm::BasicBlock *> labels;
 	std::map<std::string, std::vector<llvm::BranchInst *>> labelRefs;
 
 public:
-	Compiler(streams::Source<ast::Ptr<ast::External>> *source, std::string moduleName);
-	virtual bool next(CompilerResult *result);
+	IRGenerator(streams::Source<ast::Ptr<ast::External>> *source, std::string moduleName);
+	virtual bool next(IRFragment *result);
 
 protected:
-	llvm::Type *createType(const ast::Type *type);
+	llvm::Type *createType(const Type *type);
 	llvm::Value *getValue(ast::Expression &expr, bool load = true, bool logical = false);
 	llvm::Value *matchType(llvm::Value *value, llvm::Type *type);
 
@@ -129,5 +131,7 @@ protected:
 	virtual void visit(ast::SizeofExpressionTypeName &node);
 	virtual void visit(ast::SizeofExpressionUnary &node);
 };
+
+}
 
 #endif

@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "Analyzer.h"
 
-namespace ast {
+namespace compiler {
 
 void FileScope::close() {
 	BlockScope::close();

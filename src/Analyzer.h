@@ -12,7 +12,9 @@
 #include <stack>
 
 
-namespace ast {
+namespace compiler {
+
+using namespace ast;
 
 class AnalyzerError : public common::Error {
 public:
@@ -140,7 +142,7 @@ public:
  * A scope encapsulating the body of loops. This is used to make sure that
  * break/continue cannot be called from outside of loops.
  * @todo might want to use this as Annotation of break/continue to simplify
- *       loop resolution in the Compiler
+ *       loop resolution in the IRGenerator
  */
 class IterationScope : public Scope {
 public:

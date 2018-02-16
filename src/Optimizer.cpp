@@ -1,5 +1,5 @@
 #include "Optimizer.h"
-#include "Compiler.h"
+#include "IRGenerator.h"
 
 #include "InlinePass.h"
 #include "OptimizerPass.h"
@@ -21,15 +21,19 @@
 using namespace std;
 using namespace llvm;
 
+using namespace compiler;
 
-Optimizer::Optimizer(Source<CompilerResult> *source, Module *module)
-: Stream<CompilerResult, CompilerResult>(source), fpm(module), module(module) {
+
+namespace optimizer {
+
+Optimizer::Optimizer(Source<IRFragment> *source, Module *module)
+: Stream<IRFragment, IRFragment>(source), fpm(module), module(module) {
 	fpm.add(createPromoteMemoryToRegisterPass());
 	fpm.add(new OptimizerPass(this));
 	fpm.add(new DecompilerPass(this));
 }
 
-bool Optimizer::next(CompilerResult *result) {
+bool Optimizer::next(IRFragment *result) {
 	if (this->source->next(result)) {
 		for (auto &value : result->values)
 			if (isa<llvm::Function>(value)) fpm.run(*cast<llvm::Function>(value));
@@ -42,4 +46,6 @@ bool Optimizer::next(CompilerResult *result) {
 
 		return false;
 	}
+}
+
 }

@@ -1,4 +1,4 @@
-#include "Compiler.h"
+#include "IRGenerator.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -16,9 +16,11 @@
 #pragma GCC diagnostic pop
 
 
+namespace compiler {
+
 using namespace ast;
 
-llvm::Type *Compiler::createType(const Type *type) {
+llvm::Type *IRGenerator::createType(const Type *type) {
 	auto it = types.find(type);
 	if (it != types.end()) return it->second;
 
@@ -54,7 +56,7 @@ llvm::Type *Compiler::createType(const Type *type) {
 	return types[type] = result;
 }
 
-llvm::Value *Compiler::getValue(Expression &expr, bool load, bool logicalNeeded) {
+llvm::Value *IRGenerator::getValue(Expression &expr, bool load, bool logicalNeeded) {
 	// @todo very ugly
 	bool prevSL = shouldLoad;
 	bool prevLN = logical.needed;
@@ -83,7 +85,7 @@ llvm::Value *Compiler::getValue(Expression &expr, bool load, bool logicalNeeded)
 	return value;
 }
 
-llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
+llvm::Value *IRGenerator::matchType(llvm::Value *value, llvm::Type *type) {
 	if (type->isVoidTy()) return nullptr; // discard value ("return (void)...;")
 	if (type == value->getType()) return value;
 	if (value->getType()->isPointerTy())
@@ -93,13 +95,13 @@ llvm::Value *Compiler::matchType(llvm::Value *value, llvm::Type *type) {
 	return builder.CreateIntCast(value, type, true, "cast");
 }
 
-Compiler::Compiler(Source<Ptr<ast::External>> *source, std::string moduleName)
-: Stream<Ptr<External>, CompilerResult>(source), builder(ctx), allocaBuilder(ctx), mod(new llvm::Module(moduleName, ctx)),
+IRGenerator::IRGenerator(Source<Ptr<ast::External>> *source, std::string moduleName)
+: Stream<Ptr<External>, IRFragment>(source), builder(ctx), allocaBuilder(ctx), mod(new llvm::Module(moduleName, ctx)),
 dataLayout(mod) {
 	modPtr.reset(mod);
 }
 
-bool Compiler::next(CompilerResult *result) {
+bool IRGenerator::next(IRFragment *result) {
 	Ptr<External> ext;
 	if (this->source->next(&ext)) {
 		cres.values.clear();
@@ -115,7 +117,7 @@ bool Compiler::next(CompilerResult *result) {
 	}
 }
 
-void Compiler::visit(REPLStatement &node) {
+void IRGenerator::visit(REPLStatement &node) {
 	std::vector<llvm::Type *> argTypes;
 	auto fnType = llvm::FunctionType::get(builder.getVoidTy(), argTypes, false);
 	func = llvm::Function::Create(
@@ -133,7 +135,7 @@ void Compiler::visit(REPLStatement &node) {
 	cres.values.push_back(func);
 }
 
-void Compiler::createLabels(const PtrVector<Label> &labels) {
+void IRGenerator::createLabels(const PtrVector<Label> &labels) {
 	for (auto &lab : labels)
 		if (auto il = dynamic_cast<IdentifierLabel *>(lab.get())) {
 			auto block = llvm::BasicBlock::Create(ctx, il->id, func, 0);
@@ -143,16 +145,16 @@ void Compiler::createLabels(const PtrVector<Label> &labels) {
 			this->labels[il->id] = block;
 			for (auto &ref : labelRefs[il->id]) ref->setSuccessor(0, block);
 		} else
-			throw AnalyzerError("only identifier labels supported", lab->pos); // @todo CompilerError
+			throw AnalyzerError("only identifier labels supported", lab->pos); // @todo IRGeneratorError
 }
 
-void Compiler::visit(CompoundStatement &node) {
+void IRGenerator::visit(CompoundStatement &node) {
 	createLabels(node.labels);
 	for (auto &item : node.items) inspect(item);
 }
 
-void Compiler::visit(Declaration &node) { declaration(node, false); }
-void Compiler::declaration(Declaration &node, bool isGlobal) {
+void IRGenerator::visit(Declaration &node) { declaration(node, false); }
+void IRGenerator::declaration(Declaration &node, bool isGlobal) {
 	for (const auto &decl : node.declarators) {
 		auto dr = (DeclarationRef *)decl.annotation.get();
 		if (values.find(dr) == values.end()) {
@@ -193,11 +195,11 @@ void Compiler::declaration(Declaration &node, bool isGlobal) {
 	}
 }
 
-void Compiler::visit(GlobalVariable &node) {
+void IRGenerator::visit(GlobalVariable &node) {
 	declaration(node.declaration, true);
 }
 
-void Compiler::visit(Function &node) {
+void IRGenerator::visit(Function &node) {
 	declaration(node.declaration, true);
 
 	auto &decl = node.declaration.declarators.front();
@@ -237,23 +239,23 @@ void Compiler::visit(Function &node) {
 	llvm::verifyFunction(*func, &llvm::errs()); // @todo also verifyFunction in Optimizer
 }
 
-void Compiler::visit(IdentifierExpression &node) {
+void IRGenerator::visit(IdentifierExpression &node) {
 	auto dr = (DeclarationRef *)node.annotation.get();
 	value = values[dr];
 	if (shouldLoad && !dr->type->isFunction()) // cannot load functions
 		value = builder.CreateLoad(value, "rval");
 }
 
-void Compiler::visit(Constant &node) {
+void IRGenerator::visit(Constant &node) {
 	if (node.isChar) value = builder.getInt8(node.value);
 	else value = builder.getInt32(node.value);
 }
 
-void Compiler::visit(StringLiteral &node) {
+void IRGenerator::visit(StringLiteral &node) {
 	value = builder.CreateGlobalStringPtr(node.value);
 }
 
-void Compiler::visit(UnaryExpression &node) {
+void IRGenerator::visit(UnaryExpression &node) {
 	using P = lexer::Token::Punctuator;
 	switch (node.op) {
 	// pointer operations
@@ -285,11 +287,11 @@ void Compiler::visit(UnaryExpression &node) {
 	case P::BIT_NOT: value = builder.CreateNot(getValue(*node.operand)); break;
 	case P::LOG_NOT: createLogicalNot(node); break;
 
-	default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
+	default: throw AnalyzerError("operation not supported", node.pos); // @todo IRGeneratorError
 	}
 }
 
-llvm::PHINode *Compiler::createLogicalPHI(llvm::BasicBlock *&post) {
+llvm::PHINode *IRGenerator::createLogicalPHI(llvm::BasicBlock *&post) {
 	if (logical.needed) {
 		post = builder.GetInsertBlock();
 		return nullptr;
@@ -318,7 +320,7 @@ llvm::PHINode *Compiler::createLogicalPHI(llvm::BasicBlock *&post) {
 	}
 }
 
-void Compiler::createLogicalAnd(BinaryExpression &node) {
+void IRGenerator::createLogicalAnd(BinaryExpression &node) {
 	llvm::BasicBlock *post;
 	auto phi = createLogicalPHI(post);
 
@@ -336,7 +338,7 @@ void Compiler::createLogicalAnd(BinaryExpression &node) {
 	logical.needed = false;
 }
 
-void Compiler::createLogicalOr(BinaryExpression &node) {
+void IRGenerator::createLogicalOr(BinaryExpression &node) {
 	llvm::BasicBlock *post;
 	auto phi = createLogicalPHI(post);
 
@@ -354,7 +356,7 @@ void Compiler::createLogicalOr(BinaryExpression &node) {
 	logical.needed = false;
 }
 
-void Compiler::createLogicalNot(UnaryExpression &node) {
+void IRGenerator::createLogicalNot(UnaryExpression &node) {
 	llvm::BasicBlock *post;
 	auto phi = createLogicalPHI(post);
 
@@ -375,7 +377,7 @@ void Compiler::createLogicalNot(UnaryExpression &node) {
 	logical.needed = false;
 }
 
-llvm::Value *Compiler::performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
+llvm::Value *IRGenerator::performAdd(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
 	bool lptr = lhs->getType()->isPointerTy();
 	bool rptr = rhs->getType()->isPointerTy();
 
@@ -383,7 +385,7 @@ llvm::Value *Compiler::performAdd(llvm::Value *lhs, llvm::Value *rhs, std::strin
 	return builder.CreateAdd(lhs, matchType(rhs, lhs->getType()), name);
 }
 
-llvm::Value *Compiler::performSub(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
+llvm::Value *IRGenerator::performSub(llvm::Value *lhs, llvm::Value *rhs, std::string name) {
 	bool lptr = lhs->getType()->isPointerTy();
 	bool rptr = rhs->getType()->isPointerTy();
 	
@@ -392,7 +394,7 @@ llvm::Value *Compiler::performSub(llvm::Value *lhs, llvm::Value *rhs, std::strin
 	else return builder.CreateSub(lhs, matchType(rhs, lhs->getType()), name);
 }
 
-void Compiler::visit(BinaryExpression &node) {
+void IRGenerator::visit(BinaryExpression &node) {
 	using Op = lexer::Token::Punctuator;
 	using Prec = lexer::Token::Precedence;
 
@@ -432,15 +434,15 @@ void Compiler::visit(BinaryExpression &node) {
 	case Op::ASTERISK: value = builder.CreateMul(lhs, rhs); break;
 	case Op::SLASH: value = builder.CreateSDiv(lhs, rhs); break;
 	case Op::MODULO: value = builder.CreateSRem(lhs, rhs); break;
-	default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
+	default: throw AnalyzerError("operation not supported", node.pos); // @todo IRGeneratorError
 	}
 }
 
-void Compiler::visit(ConditionalExpression &) {
+void IRGenerator::visit(ConditionalExpression &) {
 	// @todo @minor
 }
 
-void Compiler::visit(ExpressionList &node) {
+void IRGenerator::visit(ExpressionList &node) {
 	for (auto &child : node.children) {
 		bool isLast = &child == &node.children.back();
 		getValue(*child, isLast ? shouldLoad : true, isLast ? logical.needed : false);
@@ -449,7 +451,7 @@ void Compiler::visit(ExpressionList &node) {
 	logical.needed = logical.prevLN;
 }
 
-void Compiler::visit(CallExpression &node) {
+void IRGenerator::visit(CallExpression &node) {
 	auto fn = getValue(*node.function, false);
 	auto fnPtrType = (llvm::PointerType *)fn->getType();
 
@@ -474,17 +476,17 @@ void Compiler::visit(CallExpression &node) {
 	value = builder.CreateCall(fn, args);
 }
 
-void Compiler::visit(CastExpression &node) {
+void IRGenerator::visit(CastExpression &node) {
 	auto type = createType(((DeclarationRef *)node.annotation.get())->type.get());
 	value = matchType(getValue(*node.expression), type);
 }
 
-void Compiler::visit(SubscriptExpression &node) {
+void IRGenerator::visit(SubscriptExpression &node) {
 	value = performAdd(getValue(*node.base), getValue(node.subscript));
 	if (shouldLoad) value = builder.CreateLoad(value, "subs");
 }
 
-void Compiler::visit(MemberExpression &node) {
+void IRGenerator::visit(MemberExpression &node) {
 	auto ct = ((TypePair *)node.base->annotation.get())->type;
 	if (node.dereference) ct = ct->dereference(node.pos); // @todo integrate into getMember
 	auto member = ct->getMember(node.id, node.pos);
@@ -499,7 +501,7 @@ void Compiler::visit(MemberExpression &node) {
 	if (shouldLoad) value = builder.CreateLoad(value);
 }
 
-void Compiler::visit(PostExpression &node) {
+void IRGenerator::visit(PostExpression &node) {
 	using P = lexer::Token::Punctuator;
 
 	switch (node.op) {
@@ -516,33 +518,33 @@ void Compiler::visit(PostExpression &node) {
 		auto v = performSub(value, builder.getInt8(1), "post-dec");
 		builder.CreateStore(v, var);
 	}; break;
-	default: throw AnalyzerError("operation not supported", node.pos); // @todo CompilerError
+	default: throw AnalyzerError("operation not supported", node.pos); // @todo IRGeneratorError
 	}
 }
 
-void Compiler::visit(ExpressionStatement &node) {
+void IRGenerator::visit(ExpressionStatement &node) {
 	createLabels(node.labels);
 
 	shouldLoad = true;
 	visit(node.expressions);
 }
 
-void Compiler::createSizeof(ast::Node &node) {
+void IRGenerator::createSizeof(ast::Node &node) {
 	auto &type = ((TypePair *)node.annotation.get())->type;
 	size_t size = type->getSizeOverride();
 	if (!size) size = dataLayout.getTypeAllocSize(createType(type.get()));
 	value = builder.getInt32((uint32_t)size);
 }
 
-void Compiler::visit(SizeofExpressionTypeName &node) {
+void IRGenerator::visit(SizeofExpressionTypeName &node) {
 	createSizeof(node.type);
 }
 
-void Compiler::visit(SizeofExpressionUnary &node) {
+void IRGenerator::visit(SizeofExpressionUnary &node) {
 	createSizeof(*node.expression);
 }
 
-void Compiler::visit(IterationStatement &node) {
+void IRGenerator::visit(IterationStatement &node) {
 	auto prevLoop = loop;
 	createLabels(node.labels);
 
@@ -566,7 +568,7 @@ void Compiler::visit(IterationStatement &node) {
 	loop = prevLoop;
 }
 
-void Compiler::visit(SelectionStatement &node) {
+void IRGenerator::visit(SelectionStatement &node) {
 	createLabels(node.labels);
 
 	auto ifTrue = llvm::BasicBlock::Create(ctx, "if-true", func, 0);
@@ -591,28 +593,30 @@ void Compiler::visit(SelectionStatement &node) {
 	builder.SetInsertPoint(end);
 }
 
-void Compiler::createDeadBlock() {
+void IRGenerator::createDeadBlock() {
 	// @todo don't even bother inserting here!
 	auto deadBlock = llvm::BasicBlock::Create(ctx, "dead-block", func, 0);
 	builder.SetInsertPoint(deadBlock);
 }
 
-void Compiler::visit(ReturnStatement &node) {
+void IRGenerator::visit(ReturnStatement &node) {
 	createLabels(node.labels);
 
 	builder.CreateRet(matchType(getValue(node.expressions), func->getReturnType()));
 	createDeadBlock();
 }
 
-void Compiler::visit(GotoStatement &node) {
+void IRGenerator::visit(GotoStatement &node) {
 	auto target = labels[node.target];
 	if (!target) target = builder.GetInsertBlock(); // will be patched later
 	labelRefs[node.target].push_back(builder.CreateBr(target));
 	createDeadBlock();
 }
 
-void Compiler::visit(ContinueStatement &node) {
+void IRGenerator::visit(ContinueStatement &node) {
 	createLabels(node.labels);
 	builder.CreateBr(node.keyword == lexer::Token::Keyword::BREAK ? loop.end : loop.header);
 	createDeadBlock();
+}
+
 }

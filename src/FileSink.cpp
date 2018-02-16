@@ -1,5 +1,5 @@
 #include "FileSink.h"
-#include "Compiler.h"
+#include "IRGenerator.h"
 
 #include <stddef.h>
 
@@ -12,11 +12,13 @@
 #pragma GCC diagnostic pop
 
 
-FileSink::FileSink(Source<CompilerResult> *source, llvm::Module *mod, std::string outPath, bool print)
-: Stream<CompilerResult, void>(source), mod(mod), outPath(outPath), print(print) {}
+namespace compiler {
+
+FileSink::FileSink(Source<IRFragment> *source, llvm::Module *mod, std::string outPath, bool print)
+: Stream<IRFragment, void>(source), mod(mod), outPath(outPath), print(print) {}
 
 bool FileSink::next(void *) {
-	CompilerResult cres;
+	IRFragment cres;
 	if (this->source->next(&cres)) return true;
 	else {
 		std::error_code EC;
@@ -26,4 +28,6 @@ bool FileSink::next(void *) {
 
 		return false;
 	}
+}
+
 }

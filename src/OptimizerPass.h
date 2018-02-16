@@ -22,6 +22,9 @@ namespace llvm {
 	class BasicBlock;
 }
 
+
+namespace optimizer {
+
 using Predicate = llvm::CmpInst::Predicate;
 
 struct OptimizerPass : public llvm::FunctionPass {
@@ -151,5 +154,7 @@ struct OptimizerPass : public llvm::FunctionPass {
 	bool runOnFunction(llvm::Function &func) override;
 	void print(llvm::raw_ostream &out, const llvm::Module *module) const override;
 };
+
+}
 
 #endif /* OptimizerPass_h */

@@ -15,10 +15,15 @@ namespace llvm {
 	class Module;
 }
 
+namespace compiler {
+	class IRGenerator;
+	struct IRFragment;
+}
 
-class Compiler;
-struct CompilerResult;
-class Optimizer : public streams::Stream<CompilerResult, CompilerResult> {
+
+namespace optimizer {
+
+class Optimizer : public streams::Stream<compiler::IRFragment, compiler::IRFragment> {
 protected:
 	llvm::legacy::FunctionPassManager fpm;
 	llvm::Module *module;
@@ -31,8 +36,10 @@ public:
 		bool decom = false;
 	} options;
 
-	Optimizer(Source<CompilerResult> *source, llvm::Module *module);
-	virtual bool next(CompilerResult *);
+	Optimizer(Source<compiler::IRFragment> *source, llvm::Module *module);
+	virtual bool next(compiler::IRFragment *);
 };
+
+}
 
 #endif /* Optimizer_h */

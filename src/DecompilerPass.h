@@ -26,6 +26,8 @@ namespace llvm {
 }
 
 
+namespace optimizer {
+
 struct DecompilerPass : public llvm::FunctionPass {
 	const Optimizer *optimizer;
 
@@ -60,5 +62,7 @@ struct DecompilerPass : public llvm::FunctionPass {
 	void fixGotos(ast::Statement *body, std::set<std::string> &refs, ast::IdentifierLabel *follow = nullptr);
 	void fixLabels(ast::Statement *body, const std::set<std::string> &refs);
 };
+
+}
 
 #endif /* Decompiler_h */

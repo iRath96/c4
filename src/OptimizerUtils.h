@@ -10,6 +10,8 @@
 extern bool debug_mode;
 
 
+namespace optimizer {
+
 void debug_print(std::string prefix, llvm::Value *value, bool printValue = true);
 std::ostream &operator<<(std::ostream &os, OptimizerPass::ValueDomain const &vd);
 std::ostream &operator<<(std::ostream &os, OptimizerPass::ConstraintSet const &cs);
@@ -28,6 +30,8 @@ bool discard_if(std::set<T, Comp, Alloc> &c, Predicate pred) {
     }
 
     return has_changed;
+}
+
 }
 
 #endif /* OptimizerUtils_h */

@@ -17,6 +17,9 @@
 using namespace std;
 using namespace llvm;
 
+
+namespace optimizer {
+
 void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 	auto block = call->getParent();
 	auto caller = call->getFunction();
@@ -125,3 +128,6 @@ bool InlinePass::runOnModule(Module &module) {
 }
 
 char InlinePass::ID = 1;
+
+}
+

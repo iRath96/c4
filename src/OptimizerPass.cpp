@@ -11,14 +11,17 @@
 
 #include <iostream>
 
-using ValueDomain = OptimizerPass::ValueDomain;
-using BlockDomain = OptimizerPass::BlockDomain;
-using ConstraintSet = OptimizerPass::ConstraintSet;
-using Condition = OptimizerPass::Condition;
 
 using namespace llvm;
 using namespace std;
 
+
+namespace optimizer {
+
+using ValueDomain = OptimizerPass::ValueDomain;
+using BlockDomain = OptimizerPass::BlockDomain;
+using ConstraintSet = OptimizerPass::ConstraintSet;
+using Condition = OptimizerPass::Condition;
 
 ValueDomain ValueDomain::join(ValueDomain &a, ValueDomain &b) {
 	if (a.isBottom) return b;
@@ -1496,3 +1499,6 @@ void OptimizerPass::print(raw_ostream &, const Module *) const {
 }
 
 char OptimizerPass::ID = 0;
+
+}
+

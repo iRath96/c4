@@ -1,5 +1,5 @@
 #include "JITEngine.h"
-#include "Compiler.h"
+#include "IRGenerator.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -21,12 +21,15 @@
 #include <iostream>
 #include <memory>
 
-JITEngine::JITEngine(Source<CompilerResult> *source, Compiler *compiler) : Stream<CompilerResult, void>(source) {
+
+namespace compiler {
+
+JITEngine::JITEngine(Source<IRFragment> *source, IRGenerator *generator) : Stream<IRFragment, void>(source) {
 	LLVMInitializeNativeTarget();
 	LLVMInitializeNativeAsmPrinter();
 
 	std::string errStr;
-	engine = llvm::EngineBuilder(std::move(compiler->modPtr))
+	engine = llvm::EngineBuilder(std::move(generator->modPtr))
 		.setErrorStr(&errStr)
 		//.setUseMCJIT(true)
 		.setMCJITMemoryManager(llvm::make_unique<llvm::SectionMemoryManager>())
@@ -39,7 +42,7 @@ JITEngine::JITEngine(Source<CompilerResult> *source, Compiler *compiler) : Strea
 }
 
 bool JITEngine::next(void *) {
-	CompilerResult cres;
+	IRFragment cres;
 	if (this->source->next(&cres)) {
 		for (auto &global : cres.values) {
 			global->print(llvm::errs(), true);
@@ -60,4 +63,6 @@ bool JITEngine::next(void *) {
 
 		return true;
 	} else return false;
+}
+
 }

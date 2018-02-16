@@ -10,15 +10,19 @@ namespace llvm {
 }
 
 
-class Compiler;
-struct CompilerResult;
-class JITEngine : public streams::Stream<CompilerResult, void> {
+namespace compiler {
+
+class IRGenerator;
+struct IRFragment;
+class JITEngine : public streams::Stream<IRFragment, void> {
 protected:
 	llvm::ExecutionEngine *engine;
 public:
-	JITEngine(Source<CompilerResult> *source, Compiler *compiler);
+	JITEngine(Source<IRFragment> *source, IRGenerator *generator);
 
 	virtual bool next(void *);
 };
+
+}
 
 #endif /* JITEngine_h */

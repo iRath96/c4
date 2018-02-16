@@ -13,6 +13,9 @@
 
 extern bool debug_mode;
 
+
+namespace parser {
+
 using namespace ast;
 using namespace lexer;
 
@@ -1127,5 +1130,7 @@ protected:
 #undef NON_UNIQUE
 #undef BEGIN_UNIQUE
 #undef OPTIONAL
+
+}
 
 #endif /* Parser_hpp */

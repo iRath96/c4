@@ -9,6 +9,8 @@ using namespace llvm;
 using namespace std;
 
 
+namespace optimizer {
+
 void DecompilerPass::getAnalysisUsage(AnalysisUsage &info) const {
 	info.addRequired<OptimizerPass>();
 	info.setPreservesAll();
@@ -254,7 +256,7 @@ bool DecompilerPass::runOnFunction(llvm::Function &func) {
 	}
 
 	streams::VectorSource<ast::Ptr<ast::External>> buffer;
-	Beautifier beauty(&buffer);
+	utils::Beautifier beauty(&buffer);
 	beauty.lispMode = false;
 
 	auto fn = make_shared<ast::Function>();
@@ -427,3 +429,6 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 }
 
 char DecompilerPass::ID = 3;
+
+}
+

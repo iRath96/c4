@@ -10,7 +10,7 @@
 #include "common.h"
 #include "Analyzer.h"
 #include "Beautifier.h"
-#include "Compiler.h"
+#include "IRGenerator.h"
 #include "FileSink.h"
 #include "JITEngine.h"
 #include "Optimizer.h"
@@ -18,6 +18,12 @@
 
 using namespace streams;
 using namespace std;
+
+using namespace lexer;
+using namespace parser;
+using namespace compiler;
+using namespace optimizer;
+using namespace utils;
 
 
 bool debug_mode = false;
@@ -123,12 +129,12 @@ void parse(const char *filename) {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler(&analyzer, name);
-	Optimizer optimizer(&compiler, compiler.modPtr.get());
+	IRGenerator generator(&analyzer, name);
+	Optimizer optimizer(&generator, generator.modPtr.get());
 	FileSink output(
 		do_optimize ?
-			(Source<CompilerResult> *)&optimizer :
-			(Source<CompilerResult> *)&compiler, compiler.modPtr.get(),
+			(Source<IRFragment> *)&optimizer :
+			(Source<IRFragment> *)&generator, generator.modPtr.get(),
 		llPath,
 		debug_mode
 	);
@@ -171,8 +177,8 @@ void repl() {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	Compiler compiler(&analyzer, "repl");
-	JITEngine jit(&compiler, &compiler); // @todo style
+	IRGenerator generator(&analyzer, "repl");
+	JITEngine jit(&generator, &generator); // @todo style
 
 	source.parser = &parser;
 

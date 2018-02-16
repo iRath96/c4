@@ -11,6 +11,9 @@
 using namespace std;
 using namespace llvm;
 
+
+namespace optimizer {
+
 void debug_print(string prefix, Value *value, bool printValue) {
 	if (!debug_mode) return;
 
@@ -63,4 +66,6 @@ ostream &operator<<(ostream &os, OptimizerPass::BlockDomain const &bd) {
 		os << "  dom " << dom->getName().str() << endl;
 
 	return os;
+}
+
 }

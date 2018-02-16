@@ -5,6 +5,9 @@
 #include <functional>
 #include <iostream>
 
+
+namespace utils {
+
 /**
  * Reads external AST from its source and outputs these in a human-readable format
  * to stdout.
@@ -108,5 +111,7 @@ protected:
 	virtual void visit(ast::GotoStatement &node);
 	virtual void visit(ast::ReturnStatement &node);
 };
+
+}
 
 #endif /* Beautifier_h */

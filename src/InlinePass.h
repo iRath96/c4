@@ -20,6 +20,9 @@ namespace llvm {
 	class Function;
 }
 
+
+namespace optimizer {
+
 struct InlinePass : public llvm::ModulePass {
 	const Optimizer *optimizer;
 
@@ -30,5 +33,7 @@ struct InlinePass : public llvm::ModulePass {
 	void processCall(llvm::CallInst *call, std::set<llvm::Function *> &dirtyFns);
 	bool runOnModule(llvm::Module &module) override;
 };
+
+}
 
 #endif /* InlinePass_h */

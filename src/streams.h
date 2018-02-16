@@ -8,7 +8,7 @@
  * Streams allow different units to be connected seamlessly.
  * Important concepts are _pipelines_, _nodes_ and _fragments_.
  * Pipelines are networks of nodes, which solve a given task
- * (e. g. InputFile -> Lexer -> Parser -> Compiler -> OutputFile).
+ * (e. g. InputFile -> Lexer -> Parser -> IRGenerator -> OutputFile).
  * Nodes describe the units within the network. These can generate fragments
  * and/or accept fragments. And lastly, a fragment is essentially a packet of
  * data.

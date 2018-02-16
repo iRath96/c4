@@ -16,7 +16,7 @@
 		FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA6431861FAD924D00ABFB9D /* Parser.cpp */; };
 		FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D4FD1FA257A000D7CA2E /* Lexer.cpp */; };
 		FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FA74D5001FA257CC00D7CA2E /* main.cpp */; };
-		FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */; };
+		FAEF05BD1FE7BDC40076EB37 /* IRGenerator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05BB1FE7BDC40076EB37 /* IRGenerator.cpp */; };
 		FAEF05C31FEBC2600076EB37 /* JITEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */; };
 		FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */; };
 		FAEF05C91FEBDEB60076EB37 /* Optimizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FAEF05C71FEBDEB60076EB37 /* Optimizer.cpp */; };
@@ -55,8 +55,8 @@
 		FA87A23C1FB84DAD0023DB3F /* AST.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AST.h; sourceTree = "<group>"; };
 		FA87A23E1FB8E3A00023DB3F /* Beautifier.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Beautifier.h; sourceTree = "<group>"; };
 		FAED64FE1FD479C6001AC5D5 /* Analyzer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Analyzer.h; sourceTree = "<group>"; };
-		FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Compiler.cpp; sourceTree = "<group>"; };
-		FAEF05BC1FE7BDC40076EB37 /* Compiler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Compiler.h; sourceTree = "<group>"; };
+		FAEF05BB1FE7BDC40076EB37 /* IRGenerator.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = IRGenerator.cpp; sourceTree = "<group>"; };
+		FAEF05BC1FE7BDC40076EB37 /* IRGenerator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = IRGenerator.h; sourceTree = "<group>"; };
 		FAEF05BF1FE82B9F0076EB37 /* streams.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = streams.h; sourceTree = "<group>"; };
 		FAEF05C11FEBC2600076EB37 /* JITEngine.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = JITEngine.cpp; sourceTree = "<group>"; };
 		FAEF05C21FEBC2600076EB37 /* JITEngine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = JITEngine.h; sourceTree = "<group>"; };
@@ -150,8 +150,8 @@
 			children = (
 				FAED64FE1FD479C6001AC5D5 /* Analyzer.h */,
 				FA2C09C61FD5A6BA00C891A5 /* Analyzer.cpp */,
-				FAEF05BC1FE7BDC40076EB37 /* Compiler.h */,
-				FAEF05BB1FE7BDC40076EB37 /* Compiler.cpp */,
+				FAEF05BC1FE7BDC40076EB37 /* IRGenerator.h */,
+				FAEF05BB1FE7BDC40076EB37 /* IRGenerator.cpp */,
 				FAEF05C51FEBC35A0076EB37 /* FileSink.h */,
 				FAEF05C41FEBC35A0076EB37 /* FileSink.cpp */,
 				FAEF05C21FEBC2600076EB37 /* JITEngine.h */,
@@ -224,7 +224,7 @@
 				FA332576202EEE1C008BE8A5 /* InlinePass.cpp in Sources */,
 				FA74D5021FA257CC00D7CA2E /* main.cpp in Sources */,
 				FA6431881FAD924D00ABFB9D /* Parser.cpp in Sources */,
-				FAEF05BD1FE7BDC40076EB37 /* Compiler.cpp in Sources */,
+				FAEF05BD1FE7BDC40076EB37 /* IRGenerator.cpp in Sources */,
 				FAEF05C61FEBC35A0076EB37 /* FileSink.cpp in Sources */,
 				FA74D4FF1FA257A000D7CA2E /* Lexer.cpp in Sources */,
 				FA332582203046D0008BE8A5 /* Beautifier.cpp in Sources */,

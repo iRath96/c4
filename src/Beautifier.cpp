@@ -1,7 +1,11 @@
 #include "Beautifier.h"
 
+
 using namespace ast;
 using namespace std;
+
+
+namespace utils {
 
 void Beautifier::visit(CaseLabel &node) {
 	cout << "case ";
@@ -275,4 +279,6 @@ void Beautifier::visit(ReturnStatement &node) {
 	if (!node.expressions.children.empty()) cout << " ";
 	inspect(node.expressions);
 	cout << ";";
+}
+
 }

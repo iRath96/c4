@@ -1,5 +1,8 @@
 #include "Parser.h"
 
+
+namespace parser {
+
 void DebugTree::dump(Parser *parser, std::string indent) {
 	//if (has_returned && !ret_val) return;
 
@@ -19,4 +22,6 @@ void DebugTree::dump(Parser *parser, std::string indent) {
 	//}
 
 	for (auto &child : children) child->dump(parser, indent + "  ");
+}
+
 }
