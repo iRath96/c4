@@ -23,8 +23,8 @@ public:
 };
 
 /**
- * Stores information that is only locally accessible within the program
- * for a limited lifetime.
+ * Stores information about entities that are only locally accessible within
+ * the program (i.e. entities with a limited lifespan).
  * @todo might want to use con-/destructor instead of open/close.
  */
 class Scope {
@@ -52,9 +52,15 @@ struct DeclarationRef;
  */
 class BlockScope : public Scope {
 public:
+	/**
+	 * Stores for each variable its type, where it has been declared and
+	 * whether it is a definition or a declaration.
+	 **/
 	std::map<std::string, Ptr<DeclarationRef>> variables;
-	std::map<std::string, bool> definitions; // @todo could be more elegant
 
+	/**
+	 * Stores which structures have been defined in the current scope.
+	 */
 	std::map<std::string, Ptr<Type>> composedTypes;
 
 	bool declaresComposedType(ComposedTypeSpecifier *ct) const {
@@ -88,11 +94,18 @@ public:
  */
 class FunctionScope : public BlockScope {
 public:
+	/** The return type of the function that this scope encapsulates. */
 	Ptr<Type> returnType;
 
+	/** Labels which have already been defined. */
 	std::set<std::string> resolvedLabels;
+	/** Labels which have been referenced (by goto) but not yet defined. */
 	std::map<std::string, common::TextPosition> unresolvedLabels;
 
+	/**
+	 * Defines a label (i.e. marks it as resolved).
+	 * @throws AnalyzerError if the label has already been defined previously
+	 **/
 	void resolveLabel(std::string id, common::TextPosition pos) {
 		if (resolvedLabels.find(id) != resolvedLabels.end())
 			AnalyzerError("redefinition of label '" + id + "'", pos).raise();
@@ -101,6 +114,9 @@ public:
 		unresolvedLabels.erase(id);
 	}
 
+	/**
+	 * Marks it as unresolved if it has not been defined previously.
+	 */
 	void referenceLabel(std::string id, common::TextPosition pos) {
 		if (resolvedLabels.find(id) == resolvedLabels.end())
 			unresolvedLabels.insert(std::make_pair(id, pos));
@@ -131,7 +147,8 @@ public:
 };
 
 /**
- *
+ * Stores different scopes in a stack structure and allows them to be looked
+ * up easily.
  */
 class ScopeStack {
 public:
@@ -169,6 +186,11 @@ public:
 		return nullptr;
 	}
 
+	/**
+	 * Queries all BlockScopes (starting at the innermost one) for information about a
+	 * variable and returns the first match (i.e. inner declarations shadow outer
+	 * declarations).
+	 */
 	bool resolveVariable(std::string name, Ptr<DeclarationRef> &result) {
 		for (auto it = stack.rbegin(); it != stack.rend(); ++it)
 			if (auto bs = dynamic_cast<BlockScope *>(it->get()))
@@ -177,6 +199,12 @@ public:
 		return false;
 	}
 
+	/**
+	 * Queries all BlockScopes (starting at the innermost one) for information about a
+	 * structure and returns the first match (i.e. inner declarations shadow outer
+	 * declarations).
+	 * @todo not DRY with resolveVariable
+	 */
 	Ptr<Type> resolveComposedType(ComposedTypeSpecifier *ct, bool direct = false) {
 		if (!direct)
 			for (auto it = stack.rbegin(); it != stack.rend(); ++it)
@@ -188,7 +216,10 @@ public:
 	}
 };
 
-// @todo type singletons!
+/**
+ * Describes a type.
+ * @todo type singletons!
+ */
 class Type : public std::enable_shared_from_this<Type> {
 protected:
 	static std::set<Type *> typeQueue;
@@ -239,6 +270,10 @@ public:
 	virtual std::string describe() const = 0;
 };
 
+/**
+ * Describes a tuple consiting of a type and a flag indicating if the
+ * associated value is an lvalue or an rvalue.
+ */
 struct TypePair : Annotation {
 	bool lvalue;
 	Ptr<Type> type;
@@ -247,6 +282,10 @@ struct TypePair : Annotation {
 	TypePair(bool lvalue, Ptr<Type> type) : lvalue(lvalue), type(type) {}
 };
 
+/**
+ * Stores information about the declaration of a variable
+ * (i.e. where it has been declared and whether it's a declaration or a definition).
+ */
 struct DeclarationRef : TypePair {
 	DeclarationRef() { lvalue = true; }
 
@@ -254,6 +293,9 @@ struct DeclarationRef : TypePair {
 	common::TextPosition pos;
 };
 
+/**
+ * A numeric type.
+ */
 class ArithmeticType : public Type {
 public:
 	enum Size {
@@ -281,6 +323,11 @@ public:
 	}
 };
 
+/**
+ * The type use for the null pointer constant, which behaves like an
+ * ordinary numeric literal but can additionally be cast to other pointer types
+ * and has special dereferencing behavior.
+ */
 class NullPointerType : public ArithmeticType {
 public:
 	virtual bool isCompatible(const Type &other) const;
@@ -293,6 +340,9 @@ public:
 	virtual bool isNullPointer() const { return true; }
 };
 
+/**
+ * Represents a structure type (i.e. struct or union).
+ */
 class ComposedType : public Type {
 protected:
 	bool isComplete_ = false;
@@ -361,6 +411,9 @@ public:
 	}
 };
 
+/**
+ * Represents a function type.
+ */
 class FunctionType : public Type {
 public:
 	Ptr<Type> returnType;
@@ -413,6 +466,9 @@ public:
 	}
 };
 
+/**
+ * Represents the void type.
+ */
 class VoidType : public Type {
 public:
 	virtual bool isScalar() const { return false; }
@@ -421,6 +477,9 @@ public:
 	virtual bool isVoid() const { return true; }
 };
 
+/**
+ * Represents pointer types to arbitrary base types.
+ */
 class PointerType : public Type {
 public:
 	Ptr<Type> base;
@@ -445,6 +504,10 @@ public:
 	virtual bool isVoidPointer() const { return base->isVoid(); }
 };
 
+/**
+ * Represents the type of a string literal, which is essentially equivalent to a PointerType to
+ * an ArithmeticType of size CHAR, but has special sizeof behavior.
+ */
 class StringLiteralType : public PointerType {
 public:
 	size_t length;
@@ -455,6 +518,9 @@ public:
 	virtual size_t getSizeOverride() const { return length+1; }
 };
 
+/**
+ * 
+ */
 class ExpressionStack {
 public:
 	std::stack<TypePair> stack;
