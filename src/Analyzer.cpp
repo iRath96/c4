@@ -376,7 +376,7 @@ void Analyzer::visit(Function &node) {
 		});
 
 		auto fn = dynamic_cast<FunctionType *>(t.get());
-		if (!fn->returnType->isComplete())
+		if (!fn->returnType->isComplete() && !fn->returnType->isVoid())
 			error("incomplete result type in function definition", node);
 
 		decl.annotate(scope->declareVariable(decl.name, t, node.pos, true));
