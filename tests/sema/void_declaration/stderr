@@ -1,1 +1,1 @@
-tests/sema/void_declaration/input.c:1:1: error: variable has incomplete type 'void'
+tests/sema/void_declaration/input.c:1:6: error: variable has incomplete type 'void'
