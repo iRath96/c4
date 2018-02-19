@@ -371,6 +371,7 @@ void Analyzer::visit(Function &node) {
 		scopes.execute<FunctionScope>([&]() {
 			// structs need to have FunctionScope
 			// @todo not DRY with Declaration &, also: not very elegant
+			// @todo what about `void swap(int a, int a);`?
 			t = t->applyDeclarator(decl, scopes);
 		});
 
