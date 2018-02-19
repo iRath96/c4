@@ -452,6 +452,20 @@ void Analyzer::visit(UnaryExpression &node) {
 		node.annotate(new TypePair(false, tp.type->reference()));
 		break;
 
+	case Punctuator::PLUSPLUS:
+	case Punctuator::MINUSMINUS:
+		if (!tp.lvalue) // @todo not DRY
+			error("expression is not assignable", node);
+		if (!tp.type->isArithmetic() && !tp.type->isPointer())
+			error(
+				std::string("cannot ") +
+				(node.op == lexer::Token::Punctuator::PLUSPLUS ? "in" : "de") +
+				"crement value of type '" + tp.type->describe() + "'",
+				node
+			);
+		node.annotate(new TypePair(false, tp.type));
+		break;
+
 	default:
 		// @todo
 		node.annotate(new TypePair(tp.lvalue, tp.type));
@@ -596,7 +610,15 @@ void Analyzer::visit(MemberExpression &node) {
 
 void Analyzer::visit(PostExpression &node) {
 	auto t = exprType(*node.base);
-	// @todo test if this makes sense
+	if (!t.lvalue)
+		error("expression is not assignable", *node.base);
+	if (!t.type->isArithmetic() && !t.type->isPointer())
+		error(
+			std::string("cannot ") +
+			(node.op == lexer::Token::Punctuator::PLUSPLUS ? "in" : "de") +
+			"crement value of type '" + t.type->describe() + "'",
+			*node.base
+		);
 	node.annotate(new TypePair(false, t.type));
 }
 

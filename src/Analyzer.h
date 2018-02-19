@@ -262,6 +262,7 @@ public:
 	virtual bool isVoid() const { return false; }
 	virtual bool isFunction() const { return false; }
 	virtual bool isArithmetic() const { return false; }
+	virtual bool isPointer() const { return false; }
 	virtual size_t getSizeOverride() const { return 0; }
 
 	static Ptr<Type> add(Ptr<Type> &a, Ptr<Type> &b, common::TextPosition pos);
@@ -340,6 +341,7 @@ public:
 
 	virtual std::string name() const { return "nullptr"; }
 	virtual bool isNullPointer() const { return true; }
+	virtual bool isPointer() const { return true; }
 };
 
 /**
@@ -504,6 +506,7 @@ public:
 
 	virtual std::string describe() const { return base->describe() + "*"; }
 	virtual bool isVoidPointer() const { return base->isVoid(); }
+	virtual bool isPointer() const { return true; }
 };
 
 /**

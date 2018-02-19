@@ -1,0 +1,1 @@
+tests/sema/invalid_decrement/input.c:3:2: error: cannot decrement value of type 'struct (anonymous at 2:2)'

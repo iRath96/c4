@@ -1,3 +1,3 @@
-int x(int y) {
-    y--++--;
+int x(int *y) {
+    *y--;
 }
