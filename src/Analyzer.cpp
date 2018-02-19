@@ -245,11 +245,13 @@ bool NullPointerType::isCompatible(const Type &other) const {
 void Analyzer::visit(REPLStatement &node) { inspect(node.statement); }
 
 void Analyzer::visit(CaseLabel &node) {
-	if (!scopes.find<SwitchScope>().get()) error("'case' statement not in switch statement", node);
+	if (!scopes.find<SwitchScope>().get())
+		error("'case' statement not in switch statement", node);
 }
 
 void Analyzer::visit(DefaultLabel &node) {
-	if (!scopes.find<SwitchScope>().get()) error("'default' statement not in switch statement", node);
+	if (!scopes.find<SwitchScope>().get())
+		error("'default' statement not in switch statement", node);
 }
 
 void Analyzer::visit(IdentifierLabel &node) {
@@ -306,9 +308,6 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 	auto specifiers = node.specifiers;
 
 	Ptr<Type> type = Type::create(specifiers, node.pos, scopes);
-	if (type->isVoid()) // @todo could be more general
-		error("variable has incomplete type 'void'", node);
-
 	if (node.declarators.empty()) {
 		for (auto &spec : node.specifiers)
 			if (auto ct = dynamic_cast<const ComposedTypeSpecifier *>(spec.get()))
@@ -327,10 +326,10 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 		});
 
 		if (!dtype->isComplete()) {
-			if (isGlobal) {
+			/*if (isGlobal) {
 				auto scope = scopes.find<FileScope>();
 				scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
-			} else
+			} else*/ // @todo this messes up the stream architecture!
 				error("variable has incomplete type '" + dtype->describe() + "'", node);
 		}
 

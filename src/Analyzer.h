@@ -479,6 +479,7 @@ public:
 	virtual bool isCompatible(const Type &other) const { return other.isVoid(); }
 	virtual std::string describe() const { return "void"; }
 	virtual bool isVoid() const { return true; }
+	virtual bool isComplete() const { return false; }
 };
 
 /**
