@@ -508,6 +508,8 @@ const char *Token::keywordName(Token::Keyword keyword) {
 		case K::_STATIC_ASSERT: return "_static_assert";
 		case K::_THREAD_LOCAL: return "_thread_local";
 	}
+
+	return "(error)";
 }
 
 }
