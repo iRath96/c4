@@ -306,6 +306,9 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 	auto specifiers = node.specifiers;
 
 	Ptr<Type> type = Type::create(specifiers, node.pos, scopes);
+	if (type->isVoid()) // @todo could be more general
+		error("variable has incomplete type 'void'", node);
+
 	if (node.declarators.empty()) {
 		for (auto &spec : node.specifiers)
 			if (auto ct = dynamic_cast<const ComposedTypeSpecifier *>(spec.get()))
@@ -399,6 +402,9 @@ void Analyzer::visit(Function &node) {
 
 void Analyzer::visit(ParameterDeclaration &node) {
 	Ptr<Type> type = Type::create(node.specifiers, node.declarator, node.pos, scopes);
+
+	if (type->isVoid())
+		error("argument may not have 'void' type", node);
 
 	if (node.declarator.isAbstract()) return;
 

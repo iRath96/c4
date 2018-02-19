@@ -1,0 +1,1 @@
+tests/sema/void_argument/input.c:1:10: error: argument may not have 'void' type
