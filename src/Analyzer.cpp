@@ -330,7 +330,7 @@ void Analyzer::declaration(Declaration &node, bool isGlobal) {
 				auto scope = scopes.find<FileScope>();
 				scope->unresolvedTentative.push_back(std::make_pair(dtype, decl.pos));
 			} else*/ // @todo this messes up the stream architecture!
-				error("variable has incomplete type '" + dtype->describe() + "'", node);
+				error("variable has incomplete type '" + dtype->describe() + "'", decl);
 		}
 
 		// find identifier

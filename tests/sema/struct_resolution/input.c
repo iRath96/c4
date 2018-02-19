@@ -1,4 +1,4 @@
-struct x *kitten;
+// @todo struct x *kitten;
 
 struct x {
     struct x *y;
