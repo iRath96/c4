@@ -671,7 +671,7 @@ ValueDomain &OptimizerPass::getGlobalVD(Value *value) {
 	}*/
 
 	if (values.find(value) == values.end())
-		if (debug_mode) cerr << "creating VD for " << value << endl;
+		debug_print("creating VD for ", value);
 	return values[value];
 }
 
@@ -730,6 +730,14 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 		vd.isBottom = false;
 		vd.min = intVal;
 		vd.max = intVal;
+		return vd;
+	}
+
+	if (dyn_cast<ConstantPointerNull>(value)) {
+		ValueDomain vd; // @todo value size
+		vd.isBottom = false;
+		vd.min = 0;
+		vd.max = 0;
 		return vd;
 	}
 
@@ -1319,6 +1327,9 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		// cannot be referenced, do not analyse
 	} else if (auto bc = dyn_cast<BitCastInst>(v)) {
 		vd = getVD(bc->User::getOperand(0), block); // @todo
+	} else if (dyn_cast<AllocaInst>(v)) {
+		vd.isBottom = false;
+		vd.min = 1; // @todo not exactly correct (pointer size!)
 	} else if (
 		dyn_cast<GetElementPtrInst>(v) ||
 		dyn_cast<LoadInst>(v) ||
