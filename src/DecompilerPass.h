@@ -59,8 +59,14 @@ struct DecompilerPass : public llvm::FunctionPass {
 	void decompileBlock(llvm::BasicBlock &block, ast::CompoundStatement &compound);
 	void resolvePHIRefs(llvm::BasicBlock &block, ast::CompoundStatement &compound);
 
-	void fixGotos(ast::Statement *body, std::set<std::string> &refs, ast::IdentifierLabel *follow = nullptr);
+	/**
+	 * @return Whether the provided body is a compound statement that has become empty
+	 */
+	bool fixGotos(ast::Statement *body, std::set<std::string> &refs, ast::IdentifierLabel *follow = nullptr);
 	void fixLabels(ast::Statement *body, const std::set<std::string> &refs);
+
+	void unwrapCompoundStatement(ast::Ptr<ast::Statement> &stmt);
+	void negateExpression(ast::ExpressionList &expr);
 };
 
 }

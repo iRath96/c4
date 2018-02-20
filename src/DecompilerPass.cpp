@@ -78,37 +78,53 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 			ss->condition.children.push_back(resolve(branch->getCondition()));
 			
 			set<BasicBlock *> subJoin;
+			set<BasicBlock *> alreadyBound;
 			bool owned[2];
 
 			for (int i = 0; i < 2; ++i) {
 				auto succ = branch->getSuccessor(i);
+				auto otherSucc = branch->getSuccessor(1 - i);
+
 				owned[i] = opt.blocks[succ].isDominatedBy(&block) && &block != succ; // @todo not DRY!
 
-				ast::Ptr<ast::Statement> stmt;
-				if (owned[i]) {
-					auto c = make_shared<ast::CompoundStatement>();
+				bool isMergeBlock = false;
+				for (auto &e : opt.blocks[succ].edges)
+					if (opt.blocks[e.first].isDominatedBy(otherSucc)) {
+						// @todo if neither successor is a merge block, we could freely choose one
+						// that we deem more complicated, as the other will obviously terminate
+						isMergeBlock = true;
+						break;
+					}
+
+				auto c = make_shared<ast::CompoundStatement>();
+				if (owned[i] && !isMergeBlock) {
 					//cout << "cond " << resolveName(succ) << " into " << resolveName(&block) << endl;
 					bindBlock(*succ, *c, subJoin);
-					stmt = c;
+					alreadyBound.insert(succ);
 				} else {
 					// @todo not quite DRY with unconditional
 
 					auto gs = make_shared<ast::GotoStatement>();
 					gs->target = resolveName(succ);
-					stmt = gs;
+					c->items.push_back(gs); // we put this in a compound statement so fixGotos is happy
 
-					join.insert(succ);
+					if (owned[i])
+						// will be bound later
+						subJoin.insert(succ);
+					else
+						// will not be bound
+						join.insert(succ);
 				}
 
-				(i == 0 ? ss->when_true : ss->when_false) = stmt;
+				(i == 0 ? ss->when_true : ss->when_false) = c;
 			}
 
 			compound.items.push_back(ss);
 
 			// both owned false => we dominate no blocks
 
-			for (int i = 0; i < 2; ++i)
-				subJoin.erase(branch->getSuccessor(i));
+			for (auto &b : alreadyBound)
+				subJoin.erase(b);
 
 			//cout << "sub-join " << resolveName(&block) << endl;
 			for (auto &b : subJoin) {
@@ -163,9 +179,10 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 	);
 }
 
-void DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::IdentifierLabel *follow) {
+bool DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::IdentifierLabel *follow) {
 	auto compound = dynamic_cast<ast::CompoundStatement *>(body);
-	if (!compound) return;
+	if (!compound)
+		return false;
 
 	assert(!compound->items.empty());
 
@@ -183,10 +200,28 @@ void DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::Iden
 		}
 
 		if (auto ss = dynamic_cast<ast::SelectionStatement *>(stmt.get())) {
-			fixGotos(ss->when_true.get(), refs, il);
-			fixGotos(ss->when_false.get(), refs, il);
+			bool tEmpty = fixGotos(ss->when_true.get(), refs, il);
+			bool fEmpty = fixGotos(ss->when_false.get(), refs, il);
+
+			// try to simplify if statement:
+
+			if (tEmpty) {
+				swap(tEmpty, fEmpty);
+				swap(ss->when_true, ss->when_false);
+
+				negateExpression(ss->condition);
+			}
+
+			if (fEmpty)
+				ss->when_false.reset();
+
+			// @todo could remove if statement if tEmpty
+
+			unwrapCompoundStatement(ss->when_true);
+			unwrapCompoundStatement(ss->when_false);
 		} else if (auto is = dynamic_cast<ast::IterationStatement *>(stmt.get())) {
 			fixGotos(is->body.get(), refs, il);
+			// hmpf, not supported yet though
 		}
 	}
 
@@ -196,9 +231,15 @@ void DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::Iden
 		else
 			refs.insert(gs->target);
 	}
+
+	return compound->items.empty();
 }
 
 void DecompilerPass::fixLabels(ast::Statement *body, const std::set<std::string> &refs) {
+	if (!body)
+		// might be empty else part of if statement
+		return;
+
 	if (!body->labels.empty())
 		if (auto il = dynamic_cast<ast::IdentifierLabel *>(body->labels[0].get()))
 			if (refs.find(il->id) == refs.end())
@@ -218,6 +259,48 @@ void DecompilerPass::fixLabels(ast::Statement *body, const std::set<std::string>
 	for (auto &item : compound->items)
 		if (auto stmt = dynamic_cast<ast::Statement *>(item.get()))
 			fixLabels(stmt, refs);
+}
+
+void DecompilerPass::unwrapCompoundStatement(ast::Ptr<ast::Statement> &stmt) {
+	if (auto c = dynamic_cast<ast::CompoundStatement *>(stmt.get()))
+		if (c->items.size() == 1)
+			stmt = static_pointer_cast<ast::Statement>(c->items.front()); // isn't C++ just lovely?
+}
+
+void DecompilerPass::negateExpression(ast::ExpressionList &expr) {
+	using Punct = lexer::Token::Punctuator;
+
+	auto last = expr.children.back();
+	expr.children.pop_back();
+
+	if (auto ue = dynamic_cast<ast::UnaryExpression *>(last.get()))
+		if (ue->op == Punct::LOG_NOT) {
+			expr.children.push_back(ue->operand);
+			return;
+		}
+
+	if (auto be = dynamic_cast<ast::BinaryExpression *>(last.get())) {
+		// we can modify this, as it has only one use
+		switch (be->op) {
+			case Punct::CMP_EQ: be->op = Punct::CMP_NEQ; break;
+			case Punct::CMP_NEQ: be->op = Punct::CMP_EQ; break;
+			case Punct::CMP_LTE: be->op = Punct::AB_CLOSE; break;
+			case Punct::AB_CLOSE: be->op = Punct::CMP_LTE; break;
+			case Punct::CMP_GTE: be->op = Punct::AB_OPEN; break;
+			case Punct::AB_OPEN: be->op = Punct::CMP_GTE; break;
+			default: goto deny;
+		}
+
+		expr.children.push_back(last);
+		return;
+
+		deny: {}
+	}
+
+	auto neg = make_shared<ast::UnaryExpression>();
+	neg->operand = last;
+	neg->op = Punct::LOG_NOT;
+	expr.children.push_back(neg);
 }
 
 bool DecompilerPass::runOnFunction(llvm::Function &func) {
@@ -294,6 +377,10 @@ llvm::BasicBlock *DecompilerPass::findFirstDominator(BasicBlock &block) {
 }
 
 ast::Ptr<ast::Expression> DecompilerPass::resolve(Value *value) {
+	if (!value)
+		// e.g. `return void`
+		return nullptr;
+
 	if (auto cint = dyn_cast<ConstantInt>(value)) {
 		int v = (int)*cint->getValue().getRawData();
 		return make_shared<ast::Constant>(to_string(v), v, false);
