@@ -126,7 +126,7 @@ struct OptimizerPass : public llvm::FunctionPass {
 
 	std::set<llvm::Value *> valueBlacklist;
 
-	bool hasChanged;
+	bool hasChanged, isAscending;
 
 	bool hasSideEffect(llvm::Value *v);
 	bool trackValue(llvm::Value *v, llvm::BasicBlock *block);

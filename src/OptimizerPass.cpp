@@ -51,7 +51,7 @@ ValueDomain ValueDomain::top(bool isDead, Type *type) {
 ValueDomain ValueDomain::add(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
 	ValueDomain result;
 	result.type = type;
-	result.isBottom = false;
+	result.isBottom = lhs.isBottom || rhs.isBottom;
 
 	bool overflow = false;
 	result.min = result.addOverflow(lhs.min, rhs.min, overflow);
@@ -66,7 +66,7 @@ ValueDomain ValueDomain::add(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
 ValueDomain ValueDomain::sub(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
 	ValueDomain result;
 	result.type = type;
-	result.isBottom = false;
+	result.isBottom = lhs.isBottom || rhs.isBottom;
 
 	bool overflow = false;
 	result.min = result.subOverflow(lhs.min, rhs.max, overflow);
@@ -81,7 +81,7 @@ ValueDomain ValueDomain::sub(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
 ValueDomain ValueDomain::mul(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
 	ValueDomain result;
 	result.type = type;
-	result.isBottom = false;
+	result.isBottom = lhs.isBottom || rhs.isBottom;
 
 	bool overflow = false;
 	long a = result.mulOverflow(lhs.min, rhs.min, overflow);
@@ -1125,7 +1125,7 @@ void OptimizerPass::instantiateBlock(Function *func, BasicBlock *block) {
 			});
 		}
 
-		cout << parent->getName().str() << endl;
+		// cout << parent->getName().str() << endl;
 
 		// update branch from predecessor
 		if (parent == block) selfBlock = newBB;
@@ -1367,6 +1367,8 @@ bool OptimizerPass::runOnFunction(Function &func) {
 		func.print(errs());
 	}
 
+	isAscending = false;
+
 	int it = 0;
 	while (true) {
 		if (debug_mode) {
@@ -1377,6 +1379,7 @@ bool OptimizerPass::runOnFunction(Function &func) {
 		hasChanged = false;
 
 		iterate(func);
+		//isAscending = true;
 
 		if (!hasChanged) {
 			// domain analysis has finished
@@ -1386,6 +1389,8 @@ bool OptimizerPass::runOnFunction(Function &func) {
 			fixBranches(func);
 			removeDeadCode(func);
 			removeUnreachableCode(func);
+
+			isAscending = false;
 		}
 
 		if (debug_mode && hasChanged) func.print(errs());
@@ -1578,13 +1583,16 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		vd = ValueDomain::top(false, v->getType());
 	}
 
-	vd = ValueDomain::join(prevVd, vd, vd.isDead);
+	if (isAscending)
+		vd = ValueDomain::join(prevVd, vd, vd.isDead);
+
 	if (prevVd == vd)
 		return false;
 
 	if (!prevVd.isBottom && !vd.isBottom && !prevVd.isTop() && !vd.isTop() && !vd.isDead) {
-		if (debug_mode) cout << "widening" << endl;
-		vd = ValueDomain::top(vd.isDead, v->getType());
+		if (debug_mode)
+			cout << "widening" << endl;
+		vd.makeTop();
 	}
 
 	if (debug_mode) {
