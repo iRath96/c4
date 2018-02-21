@@ -565,8 +565,8 @@ void Analyzer::visit(ConditionalExpression &node) {
 			"' where arithmetic or pointer type is required", *node.condition
 		);
 
-	auto &lhs = exprType(*node.when_true);
-	exprType(*node.when_false);
+	auto &lhs = exprType(*node.whenTrue);
+	exprType(*node.whenFalse);
 
 	// @todo compare lhs and rhs type
 
@@ -668,8 +668,8 @@ void Analyzer::visit(SelectionStatement &node) {
 			"' invalid)", node.condition
 		);
 
-	inspect(node.when_true);
-	inspect(node.when_false);
+	inspect(node.whenTrue);
+	inspect(node.whenFalse);
 }
 
 void Analyzer::visit(ReturnStatement &node) {

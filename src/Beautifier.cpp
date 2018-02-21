@@ -136,9 +136,9 @@ void Beautifier::visit(ConditionalExpression &node) {
 	if (lispMode) cout << "(";
 	inspect(node.condition);
 	cout << " ? ";
-	inspect(node.when_true);
+	inspect(node.whenTrue);
 	cout << " : ";
-	inspect(node.when_false);
+	inspect(node.whenFalse);
 	if (lispMode) cout << ")";
 }
 
@@ -262,11 +262,11 @@ void Beautifier::visit(SelectionStatement &node) {
 	inspect(node.condition);
 	cout << ")";
 
-	inline_inspect(node.when_true.get(), node.when_false.get() != NULL);
+	inline_inspect(node.whenTrue.get(), node.whenFalse.get() != NULL);
 
-	if (node.when_false.get()) {
+	if (node.whenFalse.get()) {
 		cout << "else";
-		inline_inspect(node.when_false.get(), false, true);
+		inline_inspect(node.whenFalse.get(), false, true);
 	}
 }
 

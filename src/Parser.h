@@ -839,12 +839,12 @@ protected:
 		NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_OPEN))
 		NON_OPTIONAL(read_expression(node->condition))
 		NON_OPTIONAL(read_punctuator(Token::Punctuator::RB_CLOSE))
-		NON_OPTIONAL(read_statement(node->when_true))
+		NON_OPTIONAL(read_statement(node->whenTrue))
 
 		NON_UNIQUE
 		if (read_keyword(Token::Keyword::ELSE)) {
 			UNIQUE
-			NON_OPTIONAL(read_statement(node->when_false))
+			NON_OPTIONAL(read_statement(node->whenFalse))
 		}
 	END_OPTION
 
@@ -1072,12 +1072,12 @@ protected:
 				shift();
 
 				auto elist = std::make_shared<ExpressionList>();
-				tree->when_true = elist;
+				tree->whenTrue = elist;
 
 				UNIQUE
 				NON_OPTIONAL(read_expression(*elist))
 				NON_OPTIONAL(read_punctuator(Token::Punctuator::COLON))
-				NON_OPTIONAL(read_expression_with_precedence(Token::Precedence::CONDITIONAL, tree->when_false))
+				NON_OPTIONAL(read_expression_with_precedence(Token::Precedence::CONDITIONAL, tree->whenFalse))
 			} else {
 				// ordinary operator
 

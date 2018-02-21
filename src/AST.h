@@ -223,7 +223,7 @@ struct BinaryExpression : Expression {
 };
 
 struct ConditionalExpression : Expression {
-	Ptr<Expression> condition, when_true, when_false;
+	Ptr<Expression> condition, whenTrue, whenFalse;
 	ACCEPT
 };
 
@@ -291,7 +291,7 @@ struct IterationStatement : Statement {
 
 struct SelectionStatement : Statement {
 	ExpressionList condition;
-	Ptr<Statement> when_true, when_false;
+	Ptr<Statement> whenTrue, whenFalse;
 	ACCEPT
 };
 

@@ -463,11 +463,11 @@ void IRGenerator::visit(ConditionalExpression &node) {
 	getValue(*node.condition, true, true);
 
 	builder.SetInsertPoint(ifTrue);
-	auto vTrue = getValue(*node.when_true);
+	auto vTrue = getValue(*node.whenTrue);
 	builder.CreateBr(end);
 
 	builder.SetInsertPoint(ifFalse);
-	auto vFalse = getValue(*node.when_false);
+	auto vFalse = getValue(*node.whenFalse);
 	builder.CreateBr(end);
 
 	builder.SetInsertPoint(end);
@@ -615,7 +615,7 @@ void IRGenerator::visit(SelectionStatement &node) {
 
 	auto ifTrue = llvm::BasicBlock::Create(ctx, "if-true", func, 0);
 	auto end = llvm::BasicBlock::Create(ctx, "if-end", func, 0);
-	auto ifFalse = node.when_false.get() ? llvm::BasicBlock::Create(ctx, "if-false", func, 0) : end;
+	auto ifFalse = node.whenFalse.get() ? llvm::BasicBlock::Create(ctx, "if-false", func, 0) : end;
 
 	logical.tBB = ifTrue;
 	logical.fBB = ifFalse;
@@ -623,12 +623,12 @@ void IRGenerator::visit(SelectionStatement &node) {
 	getValue(node.condition, true, true);
 
 	builder.SetInsertPoint(ifTrue);
-	inspect(node.when_true);
+	inspect(node.whenTrue);
 	builder.CreateBr(end);
 
-	if (node.when_false.get()) {
+	if (node.whenFalse.get()) {
 		builder.SetInsertPoint(ifFalse);
-		inspect(node.when_false);
+		inspect(node.whenFalse);
 		builder.CreateBr(end);
 	}
 

@@ -116,7 +116,7 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 						join.insert(succ);
 				}
 
-				(i == 0 ? ss->when_true : ss->when_false) = c;
+				(i == 0 ? ss->whenTrue : ss->whenFalse) = c;
 			}
 
 			compound.items.push_back(ss);
@@ -200,25 +200,25 @@ bool DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::Iden
 		}
 
 		if (auto ss = dynamic_cast<ast::SelectionStatement *>(stmt.get())) {
-			bool tEmpty = fixGotos(ss->when_true.get(), refs, il);
-			bool fEmpty = fixGotos(ss->when_false.get(), refs, il);
+			bool tEmpty = fixGotos(ss->whenTrue.get(), refs, il);
+			bool fEmpty = fixGotos(ss->whenFalse.get(), refs, il);
 
 			// try to simplify if statement:
 
 			if (tEmpty) {
 				swap(tEmpty, fEmpty);
-				swap(ss->when_true, ss->when_false);
+				swap(ss->whenTrue, ss->whenFalse);
 
 				negateExpression(ss->condition);
 			}
 
 			if (fEmpty)
-				ss->when_false.reset();
+				ss->whenFalse.reset();
 
 			// @todo could remove if statement if tEmpty
 
-			unwrapCompoundStatement(ss->when_true);
-			unwrapCompoundStatement(ss->when_false);
+			unwrapCompoundStatement(ss->whenTrue);
+			unwrapCompoundStatement(ss->whenFalse);
 		} else if (auto is = dynamic_cast<ast::IterationStatement *>(stmt.get())) {
 			fixGotos(is->body.get(), refs, il);
 			// hmpf, not supported yet though
@@ -247,8 +247,8 @@ void DecompilerPass::fixLabels(ast::Statement *body, const std::set<std::string>
 
 	// @todo not DRY with fixGotos
 	if (auto ss = dynamic_cast<ast::SelectionStatement *>(body)) {
-		fixLabels(ss->when_true.get(), refs);
-		fixLabels(ss->when_false.get(), refs);
+		fixLabels(ss->whenTrue.get(), refs);
+		fixLabels(ss->whenFalse.get(), refs);
 	} else if (auto is = dynamic_cast<ast::IterationStatement *>(body)) {
 		fixLabels(is->body.get(), refs);
 	}
