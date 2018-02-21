@@ -408,32 +408,46 @@ void IRGenerator::visit(BinaryExpression &node) {
 	auto rhs = getValue(*node.rhs);
 	auto type = lhs->getType(); // @todo createType from annotation
 
-	if (prec == Prec::ASSIGNMENT) type = type->getPointerElementType();
+	auto mlhs = lhs;
+	auto mrhs = rhs;
+
+	if (prec == Prec::ASSIGNMENT) {
+		type = type->getPointerElementType();
+		mrhs = matchType(rhs, type);
+	} else if (auto lit = llvm::dyn_cast<llvm::IntegerType>(lhs->getType()))
+		if (auto rit = llvm::dyn_cast<llvm::IntegerType>(rhs->getType())) {
+			if (rit->getBitWidth() > lit->getBitWidth()) {
+				type = rhs->getType();
+				mlhs = matchType(lhs, type);
+			} else {
+				mrhs = matchType(rhs, type);
+			}
+		}
 
 	switch (node.op) {
 	// assignments @todo
 	case Op::ASSIGN: {
-		builder.CreateStore(matchType(rhs, type), lhs);
+		builder.CreateStore(mrhs, lhs);
 		value = lhs;
 		if (shouldLoad) value = builder.CreateLoad(value, "deref"); // @todo not DRY
 	}; break;
 
 	// relational, @todo not DRY
-	case Op::CMP_LTE: value = builder.CreateICmpSLE(lhs, matchType(rhs, type), "cmp"); break;
-	case Op::AB_OPEN: value = builder.CreateICmpSLT(lhs, matchType(rhs, type), "cmp"); break;
-	case Op::CMP_GTE: value = builder.CreateICmpSGE(lhs, matchType(rhs, type), "cmp"); break;
-	case Op::AB_CLOSE: value = builder.CreateICmpSGT(lhs, matchType(rhs, type), "cmp"); break;
-	case Op::CMP_EQ: value = builder.CreateICmpEQ(lhs, matchType(rhs, type), "cmp"); break;
-	case Op::CMP_NEQ: value = builder.CreateICmpNE(lhs, matchType(rhs, type), "cmp"); break;
+	case Op::CMP_LTE:  value = builder.CreateICmpSLE(mlhs, mrhs, "cmp"); break;
+	case Op::AB_OPEN:  value = builder.CreateICmpSLT(mlhs, mrhs, "cmp"); break;
+	case Op::CMP_GTE:  value = builder.CreateICmpSGE(mlhs, mrhs, "cmp"); break;
+	case Op::AB_CLOSE: value = builder.CreateICmpSGT(mlhs, mrhs, "cmp"); break;
+	case Op::CMP_EQ:   value = builder.CreateICmpEQ (mlhs, mrhs, "cmp"); break;
+	case Op::CMP_NEQ:  value = builder.CreateICmpNE (mlhs, mrhs, "cmp"); break;
 
 	// arithmetic
-	case Op::PLUS: value = performAdd(lhs, rhs); break;
-	case Op::MINUS: value = performSub(lhs, rhs); break;
+	case Op::PLUS:  value = performAdd(mlhs, mrhs); break;
+	case Op::MINUS: value = performSub(mlhs, mrhs); break;
 
 	// multiplicative
-	case Op::ASTERISK: value = builder.CreateMul(lhs, rhs); break;
-	case Op::SLASH: value = builder.CreateSDiv(lhs, rhs); break;
-	case Op::MODULO: value = builder.CreateSRem(lhs, rhs); break;
+	case Op::ASTERISK: value = builder.CreateMul(mlhs, mrhs); break;
+	case Op::SLASH: value = builder.CreateSDiv(mlhs, mrhs); break;
+	case Op::MODULO: value = builder.CreateSRem(mlhs, mrhs); break;
 	default: throw AnalyzerError("operation not supported", node.pos); // @todo IRGeneratorError
 	}
 }

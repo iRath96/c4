@@ -23,27 +23,148 @@ using BlockDomain = OptimizerPass::BlockDomain;
 using ConstraintSet = OptimizerPass::ConstraintSet;
 using Condition = OptimizerPass::Condition;
 
-ValueDomain ValueDomain::join(ValueDomain &a, ValueDomain &b) {
-	if (a.isBottom) return b;
-	if (b.isBottom) return a;
-
+ValueDomain ValueDomain::join(ValueDomain &a, ValueDomain &b, bool isDead) {
 	ValueDomain result;
-	result.isBottom = false;
-	result.min = std::min(a.min, b.min);
-	result.max = std::max(a.max, b.max);
+
+	if (a.isBottom) result = b;
+	else if (b.isBottom) result = a;
+	else {
+		result.type = a.type;
+		result.isBottom = false;
+		result.min = std::min(a.min, b.min);
+		result.max = std::max(a.max, b.max);
+	}
+
+	result.isDead = isDead;
 	return result;
 }
 
-ValueDomain ValueDomain::top(bool isDead) {
+ValueDomain ValueDomain::top(bool isDead, Type *type) {
 	ValueDomain result;
+	result.type = type;
 	result.isDead = isDead;
 	result.isBottom = false;
+	result.makeTop();
+	return result;
+}
+
+ValueDomain ValueDomain::add(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
+	ValueDomain result;
+	result.type = type;
+	result.isBottom = false;
+
+	bool overflow = false;
+	result.min = result.addOverflow(lhs.min, rhs.min, overflow);
+	result.max = result.addOverflow(lhs.max, rhs.max, overflow);
+
+	if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+		result.makeTop();
+
+	return result;
+}
+
+ValueDomain ValueDomain::sub(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
+	ValueDomain result;
+	result.type = type;
+	result.isBottom = false;
+
+	bool overflow = false;
+	result.min = result.subOverflow(lhs.min, rhs.max, overflow);
+	result.max = result.subOverflow(lhs.max, rhs.min, overflow);
+
+	if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+		result.makeTop();
+
+	return result;
+}
+
+ValueDomain ValueDomain::mul(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
+	ValueDomain result;
+	result.type = type;
+	result.isBottom = false;
+
+	bool overflow = false;
+	long a = result.mulOverflow(lhs.min, rhs.min, overflow);
+	long b = result.mulOverflow(lhs.min, rhs.max, overflow);
+	long c = result.mulOverflow(lhs.max, rhs.min, overflow);
+	long d = result.mulOverflow(lhs.max, rhs.max, overflow);
+
+	result.min = std::min({ a, b, c, d });
+	result.max = std::max({ a, b, c, d });
+
+	if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+		result.makeTop();
+
+	return result;
+}
+
+long ValueDomain::addOverflow(long a, long b, bool &overflow) const {
+	long result;
+	overflow = __builtin_add_overflow(a, b, &result) || overflow;
+	return truncate(result, overflow);
+}
+
+long ValueDomain::subOverflow(long a, long b, bool &overflow) const {
+	long result;
+	overflow = __builtin_sub_overflow(a, b, &result) || overflow;
+	return truncate(result, overflow);
+}
+
+long ValueDomain::mulOverflow(long a, long b, bool &overflow) const {
+	long result;
+	overflow = __builtin_mul_overflow(a, b, &result) || overflow;
+	return truncate(result, overflow);
+}
+
+long ValueDomain::truncate(long v, bool &overflow) const {
+	long mask = (1UL << (bitWidth() - 1)) - 1;
+	long result = v & mask;
+	if (v < 0)
+		result |= ~mask;
+
+	overflow = (result != v) || overflow;
 	return result;
 }
 
 bool ValueDomain::contains(int v) const { return !isBottom && v >= min && v <= max; }
 bool ValueDomain::isConstant() const { return !isBottom && min == max; }
-bool ValueDomain::isTop() const { return !isBottom && min == INT_MIN && max == INT_MAX; }
+bool ValueDomain::isTop() const {
+	long vmin, vmax;
+	fullRange(vmin, vmax);
+	return !isBottom && min == vmin && max == vmax;
+}
+
+void ValueDomain::makeTop() {
+	fullRange(min, max);
+}
+
+int ValueDomain::bitWidth() const {
+	if (!type)
+		// for branches, @todo
+		return 0;
+
+	if (auto it = dyn_cast<IntegerType>(type))
+		return it->getBitWidth();
+
+	if (dyn_cast<PointerType>(type))
+		return 64;
+
+	// invalid type:
+	return 0;
+}
+
+void ValueDomain::fullRange(long &min, long &max) const {
+	if (bitWidth() < 2) {
+		min = 0;
+		max = bitWidth();
+		return;
+	}
+
+	int bw = bitWidth();
+	long v = 1UL << (bw - 1);
+	min = -v;
+	max = v - 1;
+}
 
 bool ValueDomain::operator==(const ValueDomain &other) const {
 	return other.isBottom == isBottom && other.min == min && other.max == max && other.isDead == isDead;
@@ -406,7 +527,7 @@ void OptimizerPass::fixConstants(Function &func) {
 	for (auto &block : func.getBasicBlockList()) {
 		struct Replacement {
 			Instruction *user, *usee;
-			int value;
+			long value;
 		};
 
 		vector<Replacement> constants;
@@ -500,9 +621,11 @@ void OptimizerPass::removeDeadCode(Function &func) {
 	for (auto &block : func.getBasicBlockList()) {
 		vector<Instruction *> dead;
 		for (auto &inst : block.getInstList())
-			if (getGlobalVD(&inst).isDead) dead.push_back(&inst);
+			if (getGlobalVD(&inst).isDead)
+				dead.push_back(&inst);
 
-		for (auto &d : dead) removeInstruction(d);
+		for (auto &d : dead)
+			removeInstruction(d);
 	}
 }
 
@@ -670,8 +793,12 @@ ValueDomain &OptimizerPass::getGlobalVD(Value *value) {
 		assert(false);
 	}*/
 
-	if (values.find(value) == values.end())
+	if (values.find(value) == values.end()) {
 		debug_print("creating VD for ", value);
+		values[value].type = value->getType();
+		values[value].makeTop();
+	}
+
 	return values[value];
 }
 
@@ -728,6 +855,7 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 
 		ValueDomain vd;
 		vd.isBottom = false;
+		vd.type = value->getType();
 		vd.min = intVal;
 		vd.max = intVal;
 		return vd;
@@ -736,6 +864,7 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 	if (dyn_cast<ConstantPointerNull>(value)) {
 		ValueDomain vd; // @todo value size
 		vd.isBottom = false;
+		vd.type = value->getType();
 		vd.min = 0;
 		vd.max = 0;
 		return vd;
@@ -1299,9 +1428,6 @@ bool OptimizerPass::hasSideEffect(Value *v) {
 
 bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 	auto prevVd = getGlobalVD(v);
-	if (prevVd.isTop())
-		return false;
-
 	auto &vd = getGlobalVD(v);
 
 	vd.isDead = true;
@@ -1329,7 +1455,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		vd = getVD(bc->User::getOperand(0), block); // @todo
 	} else if (dyn_cast<AllocaInst>(v)) {
 		vd.isBottom = false;
-		vd.min = 1; // @todo not exactly correct (pointer size!)
+		vd.min = 1; // @todo not exactly correct (pointers are unsigned!)
 	} else if (
 		dyn_cast<GetElementPtrInst>(v) ||
 		dyn_cast<LoadInst>(v) ||
@@ -1338,90 +1464,62 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		dyn_cast<CallInst>(v) ||
 		dyn_cast<Constant>(v)
 	) {
-		vd = ValueDomain::top(false);
-	} else if (auto add = dyn_cast<BinaryOperator>(v)) {
-		auto lhs = getVD(add->getOperand(0), block);
-		auto rhs = getVD(add->getOperand(1), block);
+		vd = ValueDomain::top(false, v->getType());
+	} else if (auto trunc = dyn_cast<TruncInst>(v)) {
+		auto op = getVD(trunc->getOperand(0), block);
+
+		bool overflow = false;
+
+		vd.isBottom = op.isBottom;
+		vd.min = vd.truncate(op.min, overflow);
+		vd.max = vd.truncate(op.max, overflow);
+
+		if (overflow && !vd.isConstant()) // @todo common and unprecise pattern!
+			vd.makeTop();
+	} else if (auto sext = dyn_cast<SExtInst>(v)) {
+		auto op = getVD(sext->getOperand(0), block);
+
+		vd.isBottom = op.isBottom;
+		vd.min = op.min;
+		vd.max = op.max;
+	} else if (auto bin = dyn_cast<BinaryOperator>(v)) {
+		auto lhs = getVD(bin->getOperand(0), block);
+		auto rhs = getVD(bin->getOperand(1), block);
 
 		if (lhs.isBottom) vd = lhs;
 		else if (rhs.isBottom) vd = rhs;
 		else {
 			vd.isBottom = false;
 
-			switch (add->getOpcode()) {
-			case Instruction::Add: {
-				if (lhs.isTop() || rhs.isTop()) {
-					vd = ValueDomain::top(false);
-					break;
-				}
-
-				bool overflow = false;
-				overflow = __builtin_add_overflow(lhs.min, rhs.min, &vd.min) || overflow;
-				overflow = __builtin_add_overflow(lhs.max, rhs.max, &vd.max) || overflow;
-
-				if (overflow && !(lhs.isConstant() && rhs.isConstant()))
-					vd = ValueDomain::top(false);
-
-				// @todo test if one side is zero! (also test predicates?) -- also for sub, mul!
-
-				break;
-			}
-
+			switch (bin->getOpcode()) {
+			case Instruction::Add: vd = ValueDomain::add(v->getType(), lhs, rhs); break;
 			case Instruction::Sub: {
-				auto epred = blocks[block].cs.get(add->getOperand(0), add->getOperand(1));
+				auto epred = blocks[block].cs.get(bin->getOperand(0), bin->getOperand(1));
+				vd = ValueDomain::sub(v->getType(), lhs, rhs);
 
-				if (lhs.isTop() || rhs.isTop())
-					vd = ValueDomain::top(false);
-				else {
-					bool overflow = false;
-					overflow = __builtin_sub_overflow(lhs.min, rhs.max, &vd.min) || overflow;
-					overflow = __builtin_sub_overflow(lhs.max, rhs.min, &vd.max) || overflow;
-
-					if (overflow && !(lhs.isConstant() && rhs.isConstant()))
-						vd = ValueDomain::top(false);
-				}
-
-				switch (epred) {
-				case CmpInst::ICMP_EQ: vd.min = vd.max = 0; break;
-				case CmpInst::ICMP_SGT: vd.min = max(vd.min, 1); break;
-				case CmpInst::ICMP_SGE: vd.min = max(vd.min, 0); break;
-				case CmpInst::ICMP_SLT: vd.max = min(vd.max, -1); break;
-				case CmpInst::ICMP_SLE: vd.max = min(vd.max, 0); break;
+				switch (epred) { // @todo what about overflows?
+				case CmpInst::ICMP_EQ: vd.min = vd.max = 0L; break;
+				case CmpInst::ICMP_SGT: vd.min = max(vd.min, 1L); break;
+				case CmpInst::ICMP_SGE: vd.min = max(vd.min, 0L); break;
+				case CmpInst::ICMP_SLT: vd.max = min(vd.max, -1L); break;
+				case CmpInst::ICMP_SLE: vd.max = min(vd.max, 0L); break;
 				default: break;
 				}
 
 				break;
 			}
 
-			case Instruction::Mul: {
-				if (lhs.isTop() || rhs.isTop()) {
-					vd = ValueDomain::top(false);
-					break;
-				}
-
-				bool overflow = false;
-				int a = 0, b = 0, c = 0, d = 0;
-				overflow = __builtin_mul_overflow(lhs.min, rhs.min, &a) || overflow;
-				overflow = __builtin_mul_overflow(lhs.min, rhs.max, &b) || overflow;
-				overflow = __builtin_mul_overflow(lhs.max, rhs.min, &c) || overflow;
-				overflow = __builtin_mul_overflow(lhs.max, rhs.max, &d) || overflow;
-
-				vd.min = min({ a, b, c, d });
-				vd.max = max({ a, b, c, d });
-
-				if (overflow && !(lhs.isConstant() && rhs.isConstant()))
-					vd = ValueDomain::top(false);
-
-				break;
-			}
+			case Instruction::Mul: vd = ValueDomain::mul(v->getType(), lhs, rhs); break;
 
 			default:
-				if (debug_mode) cerr << "unsupported binary operation" << endl;
-				vd = ValueDomain::top(false);
+				if (debug_mode)
+					cerr << "unsupported binary operation" << endl;
+				vd.makeTop();
 			}
 		}
 	} else if (auto phi = dyn_cast<PHINode>(v)) {
 		vd.isBottom = true;
+
 		for (unsigned i = 0; i < phi->getNumIncomingValues(); ++i) {
 			auto inBB = phi->getIncomingBlock(i);
 			if (blocks[inBB].reachable) {
@@ -1439,50 +1537,54 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		auto cmpPred = cmp->getPredicate();
 		auto entailPred = blocks[block].cs.get(cmp->getOperand(0), cmp->getOperand(1));
 
-		if (entailPred == ICmpInst::BAD_ICMP_PREDICATE) {
-			switch (cmpPred) {
-			case ICmpInst::ICMP_NE: swapOut = true;
-			case ICmpInst::ICMP_EQ:
-				vFalse = lhs.min != lhs.max || rhs.min != rhs.max || lhs.min != rhs.min;
-				vTrue = lhs.max >= rhs.min && rhs.max >= lhs.min;
-				break;
+		switch (cmpPred) {
+		case ICmpInst::ICMP_NE: swapOut = true;
+		case ICmpInst::ICMP_EQ:
+			vFalse = lhs.min != lhs.max || rhs.min != rhs.max || lhs.min != rhs.min;
+			vTrue = lhs.max >= rhs.min && rhs.max >= lhs.min;
+			break;
 
-			case ICmpInst::ICMP_SGE: swapOut = true;
-			case ICmpInst::ICMP_SLT:
-				vFalse = lhs.max >= rhs.min;
-				vTrue = lhs.min < rhs.max;
-				break;
+		case ICmpInst::ICMP_SGE: swapOut = true;
+		case ICmpInst::ICMP_SLT:
+			vFalse = lhs.max >= rhs.min;
+			vTrue = lhs.min < rhs.max;
+			break;
 
-			case ICmpInst::ICMP_SGT: swapOut = true;
-			case ICmpInst::ICMP_SLE:
-				vFalse = lhs.max > rhs.min;
-				vTrue = lhs.min <= rhs.max;
-				break;
+		case ICmpInst::ICMP_SGT: swapOut = true;
+		case ICmpInst::ICMP_SLE:
+			vFalse = lhs.max > rhs.min;
+			vTrue = lhs.min <= rhs.max;
+			break;
 
-			default:
-				cerr << "unsupported comparison" << endl;
-				exit(1);
-			}
-		} else {
+		default:
+			cerr << "unsupported comparison" << endl;
+			exit(1);
+		}
+
+		if (vTrue && vFalse && entailPred == ICmpInst::BAD_ICMP_PREDICATE) {
 			// got an entailing pred
 			vTrue = !ConstraintSet::conflict(entailPred, cmpPred);
 			vFalse = !ConstraintSet::entails(entailPred, cmpPred);
 		}
 
-		if (swapOut) swap(vFalse, vTrue);
-		vd.isBottom = false;
+		if (swapOut)
+			swap(vFalse, vTrue);
+
+		vd.isBottom = lhs.isBottom || rhs.isBottom;
 		vd.min = vFalse ? 0 : 1;
 		vd.max = vTrue ? 1 : 0;
 	} else {
 		debug_print("unsupported instruction", v);
-		vd = ValueDomain::top(false);
+		vd = ValueDomain::top(false, v->getType());
 	}
 
-	if (prevVd == vd) return false;
+	vd = ValueDomain::join(prevVd, vd, vd.isDead);
+	if (prevVd == vd)
+		return false;
 
 	if (!prevVd.isBottom && !vd.isBottom && !prevVd.isTop() && !vd.isTop() && !vd.isDead) {
 		if (debug_mode) cout << "widening" << endl;
-		vd = ValueDomain::top(vd.isDead);
+		vd = ValueDomain::top(vd.isDead, v->getType());
 	}
 
 	if (debug_mode) {

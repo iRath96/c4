@@ -40,18 +40,36 @@ struct OptimizerPass : public llvm::FunctionPass {
 	};
 
 	struct ValueDomain {
+		llvm::Type *type = nullptr;
+
 		bool isBottom = true;
 		bool isDead = false;
-		int min = INT_MIN, max = INT_MAX;
+		long min = 0, max = 0;
 
 		llvm::Value *memSize = nullptr; // @todo @important for malloc (+memIndex)
 
-		static ValueDomain join(ValueDomain &a, ValueDomain &b);
-		static ValueDomain top(bool isDead);
+		static ValueDomain join(ValueDomain &a, ValueDomain &b, bool isDead = false);
+		static ValueDomain top(bool isDead, llvm::Type *type);
+
+		static ValueDomain add(llvm::Type *type, ValueDomain &lhs, ValueDomain &rhs);
+		static ValueDomain sub(llvm::Type *type, ValueDomain &lhs, ValueDomain &rhs);
+		static ValueDomain mul(llvm::Type *type, ValueDomain &lhs, ValueDomain &rhs);
+		static ValueDomain div(llvm::Type *type, ValueDomain &lhs, ValueDomain &rhs);
+		static ValueDomain mod(llvm::Type *type, ValueDomain &lhs, ValueDomain &rhs);
 
 		bool contains(int v) const;
 		bool isConstant() const;
 		bool isTop() const;
+
+		void makeTop();
+
+		long addOverflow(long a, long b, bool &overflow) const;
+		long subOverflow(long a, long b, bool &overflow) const;
+		long mulOverflow(long a, long b, bool &overflow) const;
+		long truncate(long v, bool &overflow) const;
+
+		int bitWidth() const;
+		void fullRange(long &min, long &max) const;
 
 		bool operator==(const ValueDomain &other) const;
 	};
