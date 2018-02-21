@@ -438,8 +438,36 @@ void IRGenerator::visit(BinaryExpression &node) {
 	}
 }
 
-void IRGenerator::visit(ConditionalExpression &) {
-	// @todo @minor
+void IRGenerator::visit(ConditionalExpression &node) {
+	auto ifTrue = llvm::BasicBlock::Create(ctx, "ternary-true", func, 0);
+	auto ifFalse = llvm::BasicBlock::Create(ctx, "ternary-false", func, 0);
+	auto end = llvm::BasicBlock::Create(ctx, "ternary-end", func, 0);
+
+	logical.tBB = ifTrue;
+	logical.fBB = ifFalse;
+
+	getValue(*node.condition, true, true);
+
+	builder.SetInsertPoint(ifTrue);
+	auto vTrue = getValue(*node.when_true);
+	builder.CreateBr(end);
+
+	builder.SetInsertPoint(ifFalse);
+	auto vFalse = getValue(*node.when_false);
+	builder.CreateBr(end);
+
+	builder.SetInsertPoint(end);
+
+	auto phiType = vTrue->getType();
+	if (phiType->isVoidTy()) {
+		value = nullptr;
+		return;
+	}
+
+	auto phi = builder.CreatePHI(phiType, 2);
+	phi->addIncoming(matchType(vFalse, phiType), logical.fBB);
+	phi->addIncoming(matchType(vTrue, phiType), logical.tBB);
+	value = phi;
 }
 
 void IRGenerator::visit(ExpressionList &node) {
