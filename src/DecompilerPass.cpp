@@ -303,6 +303,28 @@ void DecompilerPass::negateExpression(ast::ExpressionList &expr) {
 	expr.children.push_back(neg);
 }
 
+void DecompilerPass::decompileType(
+	Type *type,
+	ast::PtrVector<ast::TypeSpecifier> &specifiers,
+	ast::PtrVector<ast::DeclaratorModifier> &modifiers
+) {
+	std::string name = "unsupported";
+
+	if (type->isVoidTy())
+	 	name = "void";
+	else if (auto it = dyn_cast<IntegerType>(type)) {
+		switch (it->getBitWidth()) {
+			case 8: name = "char"; break;
+			case 32: name = "int"; break;
+		}
+	} else if (auto pt = dyn_cast<PointerType>(type)) {
+		modifiers.push_back(make_shared<ast::DeclaratorPointer>());
+		decompileType(pt->getElementType(), specifiers, modifiers);
+	}
+
+	specifiers.push_back(make_shared<ast::NamedTypeSpecifier>(name));
+}
+
 bool DecompilerPass::runOnFunction(llvm::Function &func) {
 	if (!optimizer->options.decom)
 		return false;
@@ -342,7 +364,22 @@ bool DecompilerPass::runOnFunction(llvm::Function &func) {
 	utils::Beautifier beauty(&buffer);
 	beauty.lispMode = false;
 
+	ast::Declarator decl;
+	decl.name = legalizeName(func.getName().str());
+
+	auto dpl = make_shared<ast::DeclaratorParameterList>();
+	for (auto &arg : func.args()) {
+		ast::ParameterDeclaration pd;
+		decompileType(arg.getType(), pd.specifiers, pd.declarator.modifiers);
+		pd.declarator.name = arg.getName().str();
+		dpl->parameters.push_back(pd);
+	} // @todo variadic
+
+	decl.modifiers.push_back(dpl);
+
 	auto fn = make_shared<ast::Function>();
+	decompileType(func.getReturnType(), fn->declaration.specifiers, decl.modifiers);
+	fn->declaration.declarators.push_back(decl);
 	buffer.data.push_back(fn); // @todo this might actually be a memory issue?
 
 	set<BasicBlock *> join;

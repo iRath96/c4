@@ -67,6 +67,11 @@ struct DecompilerPass : public llvm::FunctionPass {
 
 	void unwrapCompoundStatement(ast::Ptr<ast::Statement> &stmt);
 	void negateExpression(ast::ExpressionList &expr);
+	void decompileType(
+		llvm::Type *type,
+		ast::PtrVector<ast::TypeSpecifier> &specifiers,
+		ast::PtrVector<ast::DeclaratorModifier> &modifiers
+	);
 };
 
 }

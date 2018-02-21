@@ -351,6 +351,9 @@ struct REPLStatement : External {
 #pragma mark - Types
 
 struct NamedTypeSpecifier : TypeSpecifier {
+	NamedTypeSpecifier() : id("") {}
+	NamedTypeSpecifier(const std::string &id) : id(id) {}
+	
 	std::string id;
 	lexer::Token::Keyword keyword;
 	ACCEPT
