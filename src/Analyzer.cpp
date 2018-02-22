@@ -14,24 +14,22 @@ void FileScope::close() {
 }
 
 Ptr<DeclarationRef> BlockScope::declareVariable(std::string name, Ptr<Type> type, common::TextPosition pos, bool isDefined) {
-	for (auto &v : variables) {
-		if (v.first != name) continue;
-
+	auto v = variables.find(name);
+	if (v != variables.end()) {
 		if (isDefined) {
-			if (v.second->isDefined) {
+			if (v->second->isDefined) {
 				// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
 				throw AnalyzerError("redefinition of '" + name + "'", pos);
-			} else {
-				v.second->isDefined = true;
-			}
+			} else
+				v->second->isDefined = true;
 		}
 
-		if (!v.second->type->isCompatible(*type)) {
+		if (!v->second->type->isCompatible(*type)) {
 			// @todo "redefinition of 'x' with a different type: 'int *' vs 'int **'"
 			throw AnalyzerError("conflicting types for '" + name + "'", pos);
 		}
 
-		return v.second;
+		return v->second;
 	}
 
 	auto dr = std::make_shared<DeclarationRef>();
