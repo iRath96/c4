@@ -215,6 +215,9 @@ int main(int argc, const char *argv[]) {
 		else if (!strcmp(argv[i], "--opt-symex")) opt.symex = hasOpt = true;
 		else if (!strcmp(argv[i], "--opt-decom")) opt.decom = hasOpt = true;
 
+		else if (!strcmp(argv[i], "--optimize-compile-time")) mode = COMPILE;
+		else if (!strcmp(argv[i], "--optimize-run-time"))     mode = OPTIMIZE;
+
 		else parse(argv[i]);
 	}
 }
