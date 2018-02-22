@@ -67,7 +67,12 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 			} else {
 				auto clone = inst.clone();
 				vmap[&inst] = clone;
-				newBB->getInstList().push_back(clone);
+				if (dyn_cast<AllocaInst>(clone)) {
+					// @todo this will break for 'alloca's that are called multiple times
+					auto &entry = caller->getEntryBlock();
+					entry.getInstList().insert(entry.getFirstInsertionPt(), clone);
+				} else
+					newBB->getInstList().push_back(clone);
 			}
 		}
 	}
