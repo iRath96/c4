@@ -23,6 +23,9 @@ namespace llvm {
 
 namespace optimizer {
 
+/**
+ * Does some basic inlining by trying to integrate the control flow of called functions into the caller function.
+ */
 struct InlinePass : public llvm::ModulePass {
 	const Optimizer *optimizer;
 
@@ -30,6 +33,12 @@ struct InlinePass : public llvm::ModulePass {
 	InlinePass(const Optimizer *optimizer)
 	: ModulePass(ID), optimizer(optimizer) {}
 
+	/**
+	 * Tries to inline the given call and adds the caller function to dirtyFns if the inlining
+	 * succeeds.
+	 * @param call The call that is to be inlined (caller and callee will be derived from this)
+	 * @param [out] dirtyFns Set of functions that have been modified during inlining
+	 */
 	void processCall(llvm::CallInst *call, std::set<llvm::Function *> &dirtyFns);
 	bool runOnModule(llvm::Module &module) override;
 };
