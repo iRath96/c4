@@ -716,6 +716,13 @@ bool OptimizerPass::mergeBlock(BasicBlock *block, BasicBlock *replacement) {
 					if (!exists) phi->addIncoming(phiValue, edge.first);
 				}
 
+			if (phi->getNumIncomingValues() == 0)
+				// this can happen if we have a block
+				// A with some value v
+				// B with a phi [ A, v ]
+				// single edge A -> B
+				phi->replaceAllUsesWith(phiValue);
+
 			debug_print("  changed phi", phi);
 		}
 
