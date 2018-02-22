@@ -26,18 +26,24 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 	auto callee = dyn_cast<Function>(call->getCalledValue());
 	if (!callee || callee->isDeclaration()) return;
 
-	if (caller == callee)
-		// we don't support inlining recursion yet
+	if (callee->getBasicBlockList().size() > 16)
+		// too complex, not going to inline this
 		return;
 
-	auto retBlock = block->splitBasicBlock(call, "inline-ret");
-	block->getTerminator()->eraseFromParent();
+	//bool recursion = caller == callee;
+
+	vector<BasicBlock *> bbs;
+	for (auto &b : callee->getBasicBlockList())
+		// we copy those so that we only look at the original blocks in case of recursion
+		bbs.push_back(&b);
+
+	auto callBlock = block;
+	auto retBlock = BasicBlock::Create(block->getContext(), "inline-ret", caller);
+	block = BasicBlock::Create(block->getContext(), "inline-call", caller);
 
 	PHINode *retPHI = nullptr;
-	if (!call->getType()->isVoidTy()) {
+	if (!call->getType()->isVoidTy())
 		retPHI = PHINode::Create(call->getType(), 0);
-		retPHI->insertBefore(call);
-	}
 
 	map<Value *, Value *> vmap;
 
@@ -47,16 +53,19 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 		++arg;
 	}
 
-	for (auto &cblock : callee->getBasicBlockList()) {
+	for (auto &cblock : bbs) {
 		auto newBB =
-			&cblock == &callee->getEntryBlock() ?
+			cblock == &callee->getEntryBlock() ?
 				block :
-				BasicBlock::Create(block->getContext(), cblock.getName().str() + "-" + callee->getName().str(), caller)
+				BasicBlock::Create(block->getContext(), cblock->getName().str() + "-" + callee->getName().str(), caller)
 		;
 
-		vmap[&cblock] = newBB;
+		vmap[cblock] = newBB;
 
-		for (auto &inst : cblock.getInstList()) {
+		for (auto &inst : cblock->getInstList()) {
+			// the instruction list shouldn't change while we're in this loop
+			// (it can only do so in the case of infinite recursion)
+
 			if (auto ret = dyn_cast<ReturnInst>(&inst)) { // @todo not DRY
 				auto clone = BranchInst::Create(retBlock);
 				vmap[&inst] = clone;
@@ -68,7 +77,9 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 				auto clone = inst.clone();
 				vmap[&inst] = clone;
 				if (dyn_cast<AllocaInst>(clone)) {
-					// @todo this will break for 'alloca's that are called multiple times
+					// when inlining functions into loops, we have to make sure that
+					// 'alloca's are called only once, otherwise we'd get a stack overflow
+					// (@bug this will break for 'alloca's that are intended to be called multiple times)
 					auto &entry = caller->getEntryBlock();
 					entry.getInstList().insert(entry.getFirstInsertionPt(), clone);
 				} else
@@ -77,26 +88,41 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 		}
 	}
 
+	if (retPHI)
+		retPHI->insertAfter(call);
+
+	auto realRetBlock = callBlock->splitBasicBlock(call, "inline-ret");
+	retBlock->replaceAllUsesWith(realRetBlock);
+	retBlock->eraseFromParent();
+
+	callBlock->getTerminator()->eraseFromParent();
+	callBlock->getInstList().push_back(BranchInst::Create(block));
+
 	vmap[retPHI] = retPHI ?
 		(Value *)retPHI :
 		(Value *)UndefValue::get(call->getType())
 	; // so we fix operands here as well
 
 	for (auto &v : vmap) {
-		auto inst = dyn_cast<Instruction>(v.second);
-		if (!inst) continue;
+		if (!v.first)
+			// this is the PHI node we copied
+			continue;
+
+		if (dyn_cast<Argument>(v.first))
+			continue;
+
+		auto clone = dyn_cast<Instruction>(v.second);
+		if (!clone)
+			continue;
 
 		// @todo surprise, surprise! as with apparently all of my code, this is not elegant…
 
-		for (auto &op : inst->operands()) {
-			if (vmap.find(op.get()) == vmap.end())
-				// no replacement available, must be a global reference
-				continue;
+		for (auto &op : clone->operands())
+			if (vmap.find(op.get()) != vmap.end())
+				op.set(vmap[op.get()]);
+			// else: must be a global variable
 
-			op.set(vmap[op.get()]);
-		}
-
-		if (auto phi = dyn_cast<PHINode>(inst))
+		if (auto phi = dyn_cast<PHINode>(clone))
 			// update block references for phi nodes
 			for (auto &b : phi->blocks())
 				if (vmap.find(b) != vmap.end())
