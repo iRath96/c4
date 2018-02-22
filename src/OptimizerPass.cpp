@@ -26,13 +26,9 @@ using Condition = OptimizerPass::Condition;
 ValueDomain ValueDomain::join(ValueDomain &a, ValueDomain &b, bool isDead) {
 	ValueDomain result;
 
-	if (a.isBottom) {
-		result = b;
-		result.isBottom = true;
-	} else if (b.isBottom) {
-		result = a;
-		result.isBottom = true;
-	} else {
+	if (a.isBottom) result = b;
+	else if (b.isBottom) result = a;
+	else {
 		result.type = a.type;
 		result.isBottom = false;
 		result.min = std::min(a.min, b.min);
