@@ -1374,7 +1374,7 @@ bool OptimizerPass::runOnFunction(Function &func) {
 
 	int it = 0;
 	while (true) {
-		isAscending = it > 100; // @todo hack!
+		isAscending = it > 500; // @todo hack!
 
 		if (debug_mode) {
 			if (it > 0) cout << endl;
