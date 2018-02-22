@@ -265,6 +265,11 @@ void ConstraintSet::join(const ConstraintSet &cs) {
 		return;
 	}
 
+	if (cs.isBottom)
+		return;
+
+	PredicateMap newPredicates;
+
 	// perform OR
 	for (auto &pred : cs.predicates) {
 		auto &lhs = pred.first.first;
@@ -272,13 +277,20 @@ void ConstraintSet::join(const ConstraintSet &cs) {
 
 		auto a = get(lhs, rhs);
 		auto b = pred.second;
+		Predicate c;
 
-		if (a == b) continue;
+		if (conflict(a, b)) continue;
+		else if (a == b) c = a;
+		else if (entails(a, b)) c = b;
+		else if (entails(b, a)) c = a;
+		else
+			// a must be bad predicate
+			continue;
 
-		if (conflict(a, b)) predicates.erase(make_pair(lhs, rhs));
-		else if (entails(a, b)) addSingle(lhs, rhs, b);
-		else if (entails(b, a)) addSingle(lhs, rhs, a);
+		newPredicates[pred.first] = c;
 	}
+
+	predicates = newPredicates;
 }
 
 void ConstraintSet::removeInstruction(Instruction *instr, Value *replacement) {
@@ -980,26 +992,8 @@ void OptimizerPass::findDominators() {
 }
 
 void OptimizerPass::propagateConstraintSets() {
-	map<BasicBlock *, bool> finished;
-	while (true) {
-		bool hasChanged = false;
-
-		for (auto &bd : blocks) {
-			if (finished[bd.first]) continue;
-
-			for (auto &edge : bd.second.edges)
-				if (!finished[edge.first]) goto nextBlock; // @todo @important ignore loop edges
-
-			bd.second.propagateConstraints(blocks);
-
-			finished[bd.first] = true;
-			hasChanged = true;
-		nextBlock:
-			continue;
-		}
-
-		if (!hasChanged) return;
-	}
+	for (auto &b : buildTopology())
+		blocks[b].propagateConstraints(blocks);
 }
 
 bool OptimizerPass::shouldInstantiateBlock(BasicBlock *block) {
@@ -1123,7 +1117,17 @@ void OptimizerPass::instantiateBlock(Function *func, BasicBlock *block) {
 			// and now register block initially
 			auto &reg = blocks[newBB];
 			reg.edges[parent] = edge.second;
-			//reg.cs = blocks[parent].cs; // @todo
+			reg.cs = blocks[parent].cs;
+
+			auto &cond = edge.second;
+			if (cond.cond) {
+				reg.cs.add( // @todo not DRY!
+					cond.cond,
+					ConstantInt::get(cond.cond->getType(), 0),
+					cond.condV ? ICmpInst::ICMP_NE : ICmpInst::ICMP_EQ
+				);
+			}
+
 			reg.dominators = blocks[parent].dominators;
 			reg.dominators.insert(newBB);
 
@@ -1346,27 +1350,13 @@ bool OptimizerPass::reschedule(Function &func) {
 }
 
 vector<BasicBlock *> OptimizerPass::buildTopology() {
-	// @todo would be more efficient with a priority queue and some counter based approach
-
 	vector<BasicBlock *> topology;
-	set<BasicBlock *> remainder;
+	for (auto &b : blocks)
+		topology.push_back(b.first);
 
-	for (auto &b : blocks) remainder.insert(b.first);
-
-	while (!remainder.empty()) {
-		for (auto &b : remainder) {
-			for (auto &dom : blocks[b].dominators)
-				if (dom != b && remainder.find(dom) != remainder.end())
-					goto invalid;
-
-			topology.push_back(b);
-			remainder.erase(b);
-			break;
-
-			invalid:
-			continue;
-		}
-	}
+	sort(topology.begin(), topology.end(), [&](BasicBlock *a, BasicBlock *b) {
+		return blocks[a].dominators.size() < blocks[b].dominators.size();
+	});
 
 	return topology;
 }
@@ -1603,8 +1593,19 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 
 	if (!prevVd.isBottom && !vd.isBottom && !prevVd.isTop() && !vd.isTop() && !vd.isDead) {
 		if (debug_mode)
-			cout << "widening" << endl;
+			cout << "widening " << prevVd << " / " << vd << endl;
+
+		bool maxOk = vd.max <= prevVd.max;
+		bool minOk = vd.min >= prevVd.min;
+		long min = vd.min, max = vd.max;
+
 		vd.makeTop();
+
+		if (minOk) vd.min = min;
+		if (maxOk) vd.max = max;
+
+		if (prevVd == vd)
+			return false;
 	}
 
 	if (debug_mode) {

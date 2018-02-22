@@ -75,7 +75,8 @@ struct OptimizerPass : public llvm::FunctionPass {
 	};
 
 	struct ConstraintSet {
-		std::map<std::pair<llvm::Value *, llvm::Value *>, Predicate> predicates;
+		typedef std::map<std::pair<llvm::Value *, llvm::Value *>, Predicate> PredicateMap;
+		PredicateMap predicates;
 
 		bool isBottom = false; // bottom <=> can never become true
 		bool isTop() const { return !isBottom && predicates.empty(); }
