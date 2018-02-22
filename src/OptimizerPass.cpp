@@ -1395,8 +1395,10 @@ bool OptimizerPass::runOnFunction(Function &func) {
 			removeDeadCode(func);
 			removeUnreachableCode(func);
 
-			if (dirtyDoms)
+			if (dirtyDoms) {
 				findDominators();
+				propagateConstraintSets();
+			}
 
 			isAscending = false;
 		}
