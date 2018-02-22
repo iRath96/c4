@@ -619,6 +619,7 @@ void OptimizerPass::fixBranches(Function &func) { // @todo invalidates dead-code
 			if (auto c = dyn_cast<ConstantInt>(branch->getCondition())) {
 				auto newBranch = BranchInst::Create(branch->getSuccessor(c->isZero() ? 1 : 0));
 				replaceBranch(&block, branch, newBranch);
+				dirtyDoms = true;
 
 				// no need to remove the edge from the unreachable successor here,
 				// replaceBranch does this for us.
@@ -941,6 +942,8 @@ void OptimizerPass::initialize(Function &func) {
 }
 
 void OptimizerPass::findDominators() {
+	dirtyDoms = false;
+
 	for (auto &bd : blocks) {
 		auto &dom = bd.second.dominators;
 		dom.clear();
@@ -1391,6 +1394,9 @@ bool OptimizerPass::runOnFunction(Function &func) {
 			fixBranches(func);
 			removeDeadCode(func);
 			removeUnreachableCode(func);
+
+			if (dirtyDoms)
+				findDominators();
 
 			isAscending = false;
 		}

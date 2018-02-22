@@ -152,6 +152,7 @@ struct OptimizerPass : public llvm::FunctionPass {
 
 	void initialize(llvm::Function &func);
 
+	bool dirtyDoms;
 	void findDominators(); // fixpoint approach
 	void propagateConstraintSets();
 
