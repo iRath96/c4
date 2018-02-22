@@ -223,7 +223,7 @@ void IRGenerator::visit(Function &node) {
 		argIt->setName(param.declarator.name);
 
 		allocaBuilder.SetInsertPoint(allocaBuilder.GetInsertBlock(), allocaBuilder.GetInsertBlock()->begin());
-		auto value = allocaBuilder.CreateAlloca(argIt->getType(), nullptr, "param_" + param.declarator.name);
+		auto value = allocaBuilder.CreateAlloca(argIt->getType(), nullptr, "param." + param.declarator.name);
 		builder.CreateStore(argIt, value);
 		values[(DeclarationRef *)param.annotation.get()] = value;
 
@@ -277,13 +277,13 @@ void IRGenerator::visit(UnaryExpression &node) {
 	case P::PLUSPLUS: {
 		auto var = getValue(*node.operand, false);
 		value = builder.CreateLoad(value, "load");
-		value = performAdd(value, builder.getInt8(1), "pre-inc");
+		value = performAdd(value, builder.getInt8(1), "preinc");
 		builder.CreateStore(value, var);
 	}; break;
 	case P::MINUSMINUS: {
 		auto var = getValue(*node.operand, false);
 		value = builder.CreateLoad(value, "load");
-		value = performSub(value, builder.getInt8(1), "pre-dec");
+		value = performSub(value, builder.getInt8(1), "predec");
 		builder.CreateStore(value, var);
 	}; break;
 
@@ -303,7 +303,7 @@ llvm::PHINode *IRGenerator::createLogicalPHI(llvm::BasicBlock *&post) {
 		return nullptr;
 	} else {
 		auto pre = builder.GetInsertBlock();
-		post = llvm::BasicBlock::Create(ctx, "logical-join", func, 0);
+		post = llvm::BasicBlock::Create(ctx, "logical.join", func, 0);
 
 		logical.tBB = llvm::BasicBlock::Create(ctx, "true", func, 0);
 		logical.fBB = llvm::BasicBlock::Create(ctx, "false", func, 0);
@@ -331,7 +331,7 @@ void IRGenerator::createLogicalAnd(BinaryExpression &node) {
 	auto phi = createLogicalPHI(post);
 
 	auto prevTBB = logical.tBB;
-	auto myTBB = logical.tBB = llvm::BasicBlock::Create(ctx, "and-cont", func, 0);
+	auto myTBB = logical.tBB = llvm::BasicBlock::Create(ctx, "and.cont", func, 0);
 	getValue(*node.lhs, true, true);
 
 	builder.SetInsertPoint(myTBB);
@@ -349,7 +349,7 @@ void IRGenerator::createLogicalOr(BinaryExpression &node) {
 	auto phi = createLogicalPHI(post);
 
 	auto prevFBB = logical.fBB;
-	auto myFBB = logical.fBB = llvm::BasicBlock::Create(ctx, "or-cont", func, 0);
+	auto myFBB = logical.fBB = llvm::BasicBlock::Create(ctx, "or.cont", func, 0);
 	getValue(*node.lhs, true, true);
 
 	builder.SetInsertPoint(myFBB);
@@ -459,9 +459,9 @@ void IRGenerator::visit(BinaryExpression &node) {
 }
 
 void IRGenerator::visit(ConditionalExpression &node) {
-	auto ifTrue = llvm::BasicBlock::Create(ctx, "ternary-true", func, 0);
-	auto ifFalse = llvm::BasicBlock::Create(ctx, "ternary-false", func, 0);
-	auto end = llvm::BasicBlock::Create(ctx, "ternary-end", func, 0);
+	auto ifTrue = llvm::BasicBlock::Create(ctx, "ternary.true", func, 0);
+	auto ifFalse = llvm::BasicBlock::Create(ctx, "ternary.false", func, 0);
+	auto end = llvm::BasicBlock::Create(ctx, "ternary.end", func, 0);
 
 	logical.tBB = ifTrue;
 	logical.fBB = ifFalse;
@@ -557,13 +557,13 @@ void IRGenerator::visit(PostExpression &node) {
 	case P::PLUSPLUS: { // @todo not DRY
 		auto var = getValue(*node.base, false);
 		value = builder.CreateLoad(value, "load");
-		auto v = performAdd(value, builder.getInt8(1), "post-inc");
+		auto v = performAdd(value, builder.getInt8(1), "postinc");
 		builder.CreateStore(v, var);
 	}; break;
 	case P::MINUSMINUS: {
 		auto var = getValue(*node.base, false);
 		value = builder.CreateLoad(value, "load");
-		auto v = performSub(value, builder.getInt8(1), "post-dec");
+		auto v = performSub(value, builder.getInt8(1), "postdec");
 		builder.CreateStore(v, var);
 	}; break;
 	default: throw AnalyzerError("operation not supported", node.pos); // @todo IRGeneratorError
@@ -596,9 +596,9 @@ void IRGenerator::visit(IterationStatement &node) {
 	auto prevLoop = loop;
 	createLabels(node.labels);
 
-	loop.header = llvm::BasicBlock::Create(ctx, "while-header", func, 0);
-	loop.body = llvm::BasicBlock::Create(ctx, "while-body", func, 0);
-	loop.end = llvm::BasicBlock::Create(ctx, "while-end", func, 0);
+	loop.header = llvm::BasicBlock::Create(ctx, "while.header", func, 0);
+	loop.body = llvm::BasicBlock::Create(ctx, "while.body", func, 0);
+	loop.end = llvm::BasicBlock::Create(ctx, "while.end", func, 0);
 
 	logical.tBB = loop.body;
 	logical.fBB = loop.end;
@@ -619,9 +619,9 @@ void IRGenerator::visit(IterationStatement &node) {
 void IRGenerator::visit(SelectionStatement &node) {
 	createLabels(node.labels);
 
-	auto ifTrue = llvm::BasicBlock::Create(ctx, "if-true", func, 0);
-	auto end = llvm::BasicBlock::Create(ctx, "if-end", func, 0);
-	auto ifFalse = node.whenFalse.get() ? llvm::BasicBlock::Create(ctx, "if-false", func, 0) : end;
+	auto ifTrue = llvm::BasicBlock::Create(ctx, "if.true", func, 0);
+	auto end = llvm::BasicBlock::Create(ctx, "if.end", func, 0);
+	auto ifFalse = node.whenFalse.get() ? llvm::BasicBlock::Create(ctx, "if.false", func, 0) : end;
 
 	logical.tBB = ifTrue;
 	logical.fBB = ifFalse;
@@ -643,7 +643,7 @@ void IRGenerator::visit(SelectionStatement &node) {
 
 void IRGenerator::createDeadBlock() {
 	// @todo don't even bother inserting here!
-	auto deadBlock = llvm::BasicBlock::Create(ctx, "dead-block", func, 0);
+	auto deadBlock = llvm::BasicBlock::Create(ctx, "ghost", func, 0);
 	builder.SetInsertPoint(deadBlock);
 }
 
