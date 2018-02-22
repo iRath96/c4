@@ -41,7 +41,7 @@ bool Optimizer::next(IRFragment *result) {
 	} else {
 		if (options.inl) {
 			InlinePass ip(this);
-			for (int i = 0; i < 2; ++i)
+			for (int i = 0; i < 1; ++i)
 				ip.runOnModule(*module);
 		}
 

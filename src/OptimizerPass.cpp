@@ -98,6 +98,46 @@ ValueDomain ValueDomain::mul(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
 	return result;
 }
 
+ValueDomain ValueDomain::div(Type *type, ValueDomain &lhs, ValueDomain &rhs) {
+	ValueDomain result;
+	result.type = type;
+	result.isBottom = lhs.isBottom || rhs.isBottom;
+
+	if (rhs.isConstant() && rhs.contains(0)) {
+		// division by zero!
+		result.min = result.max = 0L;
+		return result;
+	}
+
+	long d0 = 0, d1 = 0;
+
+	if (rhs.min <= 0 && rhs.max <= 0) {
+		d0 = d1 = std::min(rhs.max, -1L);
+	} else if (rhs.min <= 0 && rhs.max > 0) {
+		if (rhs.min == 0) d0 = d1 = +1;
+		else {
+			d0 = -1;
+			d1 = +1;
+		}
+	} else if (rhs.min >= 0 && rhs.max >= 0) {
+		d0 = d1 = std::max(rhs.min, +1L);
+	}
+
+	bool overflow = false;
+	long a = result.truncate(lhs.min / d0, overflow);
+	long b = result.truncate(lhs.max / d0, overflow);
+	long c = result.truncate(lhs.min / d1, overflow);
+	long d = result.truncate(lhs.max / d1, overflow);
+
+	result.min = std::min({ a, b, c, d });
+	result.max = std::max({ a, b, c, d });
+
+	if (overflow && !(lhs.isConstant() && rhs.isConstant()))
+		result.makeTop();
+
+	return result;
+}
+
 long ValueDomain::addOverflow(long a, long b, bool &overflow) const {
 	long result;
 	overflow = __builtin_add_overflow(a, b, &result) || overflow;
@@ -1269,6 +1309,12 @@ bool OptimizerPass::reschedule(Function &func) {
 			if (hasSideEffect(&instr)) continue;
 			if (isa<PHINode>(&instr)) continue;
 
+			if (auto bin = dyn_cast<BinaryOperator>(&instr)) {
+				// might cause divide-by-zero, can't reschedule those
+				if (bin->getOpcode() == Instruction::SDiv) continue;
+				if (bin->getOpcode() == Instruction::SRem) continue;
+			}
+
 			auto instrParent = instr.getParent();
 
 			map<BasicBlock *, Instruction *> usage;
@@ -1524,6 +1570,7 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 			}
 
 			case Instruction::Mul: vd = ValueDomain::mul(v->getType(), lhs, rhs); break;
+			case Instruction::SDiv: vd = ValueDomain::div(v->getType(), lhs, rhs); break;
 
 			default:
 				if (debug_mode)

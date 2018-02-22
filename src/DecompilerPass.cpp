@@ -521,6 +521,7 @@ void DecompilerPass::decompileInstructions(BasicBlock &block, ast::CompoundState
 				case Instruction::Add: be->op = Punct::PLUS; break;
 				case Instruction::Mul: be->op = Punct::ASTERISK; break;
 				case Instruction::SDiv: be->op = Punct::SLASH; break;
+				case Instruction::SRem: be->op = Punct::MODULO; break;
 				default: be->op = Punct::NOT_A_PUNCTUATOR;
 			}
 
