@@ -16,6 +16,9 @@ void DecompilerPass::getAnalysisUsage(AnalysisUsage &info) const {
 	info.setPreservesAll();
 }
 
+/**
+ * Replaces characters that may not occur in a C identifier with underscores.
+ */
 string legalizeName(const string &str) {
 	std::string out = "";
 	for (auto &c : str) {
@@ -30,17 +33,21 @@ string legalizeName(const string &str) {
 
 string DecompilerPass::resolveName(Value *value) {
 	if (names.find(value) != names.end())
+		// already assigned a name
 		return names[value];
 
-	string test = legalizeName(value->getName().str());
+	// create a new name and assign it
+	string test = legalizeName(value->getName().str()); // try this one first
 
 	while (true) {
 		if (!test.empty() && namesReverse.find(test) == namesReverse.end()) {
+			// name is legal and does not exist yet, so assign it
 			names[value] = test;
 			namesReverse[test] = value;
 			return test;
 		}
 
+		// otherwise generate names `a` to `z` then `_26`, `_27`, …
 		if (nameCounter < 26)
 			test = 'a' + (nameCounter++);
 		else
@@ -49,10 +56,12 @@ string DecompilerPass::resolveName(Value *value) {
 }
 
 bool DecompilerPass::isLoop(BasicBlock *header, BasicBlock *body) {
+	// use (recursive) breadth-first search to check if body references header
+
 	auto &opt = getAnalysis<OptimizerPass>();
 
 	if (header == body) return true;
-	if (!opt.blocks[body].isDominatedBy(header)) return false;
+	if (!opt.blocks[body].isDominatedBy(header)) return false; // otherwise infinite recursion possible!
 
 	auto br = dyn_cast<BranchInst>(body->getTerminator());
 	if (!br) return false;
@@ -68,25 +77,29 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 	auto index = compound.items.size();
 
 	// decompile instructions
-	decompileBlock(block, compound);
+	decompileInstructions(block, compound);
 
 	// decompile terminator
 	auto term = block.getTerminator();
 	if (auto branch = dyn_cast<BranchInst>(term)) {
 		if (branch->isConditional()) {
+			// if statement necessary
 			auto ss = make_shared<ast::SelectionStatement>();
 			ss->condition.children.push_back(resolve(branch->getCondition()));
 			
-			set<BasicBlock *> subJoin;
-			set<BasicBlock *> alreadyBound;
+			set<BasicBlock *> subJoin; // blocks that were goto referenced by our successors
+			set<BasicBlock *> alreadyBound; // a list of blocks that have already been bound
 			bool owned[2];
 
 			for (int i = 0; i < 2; ++i) {
+				// do this for each successor
 				auto succ = branch->getSuccessor(i);
 				auto otherSucc = branch->getSuccessor(1 - i);
 
 				owned[i] = opt.blocks[succ].isDominatedBy(&block) && &block != succ; // @todo not DRY!
 
+				// one of our successors can be a merge block if the other successor can also reach it
+				// this means that we can create an if statement with only one child
 				bool isMergeBlock = false;
 				for (auto &e : opt.blocks[succ].edges)
 					if (opt.blocks[e.first].isDominatedBy(otherSucc)) {
@@ -96,6 +109,7 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 						break;
 					}
 
+				// create a compound statement for each child
 				auto c = make_shared<ast::CompoundStatement>();
 				if (owned[i] && !isMergeBlock) {
 					//cout << "cond " << resolveName(succ) << " into " << resolveName(&block) << endl;
@@ -104,9 +118,11 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 				} else {
 					// @todo not quite DRY with unconditional
 
+					// you might ask why we created a compound statement when there's only one goto statement
+					// the reason is simple: the fix* methods expect compound statements :-)
 					auto gs = make_shared<ast::GotoStatement>();
 					gs->target = resolveName(succ);
-					c->items.push_back(gs); // we put this in a compound statement so fixGotos is happy
+					c->items.push_back(gs);
 
 					if (owned[i])
 						// will be bound later
@@ -119,31 +135,30 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 				(i == 0 ? ss->whenTrue : ss->whenFalse) = c;
 			}
 
+			// add the if statement to the compound statement
 			compound.items.push_back(ss);
 
-			// both owned false => we dominate no blocks
-
 			for (auto &b : alreadyBound)
+				// only consider blocks that have not been already bound by us
 				subJoin.erase(b);
 
-			//cout << "sub-join " << resolveName(&block) << endl;
+			// make sure the blocks referenced by the successors are bound
 			for (auto &b : subJoin) {
 				if (opt.blocks[b].isDominatedBy(&block) && &block != b) {
-					// we need to bind this
-					//cout << "* binding " << resolveName(b) << " into " << resolveName(&block) << endl;
+					// we need to bind this because we dominate it
 					bindBlock(*b, compound, join);
 				} else
-					// not our job
+					// not our job, there must be a block that dominates b and that block will bind it
 					join.insert(b);
 			}
 		} else {
+			// simple, unconditional branch
 			auto succ = branch->getSuccessor(0);
 			if (opt.blocks[succ].isDominatedBy(&block) && &block != succ) {
-				// cout << "uncond " << resolveName(succ) << " into " << resolveName(&block) << endl;
 				bindBlock(*succ, compound, join);
 
 				// every block we dominate is also dominated by succ,
-				// succ will bind all dominated blocks for us
+				// succ will (recursively) bind all dominated blocks for us
 			} else {
 				// goto statement
 				auto gs = make_shared<ast::GotoStatement>();
@@ -152,7 +167,7 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 
 				join.insert(succ);
 
-				// no block is dominated by us
+				// no block can be dominated by us, our work is done
 			}
 		}
 	} else if (auto ret = dyn_cast<ReturnInst>(term)) {
@@ -161,12 +176,14 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 		rs->expressions.children.push_back(resolve(ret->getReturnValue()));
 		compound.items.push_back(rs);
 
-		// no block is dominated by us
+		// no block can be dominated by us, our work is done
 	} else {
 		cerr << "unsupported terminator" << endl;
 		assert(false);
 	}
 
+	// there might incorrectly be blocks in the join that we have already bound - get rid of those.
+	// @todo why?
 	discard_if(join, [&](llvm::BasicBlock *b) {
 		return opt.blocks[b].isDominatedBy(&block);
 	});
@@ -175,6 +192,7 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 
 	auto e = compound.items[index];
 	dynamic_cast<ast::Statement *>(e.get())->labels.push_back(
+		// create a label for the first statement we've inserted
 		make_shared<ast::IdentifierLabel>(resolveName(&block))
 	);
 }
@@ -182,14 +200,17 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 bool DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::IdentifierLabel *follow) {
 	auto compound = dynamic_cast<ast::CompoundStatement *>(body);
 	if (!compound)
+		// we can only remove gotos inside of compound statements
 		return false;
 
 	assert(!compound->items.empty());
 
+	// recurse
 	for (size_t i = 0; i < compound->items.size(); ++i) {
 		auto &stmt = compound->items[i];
 		ast::IdentifierLabel *il = nullptr;
 
+		// determine the label that follows the statement stmt
 		if (i == compound->items.size() - 1) {
 			il = follow;
 		} else {
@@ -225,6 +246,7 @@ bool DecompilerPass::fixGotos(ast::Statement *body, set<string> &refs, ast::Iden
 		}
 	}
 
+	// remove terminating goto statement if possible
 	if (auto gs = dynamic_cast<ast::GotoStatement *>(compound->items.back().get())) {
 		if (follow && gs->target == follow->id)
 			compound->items.pop_back();
@@ -297,6 +319,7 @@ void DecompilerPass::negateExpression(ast::ExpressionList &expr) {
 		deny: {}
 	}
 
+	// fall back to just putting a logical not around the expression
 	auto neg = make_shared<ast::UnaryExpression>();
 	neg->operand = last;
 	neg->op = Punct::LOG_NOT;
@@ -329,7 +352,6 @@ bool DecompilerPass::runOnFunction(llvm::Function &func) {
 	if (!optimizer->options.decom)
 		return false;
 
-	ignoreInst.clear();
 	phiRefs.clear();
 	vmap.clear();
 	names.clear();
@@ -360,10 +382,12 @@ bool DecompilerPass::runOnFunction(llvm::Function &func) {
 		}
 	}
 
+	// prepare beautifier
 	streams::VectorSource<ast::Ptr<ast::External>> buffer;
 	utils::Beautifier beauty(&buffer);
 	beauty.lispMode = false;
 
+	// decompile function signature
 	ast::Declarator decl;
 	decl.name = legalizeName(func.getName().str());
 
@@ -377,32 +401,37 @@ bool DecompilerPass::runOnFunction(llvm::Function &func) {
 
 	decl.modifiers.push_back(dpl);
 
+	// create function
 	auto fn = make_shared<ast::Function>();
 	decompileType(func.getReturnType(), fn->declaration.specifiers, decl.modifiers);
 	fn->declaration.declarators.push_back(decl);
 	buffer.data.push_back(fn); // @todo this might actually be a memory issue?
 
+
+	// decompile entry block
 	set<BasicBlock *> join;
 	bindBlock(func.getEntryBlock(), fn->body, join);
+	assert(join.empty());
 
+	// enhance decompiler output
 	set<string> refs;
 	fixGotos(&fn->body, refs);
 	fixLabels(&fn->body, refs);
 
+	// output result
 	beauty.drain();
 
-	for (auto &b : join) cout << b->getName().str() << " not bound" << endl;
-	assert(join.empty());
-
+	// return that nothing has been modified
 	return false;
 }
 
-llvm::BasicBlock *DecompilerPass::findFirstDominator(BasicBlock &block) {
+llvm::BasicBlock *DecompilerPass::findImmediateDominator(BasicBlock &block) {
 	auto &opt = getAnalysis<OptimizerPass>();
 	auto &doms = opt.blocks[&block].dominators;
 
 	// find the closest strict dominator by finding the dominator which itself
 	// dominates the most blocks (excluding our own block, of course)
+	// @todo this might not be the most efficient way to achieve this
 	return *max_element(doms.begin(), doms.end(), [&](BasicBlock *a, BasicBlock *b) {
 		// exclude our own block (sort as minimum)
 		if (a == &block) return true;
@@ -419,6 +448,8 @@ ast::Ptr<ast::Expression> DecompilerPass::resolve(Value *value) {
 		return nullptr;
 
 	if (auto cint = dyn_cast<ConstantInt>(value)) {
+		// generate ast literals for constants
+		// @todo singletons
 		int v = (int)*cint->getValue().getRawData();
 		return make_shared<ast::Constant>(to_string(v), v, false);
 	}
@@ -445,7 +476,7 @@ void DecompilerPass::resolvePHIRefs(BasicBlock &block, ast::CompoundStatement &c
 	}
 }
 
-void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &compound) {
+void DecompilerPass::decompileInstructions(BasicBlock &block, ast::CompoundStatement &compound) {
 	auto &opt = getAnalysis<OptimizerPass>();
 
 	for (auto &inst : block.getInstList()) {
@@ -454,9 +485,6 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 			resolvePHIRefs(block, compound);
 			return;
 		}
-
-		if (ignoreInst[&inst])
-			continue;
 
 		if (vmap.find(&inst) != vmap.end())
 			// translated this already, must be a PHI node
@@ -509,6 +537,10 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 
 		bool needsStore = opt.hasSideEffect(&inst) || inst.getNumUses() > 1;
 		if (!needsStore && inst.getNumUses() == 1) {
+			// we pretend this has a side-effect if it's defined in a different block
+			// than the one it is used in -- this is so that we can visualize the result
+			// of the loop-invariant code motion pass!
+
 			auto &use = *inst.uses().begin();
 			auto i = dyn_cast<Instruction>(use.getUser());
 
@@ -517,6 +549,7 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 		}
 
 		if (needsStore) { // @todo not DRY
+			// generate an assignment statement to a fresh variable for this
 			assert(!bi.get());
 
 			ast::Declarator d;
@@ -545,8 +578,10 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 			// @todo push back declaration
 
 			compound.items.push_back(bi);
-			vmap[&inst] = make_shared<ast::IdentifierExpression>(d.name);
+			vmap[&inst] = make_shared<ast::IdentifierExpression>(d.name); // reference the new variable
 		} else {
+			// reference the expression itself
+			// (will be "inlined" where it is referenced)
 			vmap[&inst] = expr;
 		}
 	}
@@ -555,4 +590,3 @@ void DecompilerPass::decompileBlock(BasicBlock &block, ast::CompoundStatement &c
 char DecompilerPass::ID = 3;
 
 }
-
