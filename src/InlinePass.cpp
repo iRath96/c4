@@ -100,7 +100,7 @@ void InlinePass::processCall(CallInst *call, set<Function *> &dirtyFns) {
 		exitPHI->insertAfter(call);
 
 	// fix control flow
-	auto exitBlock = callBlock->splitBasicBlock(call, "inline-ret");
+	auto exitBlock = callBlock->splitBasicBlock(call, "exit");
 	exitPlaceholder->replaceAllUsesWith(exitBlock);
 	exitPlaceholder->eraseFromParent();
 
