@@ -16,6 +16,9 @@
 #pragma GCC diagnostic pop
 
 
+extern bool debug_mode;
+
+
 namespace compiler {
 
 using namespace ast;
@@ -112,7 +115,8 @@ bool IRGenerator::next(IRFragment *result) {
 
 		return true;
 	} else {
-		llvm::verifyModule(*mod, &llvm::errs());
+		if (debug_mode)
+			llvm::verifyModule(*mod, &llvm::errs());
 		return false;
 	}
 }
@@ -130,7 +134,8 @@ void IRGenerator::visit(REPLStatement &node) {
 
 	inspect(node.statement);
 
-	llvm::verifyFunction(*func, &llvm::errs());
+	if (debug_mode)
+		llvm::verifyFunction(*func, &llvm::errs());
 
 	cres.values.push_back(func);
 }
@@ -236,7 +241,8 @@ void IRGenerator::visit(Function &node) {
 		else builder.CreateRet(llvm::Constant::getNullValue(retType));
 	}
 
-	llvm::verifyFunction(*func, &llvm::errs()); // @todo also verifyFunction in Optimizer
+	if (debug_mode)
+		llvm::verifyFunction(*func, &llvm::errs()); // @todo also verifyFunction in Optimizer
 }
 
 void IRGenerator::visit(IdentifierExpression &node) {
