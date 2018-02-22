@@ -1372,10 +1372,10 @@ bool OptimizerPass::runOnFunction(Function &func) {
 		func.print(errs());
 	}
 
-	isAscending = false;
-
 	int it = 0;
 	while (true) {
+		isAscending = it > 100; // @todo hack!
+
 		if (debug_mode) {
 			if (it > 0) cout << endl;
 			cout << "iteration #" << it << endl;
@@ -1384,7 +1384,6 @@ bool OptimizerPass::runOnFunction(Function &func) {
 		hasChanged = false;
 
 		iterate(func);
-		//isAscending = true;
 
 		if (!hasChanged) {
 			// domain analysis has finished
@@ -1399,8 +1398,6 @@ bool OptimizerPass::runOnFunction(Function &func) {
 				findDominators();
 				propagateConstraintSets();
 			}
-
-			isAscending = false;
 		}
 
 		if (debug_mode && hasChanged) func.print(errs());
@@ -1603,8 +1600,8 @@ bool OptimizerPass::trackValue(Value *v, BasicBlock *block) {
 		if (debug_mode)
 			cout << "widening " << prevVd << " / " << vd << endl;
 
-		bool maxOk = vd.max <= prevVd.max;
-		bool minOk = vd.min >= prevVd.min;
+		bool maxOk = vd.max == prevVd.max || (vd.max < prevVd.max && !isAscending);
+		bool minOk = vd.min == prevVd.min || (vd.min > prevVd.min && !isAscending);
 		long min = vd.min, max = vd.max;
 
 		vd.makeTop();
