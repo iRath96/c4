@@ -26,9 +26,13 @@ using Condition = OptimizerPass::Condition;
 ValueDomain ValueDomain::join(ValueDomain &a, ValueDomain &b, bool isDead) {
 	ValueDomain result;
 
-	if (a.isBottom) result = b;
-	else if (b.isBottom) result = a;
-	else {
+	if (a.isBottom) {
+		result = b;
+		result.isBottom = true;
+	} else if (b.isBottom) {
+		result = a;
+		result.isBottom = true;
+	} else {
 		result.type = a.type;
 		result.isBottom = false;
 		result.min = std::min(a.min, b.min);
@@ -498,6 +502,7 @@ void OptimizerPass::fixPHINodes(Function &func) {
 					Value *inV = phi->getIncomingValue(i);
 					BasicBlock *inB = phi->getIncomingBlock(i);
 
+					/* @todo wtf was I thinking when I wrote this?
 					if (auto phi2 = dyn_cast<PHINode>(inV)) {
 						if (phi2->getParent() == phi->getParent()) {
 							// we're refering a phi node from the same block,
@@ -506,7 +511,7 @@ void OptimizerPass::fixPHINodes(Function &func) {
 							assert(inV);
 							phi->setIncomingValue(i, inV);
 						}
-					}
+					}*/
 
 					// @todo check equality, not pointer equality (also commotativity)
 					if (v != inV && blocks[inB].cs.get(v, inV) != ICmpInst::ICMP_EQ) isSingular = false;
@@ -861,8 +866,12 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 		return vd;
 	}
 
+	if (dyn_cast<Argument>(value)) {
+		return ValueDomain::top(false, value->getType());
+	}
+
 	if (dyn_cast<ConstantPointerNull>(value)) {
-		ValueDomain vd; // @todo value size
+		ValueDomain vd;
 		vd.isBottom = false;
 		vd.type = value->getType();
 		vd.min = 0;

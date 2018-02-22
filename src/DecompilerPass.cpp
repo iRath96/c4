@@ -139,7 +139,7 @@ void DecompilerPass::bindBlock(BasicBlock &block, ast::CompoundStatement &compou
 		} else {
 			auto succ = branch->getSuccessor(0);
 			if (opt.blocks[succ].isDominatedBy(&block) && &block != succ) {
-				cout << "uncond " << resolveName(succ) << " into " << resolveName(&block) << endl;
+				// cout << "uncond " << resolveName(succ) << " into " << resolveName(&block) << endl;
 				bindBlock(*succ, compound, join);
 
 				// every block we dominate is also dominated by succ,
