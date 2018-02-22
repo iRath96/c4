@@ -497,7 +497,7 @@ void OptimizerPass::iterate(Function &func) {
 	// update domains for all variables
 	for (auto &block : func.getBasicBlockList())
 		for (auto &inst : block.getInstList())
-			hasChanged = trackValue(&inst, &block) || hasChanged;
+			hasChanged = hasChanged || trackValue(&inst, &block);
 }
 
 void OptimizerPass::fixPHINodes(Function &func) {
