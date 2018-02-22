@@ -457,7 +457,7 @@ void OptimizerPass::iterate(Function &func) {
 	// update domains for all variables
 	for (auto &block : func.getBasicBlockList())
 		for (auto &inst : block.getInstList())
-			hasChanged = hasChanged || trackValue(&inst, &block);
+			hasChanged = trackValue(&inst, &block) || hasChanged;
 }
 
 void OptimizerPass::fixPHINodes(Function &func) {
@@ -787,6 +787,8 @@ void OptimizerPass::removeBlock(BasicBlock *block) {
 void OptimizerPass::removeInstruction(Instruction *instr, Value *replacement) {
 	assert(instr != replacement);
 
+	hasChanged = true;
+
 	debug_print("removing instruction", instr);
 
 	for (auto &b : blocks)
@@ -841,7 +843,7 @@ void OptimizerPass::applyConstraintSetToDomain(Value *value, ValueDomain &vd, co
 		if (c.first.first != value) continue;
 		if (c.first.second == value) continue;
 
-		debug_print("compare ", c.first.second);
+		//debug_print("compare ", c.first.second);
 
 		auto rhsVD = getVD(c.first.second, block, max_depth);
 		if (rhsVD.isTop() || rhsVD.isBottom) continue;
@@ -895,7 +897,7 @@ ValueDomain OptimizerPass::getVD(Value *value, BasicBlock *block, int max_depth)
 		return vd;
 	}
 
-	debug_print("getting ", value);
+	//debug_print("getting ", value);
 
 	auto vd = getGlobalVD(value);
 	if (max_depth > 0)
