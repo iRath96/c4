@@ -10,6 +10,8 @@
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/IR/DebugLoc.h>
+#include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/Support/Signals.h>
 #include <llvm/Support/SystemUtils.h>
 #include <llvm/Support/PrettyStackTrace.h>
@@ -98,10 +100,41 @@ llvm::Value *IRGenerator::matchType(llvm::Value *value, llvm::Type *type) {
 	return builder.CreateIntCast(value, type, true, "cast");
 }
 
-IRGenerator::IRGenerator(Source<Ptr<ast::External>> *source, std::string moduleName)
-: Stream<Ptr<External>, IRFragment>(source), builder(ctx), allocaBuilder(ctx), mod(new llvm::Module(moduleName, ctx)),
-dataLayout(mod) {
+IRGenerator::IRGenerator(Source<Ptr<ast::External>> *source, std::string moduleName, bool emitDebug)
+:
+	Stream<Ptr<External>, IRFragment>(source),
+	mod(new llvm::Module(moduleName, ctx)),
+	builder(ctx), allocaBuilder(ctx), diBuilder(*mod),
+	dataLayout(mod),
+	emitDebug(emitDebug)
+{
 	modPtr.reset(mod);
+
+	if (emitDebug) {
+		diFile = diBuilder.createFile(moduleName, ".");
+		diStack.push(
+			diBuilder.createCompileUnit(
+				llvm::dwarf::DW_LANG_C,
+				diFile,
+				"acom",
+				0,
+				"",
+				0
+			)
+		);
+
+		mod->addModuleFlag(llvm::Module::Warning, "Debug Info Version", llvm::DEBUG_METADATA_VERSION);
+	}
+}
+
+void IRGenerator::inspect(ast::Node &node) {
+	if (emitDebug) {
+		auto loc = llvm::DebugLoc::get(node.pos.line, node.pos.column, diStack.top());
+		builder.SetCurrentDebugLocation(loc);
+		allocaBuilder.SetCurrentDebugLocation(loc);
+	}
+
+	node.accept(*this);
 }
 
 bool IRGenerator::next(IRFragment *result) {
@@ -110,11 +143,13 @@ bool IRGenerator::next(IRFragment *result) {
 		cres.values.clear();
 		cres.shouldExecute = dynamic_cast<REPLStatement *>(ext.get()) ? true : false;
 
-		inspect(ext);
+		inspect(*ext);
 		*result = cres;
 
 		return true;
 	} else {
+		if (emitDebug)
+			diBuilder.finalize();
 		if (debug_mode)
 			llvm::verifyModule(*mod, &llvm::errs());
 		return false;
@@ -132,7 +167,7 @@ void IRGenerator::visit(REPLStatement &node) {
 	builder.SetInsertPoint(entry);
 	allocaBuilder.SetInsertPoint(entry);
 
-	inspect(node.statement);
+	inspect(*node.statement);
 
 	if (debug_mode)
 		llvm::verifyFunction(*func, &llvm::errs());
@@ -155,7 +190,8 @@ void IRGenerator::createLabels(const PtrVector<Label> &labels) {
 
 void IRGenerator::visit(CompoundStatement &node) {
 	createLabels(node.labels);
-	for (auto &item : node.items) inspect(item);
+	for (auto &item : node.items)
+		inspect(*item);
 }
 
 void IRGenerator::visit(Declaration &node) { declaration(node, false); }
@@ -230,9 +266,42 @@ void IRGenerator::visit(Function &node) {
 		argIt++;
 	}
 
-	for (auto &d : node.declarations) visit(d);
+	for (auto &d : node.declarations)
+		inspect(d);
 
-	visit(node.body);
+	// debug information
+
+	if (emitDebug) {
+		llvm::SmallVector<llvm::Metadata *, 8> eltTypes;
+		llvm::DIType *voidType = diBuilder.createBasicType("void", 0, llvm::dwarf::DW_ATE_signed);
+
+		eltTypes.push_back(voidType); // return type
+
+		for (unsigned i = 0; i < func->arg_size(); ++i)
+			eltTypes.push_back(voidType);
+
+		auto dist = diBuilder.createSubroutineType(diBuilder.getOrCreateTypeArray(eltTypes));
+		auto diSub = diBuilder.createFunction(
+			diFile,
+			func->getName(),
+			llvm::StringRef(),
+			diFile,
+			node.pos.line,
+			dist,
+			false,
+			true,
+			0
+		);
+
+		func->setSubprogram(diSub);
+
+		diStack.push(diSub);
+	}
+
+	inspect(node.body);
+
+	if (emitDebug)
+		diStack.pop();
 
 	// always create return
 	if (builder.GetInsertBlock()->getTerminator() == nullptr) {
@@ -574,7 +643,7 @@ void IRGenerator::visit(ExpressionStatement &node) {
 	createLabels(node.labels);
 
 	shouldLoad = true;
-	visit(node.expressions);
+	inspect(node.expressions);
 }
 
 void IRGenerator::createSizeof(ast::Node &node) {
@@ -609,7 +678,7 @@ void IRGenerator::visit(IterationStatement &node) {
 	getValue(node.condition, true, true);
 
 	builder.SetInsertPoint(loop.body);
-	inspect(node.body);
+	inspect(*node.body);
 	builder.CreateBr(loop.header);
 	builder.SetInsertPoint(loop.end);
 
@@ -629,12 +698,12 @@ void IRGenerator::visit(SelectionStatement &node) {
 	getValue(node.condition, true, true);
 
 	builder.SetInsertPoint(ifTrue);
-	inspect(node.whenTrue);
+	inspect(*node.whenTrue);
 	builder.CreateBr(end);
 
 	if (node.whenFalse.get()) {
 		builder.SetInsertPoint(ifFalse);
-		inspect(node.whenFalse);
+		inspect(*node.whenFalse);
 		builder.CreateBr(end);
 	}
 

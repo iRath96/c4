@@ -29,6 +29,8 @@ using namespace utils;
 bool debug_mode = false;
 bool enable_output = true;
 bool do_sema = true;
+bool emit_llvm = false;
+bool emit_debug = false;
 
 bool hasOpt = false;
 Optimizer::Options opt;
@@ -129,14 +131,14 @@ void parse(const char *filename) {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	IRGenerator generator(&analyzer, name);
+	IRGenerator generator(&analyzer, name, emit_debug);
 	Optimizer optimizer(&generator, generator.modPtr.get());
 	FileSink output(
 		do_optimize ?
 			(Source<IRFragment> *)&optimizer :
 			(Source<IRFragment> *)&generator, generator.modPtr.get(),
 		llPath,
-		debug_mode
+		debug_mode || emit_llvm
 	);
 
 	if (hasOpt)
@@ -177,7 +179,7 @@ void repl() {
 	Buffer<Parser::Output> buffer(&parser);
 
 	Analyzer analyzer(buffer.createChild());
-	IRGenerator generator(&analyzer, "repl");
+	IRGenerator generator(&analyzer, "repl", emit_debug);
 	JITEngine jit(&generator, &generator); // @todo style
 
 	source.parser = &parser;
@@ -199,15 +201,17 @@ int main(int argc, const char *argv[]) {
 	opt.decom = false;
 
 	for (int i = 1; i < argc; ++i) {
-		if      (!strcmp(argv[i], "--tokenize" )) mode = TOKENIZE;
-		else if (!strcmp(argv[i], "--debug"    )) debug_mode = true;
-		else if (!strcmp(argv[i], "--no-sema"  )) do_sema = false;
-		else if (!strcmp(argv[i], "--dry"      )) enable_output = false;
-		else if (!strcmp(argv[i], "--parse"    )) mode = PARSE;
-		else if (!strcmp(argv[i], "--print-ast")) mode = PRINT_AST;
-		else if (!strcmp(argv[i], "--repl"     )) repl();
-		else if (!strcmp(argv[i], "--compile"  )) mode = COMPILE;
-		else if (!strcmp(argv[i], "--optimize" )) mode = OPTIMIZE;
+		if      (!strcmp(argv[i], "--tokenize"  )) mode = TOKENIZE;
+		else if (!strcmp(argv[i], "--debug"     )) debug_mode = true;
+		else if (!strcmp(argv[i], "--no-sema"   )) do_sema = false;
+		else if (!strcmp(argv[i], "--dry"       )) enable_output = false;
+		else if (!strcmp(argv[i], "--parse"     )) mode = PARSE;
+		else if (!strcmp(argv[i], "--print-ast" )) mode = PRINT_AST;
+		else if (!strcmp(argv[i], "--repl"      )) repl();
+		else if (!strcmp(argv[i], "--compile"   )) mode = COMPILE;
+		else if (!strcmp(argv[i], "--optimize"  )) mode = OPTIMIZE;
+		else if (!strcmp(argv[i], "--emit-llvm" )) emit_llvm = true;
+		else if (!strcmp(argv[i], "--emit-debug")) emit_debug = true;
 
 		else if (!strcmp(argv[i], "--opt-inl"  )) opt.inl   = hasOpt = true;
 		else if (!strcmp(argv[i], "--opt-cse"  )) opt.cse   = hasOpt = true;

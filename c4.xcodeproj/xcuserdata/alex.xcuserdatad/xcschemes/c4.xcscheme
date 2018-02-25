@@ -66,10 +66,14 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "--debug"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--emit-llvm"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "--print-ast"
+            argument = "--emit-debug"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
@@ -77,8 +81,20 @@
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
+            argument = "--opt-inl"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--opt-decom"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
             argument = "--opt-symex"
-            isEnabled = "YES">
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "--print-ast"
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--parse"
@@ -86,7 +102,7 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--optimize"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--repl"
@@ -94,10 +110,6 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "--tokenize"
-            isEnabled = "NO">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "hi.c"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument

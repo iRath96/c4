@@ -7,6 +7,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <stack>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -15,11 +16,13 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/IR/DIBuilder.h>
 #pragma GCC diagnostic pop
 
 
 namespace llvm {
 	class Value;
+	class Instruction;
 	class PHINode;
 	class Type;
 	class Module;
@@ -39,22 +42,20 @@ struct IRFragment { // @todo put into IRGenerator
 
 class IRGenerator : public ast::Visitor, public streams::Stream<ast::Ptr<ast::External>, IRFragment> {
 protected:
-	void inspect(ast::Node &node) {
-		node.accept(*this);
-	}
-
-	template<typename T>
-	void inspect(ast::Ptr<T> &node) { // @todo not DRY
-		if (node.get()) node->accept(*this);
-	}
+	void inspect(ast::Node &node);
 
 	llvm::LLVMContext ctx;
-	llvm::IRBuilder<> builder, allocaBuilder;
 	llvm::Module *mod;
+	llvm::IRBuilder<> builder, allocaBuilder;
+	llvm::DIBuilder diBuilder;
 	llvm::DataLayout dataLayout;
+
+	llvm::DIFile *diFile;
+	std::stack<llvm::DIScope *> diStack;
 
 public:
 	std::unique_ptr<llvm::Module> modPtr;
+	bool emitDebug;
 
 protected:
 	struct Loop {
@@ -81,7 +82,7 @@ protected:
 	std::map<std::string, std::vector<llvm::BranchInst *>> labelRefs;
 
 public:
-	IRGenerator(streams::Source<ast::Ptr<ast::External>> *source, std::string moduleName);
+	IRGenerator(streams::Source<ast::Ptr<ast::External>> *source, std::string moduleName, bool emitDebug);
 	virtual bool next(IRFragment *result);
 
 protected:
