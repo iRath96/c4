@@ -163,6 +163,11 @@ public:
 	Lexer(Source<std::string> *source) : Stream<std::string, Token>(source) {}
 	virtual bool next(Token *);
 
+	void reset() {
+		pos.index = 0;
+		buffer = "";
+	}
+
 protected:
 	std::string buffer;
 	common::TextPosition pos;

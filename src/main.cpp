@@ -189,6 +189,10 @@ void repl() {
 			jit.next(nullptr);
 		} catch (common::Error &e) {
 			fprintf(stderr, "stdin:%d:%d: error: %s\n", e.pos.line, e.pos.column, e.message.c_str());
+
+			// error recorvery: reset everything
+			lexer.reset();
+			parser.reset();
 		}
 	}
 }

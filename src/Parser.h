@@ -238,7 +238,10 @@ public:
 	: Stream<Token, Ptr<External>>(source), allowTLS(tls) {}
 
 	void reset() {
-		i = (int)token_queue.size();
+		depth = 0;
+		
+		i = 0;
+		token_queue.clear();
 	}
 
 	int depth;
