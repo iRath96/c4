@@ -168,6 +168,7 @@ void IRGenerator::visit(REPLStatement &node) {
 	allocaBuilder.SetInsertPoint(entry);
 
 	inspect(*node.statement);
+	builder.CreateRetVoid();
 
 	if (debug_mode)
 		llvm::verifyFunction(*func, &llvm::errs());

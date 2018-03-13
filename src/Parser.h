@@ -259,6 +259,8 @@ public:
 				read_external_declaration(decl);
 				*result = decl;
 			} catch (ParserError e) {
+				depth = 0;
+				
 				auto repl = std::make_shared<REPLStatement>();
 				read_statement(repl->statement);
 				*result = repl;

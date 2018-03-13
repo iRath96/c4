@@ -50,8 +50,6 @@ bool JITEngine::next(void *) {
 
 			//auto ptr = engine->getPointerToGlobal(global);
 			if (cres.shouldExecute) {
-				std::cout << "execute!" << std::endl;
-
 				auto func = (llvm::Function *)global;
 				std::vector<llvm::GenericValue> args;
 				engine->runFunction(func, args);
