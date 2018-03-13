@@ -43,13 +43,14 @@ const char *token_kind_name(Token::Kind kind) {
 	using Kind = Token::Kind;
 
 	switch (kind) {
-		case Kind::KEYWORD: return "keyword";
-		case Kind::IDENTIFIER: return "identifier";
-		case Kind::CONSTANT: return "constant";
+		case Kind::KEYWORD:        return "keyword";
+		case Kind::IDENTIFIER:     return "identifier";
+		case Kind::CONSTANT:       return "constant";
 		case Kind::STRING_LITERAL: return "string-literal";
-		case Kind::PUNCTUATOR: return "punctuator";
-		case Kind::END: return "end";
+		case Kind::PUNCTUATOR:     return "punctuator";
+		case Kind::END:            return "end";
 	}
+
 	return "unknown";
 }
 
