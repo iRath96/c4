@@ -539,10 +539,12 @@ void IRGenerator::visit(ConditionalExpression &node) {
 
 	builder.SetInsertPoint(ifTrue);
 	auto vTrue = getValue(*node.whenTrue);
+	ifTrue = builder.GetInsertBlock();
 	builder.CreateBr(end);
 
 	builder.SetInsertPoint(ifFalse);
 	auto vFalse = getValue(*node.whenFalse);
+	ifFalse = builder.GetInsertBlock();
 	builder.CreateBr(end);
 
 	builder.SetInsertPoint(end);
@@ -554,8 +556,8 @@ void IRGenerator::visit(ConditionalExpression &node) {
 	}
 
 	auto phi = builder.CreatePHI(phiType, 2);
-	phi->addIncoming(matchType(vFalse, phiType), logical.fBB);
-	phi->addIncoming(matchType(vTrue, phiType), logical.tBB);
+	phi->addIncoming(matchType(vFalse, phiType), ifFalse);
+	phi->addIncoming(matchType(vTrue, phiType), ifTrue);
 	value = phi;
 }
 
